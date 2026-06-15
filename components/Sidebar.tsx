@@ -5,12 +5,10 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
 const NAV = [
-  { href: "/", label: "Dashboard", icon: "▦" },
-  { href: "/accounts", label: "Accounts", icon: "🏢" },
-  { href: "/work-orders", label: "Work Orders", icon: "📋" },
-  { href: "/assets", label: "Assets", icon: "⚙️" },
-  { href: "/reports", label: "Reports", icon: "📊" },
-  { href: "/notifications", label: "Notifications", icon: "🔔" },
+  { href: "/",              label: "Dashboard",    icon: "▦"  },
+  { href: "/accounts",      label: "Accounts",     icon: "◫"  },
+  { href: "/pm-checklists", label: "PM Checklists", icon: "✓" },
+  { href: "/notifications", label: "Notifications", icon: "⊙" },
 ];
 
 export default function Sidebar() {
