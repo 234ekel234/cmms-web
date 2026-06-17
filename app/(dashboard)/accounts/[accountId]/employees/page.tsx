@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import api from "@/lib/api";
 
 type Employee = {
@@ -140,7 +141,7 @@ export default function EmployeesPage() {
       ) : (
         <div className="space-y-3">
           {employees.map((emp) => (
-            <div key={emp.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <Link key={emp.id} href={`/accounts/${accountId}/employees/${emp.id}`} className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -180,7 +181,7 @@ export default function EmployeesPage() {
                   </div>
                 </div>
               )}
-            </div>
+            </Link>
           ))}
         </div>
       )}

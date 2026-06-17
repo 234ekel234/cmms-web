@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -177,7 +178,11 @@ export default function PMChecklistsPage() {
             const freq = FREQUENCY_CONFIG[c.frequency] ?? { label: c.frequency, cls: "bg-gray-100 text-gray-600" };
             const itemCount = c.sections.reduce((sum, s) => sum + s.items.length, 0);
             return (
-              <div key={c.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
+              <Link
+                key={c.id}
+                href={`/pm-checklists/${c.id}`}
+                className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-gray-800">{c.name}</p>
@@ -195,7 +200,7 @@ export default function PMChecklistsPage() {
                   </div>
                   <span className="text-gray-300 text-xl">›</span>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>
