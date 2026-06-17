@@ -23,9 +23,12 @@ export default function Sidebar() {
   return (
     <aside className="w-60 min-h-screen bg-[#1a3a5c] flex flex-col shrink-0">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-white/10">
-        <p className="text-white text-xl font-black tracking-tight">CMMS</p>
-        <p className="text-white/50 text-xs mt-0.5">Maintenance Management</p>
+      <div className="px-5 py-4 border-b border-white/10">
+        <div className="bg-white rounded-xl px-3 py-2.5 inline-block mb-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/fmi_logo.png" alt="FMI" className="h-7 w-auto object-contain" />
+        </div>
+        <p className="text-white/50 text-xs">Maintenance Management</p>
       </div>
 
       {/* Nav */}

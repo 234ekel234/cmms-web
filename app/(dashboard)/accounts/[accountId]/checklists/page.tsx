@@ -99,9 +99,10 @@ export default function ChecklistsPage() {
     const itemCount = a.checklist.sections.reduce((sum, s) => sum + (s.items as unknown[]).length, 0);
 
     return (
-      <div
+      <Link
         key={a.id}
-        className={`bg-white rounded-xl border shadow-sm p-4 ${
+        href={`/accounts/${accountId}/checklists/${a.id}`}
+        className={`block bg-white rounded-xl border shadow-sm p-4 hover:shadow-md transition-shadow ${
           done ? "border-green-200 bg-green-50/30" :
           isDraft ? "border-amber-200 bg-amber-50/30" :
           "border-gray-100"
@@ -137,7 +138,7 @@ export default function ChecklistsPage() {
             </button>
           </div>
         </div>
-      </div>
+      </Link>
     );
   }
 

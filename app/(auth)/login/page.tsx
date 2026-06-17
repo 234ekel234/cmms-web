@@ -27,7 +27,7 @@ export default function LoginPage() {
       });
       const { token, user } = res.data;
       saveSession(token, user);
-      router.push("/");
+      router.push("/accounts");
     } catch (err: any) {
       setError(err?.response?.data?.error ?? "Incorrect email or password.");
     } finally {
@@ -39,8 +39,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left — brand panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-[#2166AC] flex-col items-center justify-center p-12 gap-6">
-        <div className="bg-white rounded-2xl px-10 py-6 shadow-xl">
-          <p className="text-[#2166AC] text-4xl font-black tracking-tight">CMMS</p>
+        <div className="bg-white rounded-2xl px-10 py-6 shadow-xl flex flex-col items-center gap-3">
+          {/* eslint-disable @next/next/no-img-element */}
+          <img src="/fmi_logo.png" alt="FMI" className="h-14 w-auto object-contain" />
+          <div className="w-full h-px bg-gray-100" />
+          <img src="/logo_with_label.png" alt="ServiceMaster" className="h-8 w-auto object-contain" />
+          {/* eslint-enable @next/next/no-img-element */}
         </div>
         <div className="text-center">
           <p className="text-white text-3xl font-bold">Maintenance Management</p>
@@ -65,11 +69,11 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center bg-white p-8">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center mb-8">
-            <div className="bg-[#2166AC] rounded-xl px-6 py-3 mb-3">
-              <p className="text-white text-2xl font-black tracking-tight">CMMS</p>
-            </div>
-            <p className="text-gray-500 text-sm">Maintenance Management System</p>
+          <div className="lg:hidden flex flex-col items-center mb-8 gap-3">
+            {/* eslint-disable @next/next/no-img-element */}
+            <img src="/fmi_logo.png" alt="FMI" className="h-10 w-auto object-contain" />
+            <img src="/logo_with_label.png" alt="ServiceMaster" className="h-7 w-auto object-contain" />
+            {/* eslint-enable @next/next/no-img-element */}
           </div>
 
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
@@ -130,9 +134,10 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <p className="text-center text-xs text-gray-400 mt-10">
-            Powered by <span className="font-semibold text-gray-500">ServiceMaster</span>
-          </p>
+          <div className="flex justify-center mt-10">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo_with_label.png" alt="ServiceMaster" className="h-6 w-auto object-contain opacity-50" />
+          </div>
         </div>
       </div>
     </div>

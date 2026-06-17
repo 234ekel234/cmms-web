@@ -20,6 +20,7 @@ const TABS = [
   { label: "Reports", path: "reports" },
   { label: "Activity", path: "activity" },
   { label: "Attendance", path: "attendance" },
+  { label: "Training", path: "training" },
   { label: "Members", path: "members" },
 ];
 
