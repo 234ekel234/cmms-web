@@ -98,6 +98,15 @@ function IconClipboard(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconGradCap(p: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+      <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+      <path d="M6 12v5c0 1.657 2.686 3 6 3s6-1.343 6-3v-5"/>
+    </svg>
+  );
+}
+
 function IconLogOut(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
@@ -155,6 +164,7 @@ const NAV_ITEMS: {
   { href: "/accounts",       label: "Accounts",      Icon: IconBuilding  },
   { href: "/employees",      label: "Employees",     Icon: IconUserPlus  },
   { href: "/pm-checklists",  label: "PM Checklists", Icon: IconChecklist },
+  { href: "/trainings",      label: "Trainings",     Icon: IconGradCap   },
   { href: "/reports",        label: "Reports",       Icon: IconClipboard },
   { href: "/notifications",  label: "Notifications", Icon: IconBell, badge: true },
   { href: "/users",          label: "Users",         Icon: IconUsers, roles: ["GENERAL_MANAGER", "MANAGER"] },
