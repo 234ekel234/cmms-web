@@ -55,6 +55,17 @@ function IconGear(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+function IconUsers(p: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  );
+}
+
 function IconHelp(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
@@ -130,19 +141,29 @@ function IconX(p: React.SVGProps<SVGSVGElement>) {
 // ── Data ─────────────────────────────────────────────────
 
 type Account = { id: string; name: string };
+type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
 
-const NAV_ITEMS = [
-  { href: "/",               label: "Dashboard",    Icon: IconGrid      },
-  { href: "/work-orders",    label: "Work Orders",  Icon: IconClipboard },
-  { href: "/accounts",       label: "Accounts",     Icon: IconBuilding  },
-  { href: "/employees",      label: "Employees",    Icon: IconUserPlus  },
+const NAV_ITEMS: {
+  href: string;
+  label: string;
+  Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  badge?: boolean;
+  roles?: Role[];
+}[] = [
+  { href: "/",               label: "Dashboard",     Icon: IconGrid      },
+  { href: "/work-orders",    label: "Work Orders",   Icon: IconClipboard },
+  { href: "/accounts",       label: "Accounts",      Icon: IconBuilding  },
+  { href: "/employees",      label: "Employees",     Icon: IconUserPlus  },
   { href: "/pm-checklists",  label: "PM Checklists", Icon: IconChecklist },
+  { href: "/reports",        label: "Reports",       Icon: IconClipboard },
   { href: "/notifications",  label: "Notifications", Icon: IconBell, badge: true },
+  { href: "/users",          label: "Users",         Icon: IconUsers, roles: ["GENERAL_MANAGER", "MANAGER"] },
+  { href: "/settings",       label: "Settings",      Icon: IconGear     },
 ];
 
 // ── Sidebar nav content (shared between desktop and mobile) ─
 
-function NavContent({ user, logout }: { user: { name: string; email: string } | null; logout: () => void }) {
+function NavContent({ user, logout }: { user: { name: string; email: string; role?: string } | null; logout: () => void }) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -177,7 +198,7 @@ function NavContent({ user, logout }: { user: { name: string; email: string } | 
       {/* Primary navigation */}
       <nav className="tu-nav" aria-label="Main navigation">
         <ul role="list">
-          {NAV_ITEMS.map((item) => {
+          {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user?.role as Role)).map((item) => {
             const active = isActive(item.href);
             const count = item.badge ? unreadCount : 0;
             return (
