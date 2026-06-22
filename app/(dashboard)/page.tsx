@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 
 type AccountSummary = {
@@ -45,16 +46,6 @@ const PERIOD_LABELS: Record<Period, string> = {
   month: "This Month",
 };
 
-function StatCard({ label, value, sub, accent }: { label: string; value: string | number; sub?: string; accent?: string }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 p-5 shadow-sm">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-3xl font-bold ${accent ?? "text-gray-900"}`}>{value}</p>
-      {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
-    </div>
-  );
-}
-
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
@@ -65,6 +56,22 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function SkeletonRows({ count, cols }: { count: number; cols: number }) {
+  return (
+    <>
+      {Array.from({ length: count }).map((_, i) => (
+        <tr key={i} aria-hidden="true">
+          {Array.from({ length: cols }).map((_, j) => (
+            <td key={j} style={{ padding: "14px 24px" }}>
+              <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
+            </td>
+          ))}
+        </tr>
+      ))}
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [period, setPeriod] = useState<Period>("today");
@@ -73,6 +80,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboard();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [period]);
 
   async function fetchDashboard() {
@@ -91,26 +99,30 @@ export default function DashboardPage() {
   const wo = data?.workOrders;
   const openWOs = (wo?.REQUESTED ?? 0) + (wo?.PENDING ?? 0) + (wo?.IN_PROGRESS ?? 0);
   const totalAssets = (data?.assets.OPERATIONAL ?? 0) + (data?.assets.UNDER_MAINTENANCE ?? 0);
-  const attendanceTotal = (data?.attendance.present ?? 0) + (data?.attendance.absent ?? 0);
+  const overdue = data?.overdueWorkOrders ?? 0;
+  const checklistPct =
+    data && data.checklists.total > 0
+      ? data.checklists.completed < data.checklists.total
+      : false;
 
   return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+    <div className="tu-page">
+      {/* Page header */}
+      <div className="tu-page-header">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-400 text-sm mt-0.5">Overview across all accounts</p>
+          <h1 className="tu-page-title">Dashboard</h1>
+          <p className="tu-page-sub">Overview across all accounts</p>
         </div>
-        <div className="flex gap-2">
+
+        {/* Period filter */}
+        <div className="tu-filter-group" role="group" aria-label="Select time period">
           {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
             <button
               key={p}
+              type="button"
               onClick={() => setPeriod(p)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-                period === p
-                  ? "bg-[#2166AC] text-white"
-                  : "bg-white border border-gray-200 text-gray-600 hover:border-[#2166AC] hover:text-[#2166AC]"
-              }`}
+              className={`tu-period-pill${period === p ? " tu-active-pill" : ""}`}
+              aria-pressed={period === p}
             >
               {PERIOD_LABELS[p]}
             </button>
@@ -118,136 +130,166 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* Error state */}
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">
-          Failed to load dashboard. Try refreshing.
+        <div className="tu-error-banner" role="alert">
+          Failed to load dashboard data. Please try refreshing the page.
         </div>
       )}
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          label="Open Work Orders"
-          value={loading ? "—" : openWOs}
-          sub={loading ? undefined : `${wo?.REQUESTED ?? 0} requested · ${wo?.IN_PROGRESS ?? 0} in progress`}
-        />
-        <StatCard
-          label="Overdue"
-          value={loading ? "—" : (data?.overdueWorkOrders ?? 0)}
-          sub="work orders past due date"
-          accent={data?.overdueWorkOrders ? "text-red-600" : undefined}
-        />
-        <StatCard
-          label="Assets"
-          value={loading ? "—" : totalAssets}
-          sub={loading ? undefined : `${data?.assets.UNDER_MAINTENANCE ?? 0} under maintenance`}
-        />
-        <StatCard
-          label="PM Checklists"
-          value={loading ? "—" : `${data?.checklists.completed ?? 0} / ${data?.checklists.total ?? 0}`}
-          sub={`completed ${PERIOD_LABELS[period].toLowerCase()}`}
-          accent={
-            data && data.checklists.total > 0 && data.checklists.completed < data.checklists.total
-              ? "text-amber-600"
-              : undefined
-          }
-        />
+      <div className="tu-kpi-grid" aria-label="Key metrics">
+        <div className="tu-stat-card">
+          <p className="tu-stat-label">Open Work Orders</p>
+          <p className={`tu-stat-value${openWOs > 0 ? " tu-stat-brand" : ""}`} aria-live="polite">
+            {loading ? "—" : openWOs}
+          </p>
+          <p className="tu-stat-sub">
+            {loading ? " " : `${wo?.REQUESTED ?? 0} requested · ${wo?.IN_PROGRESS ?? 0} in progress`}
+          </p>
+        </div>
+
+        <div className="tu-stat-card">
+          <p className="tu-stat-label">Overdue</p>
+          <p className={`tu-stat-value${overdue > 0 ? " tu-stat-danger" : ""}`} aria-live="polite">
+            {loading ? "—" : overdue}
+          </p>
+          <p className="tu-stat-sub">work orders past due date</p>
+        </div>
+
+        <div className="tu-stat-card">
+          <p className="tu-stat-label">Total Assets</p>
+          <p className="tu-stat-value" aria-live="polite">
+            {loading ? "—" : totalAssets}
+          </p>
+          <p className="tu-stat-sub">
+            {loading ? " " : `${data?.assets.UNDER_MAINTENANCE ?? 0} under maintenance`}
+          </p>
+        </div>
+
+        <div className="tu-stat-card">
+          <p className="tu-stat-label">PM Checklists</p>
+          <p className={`tu-stat-value${checklistPct ? " tu-stat-warning" : ""}`} aria-live="polite">
+            {loading ? "—" : `${data?.checklists.completed ?? 0}/${data?.checklists.total ?? 0}`}
+          </p>
+          <p className="tu-stat-sub">completed {PERIOD_LABELS[period].toLowerCase()}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Account summaries */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Accounts</h2>
-          </div>
-          {loading ? (
-            <div className="p-6 space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-gray-100 rounded-lg animate-pulse" />
-              ))}
+      {/* Main content grid */}
+      <div className="tu-content-grid">
+        {/* Account summary table */}
+        <section aria-labelledby="accounts-heading">
+          <div className="tu-card">
+            <div className="tu-card-header">
+              <h2 id="accounts-heading" className="tu-card-title">Account Summary</h2>
             </div>
-          ) : !data?.accounts.length ? (
-            <div className="p-8 text-center text-gray-400 text-sm">No accounts found.</div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                  <th className="px-6 py-3 text-left">Account</th>
-                  <th className="px-4 py-3 text-center">Open WOs</th>
-                  <th className="px-4 py-3 text-center">Overdue</th>
-                  <th className="px-4 py-3 text-center">Poor Assets</th>
-                  <th className="px-4 py-3 text-center">Checklists</th>
-                  <th className="px-4 py-3 text-center">Attendance</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {data.accounts.map((acc) => (
-                  <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-800">{acc.name}</td>
-                    <td className="px-4 py-4 text-center">
-                      <span className={acc.openWorkOrders > 0 ? "text-blue-600 font-semibold" : "text-gray-400"}>
-                        {acc.openWorkOrders}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {acc.overdueWorkOrders > 0 ? (
-                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-50 text-red-600">
-                          {acc.overdueWorkOrders}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center">
-                      {acc.poorHealthAssets > 0 ? (
-                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-600">
-                          {acc.poorHealthAssets}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4 text-center text-gray-600">
-                      {acc.checklistsDone}/{acc.checklistsTotal}
-                    </td>
-                    <td className="px-4 py-4 text-center text-gray-600">
-                      {acc.attendanceTotal > 0
-                        ? `${acc.attendancePresent}/${acc.attendanceTotal}`
-                        : <span className="text-gray-300">—</span>}
-                    </td>
+            <div style={{ overflowX: "auto" }}>
+              <table className="tu-table" aria-label="Account metrics">
+                <thead>
+                  <tr>
+                    <th scope="col">Account</th>
+                    <th scope="col" className="tu-center">Open WOs</th>
+                    <th scope="col" className="tu-center">Overdue</th>
+                    <th scope="col" className="tu-center">Poor Assets</th>
+                    <th scope="col" className="tu-center">Checklists</th>
+                    <th scope="col" className="tu-center">Attendance</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
+                </thead>
+                <tbody>
+                  {loading ? (
+                    <SkeletonRows count={3} cols={6} />
+                  ) : !data?.accounts.length ? (
+                    <tr>
+                      <td
+                        colSpan={6}
+                        style={{ textAlign: "center", padding: "32px 24px", color: "var(--tu-text-body)", fontSize: 14 }}
+                      >
+                        No accounts found.
+                      </td>
+                    </tr>
+                  ) : (
+                    data.accounts.map((acc) => (
+                      <tr key={acc.id} style={{ cursor: "pointer" }}>
+                        <td className="tu-strong" scope="row">
+                          <Link
+                            href={`/accounts/${acc.id}/work-orders`}
+                            style={{ color: "inherit", textDecoration: "none" }}
+                            className="hover:text-[#1447e6] transition-colors"
+                          >
+                            {acc.name}
+                          </Link>
+                        </td>
+                        <td className="tu-center">
+                          {acc.openWorkOrders > 0 ? (
+                            <span className="tu-badge tu-badge-brand">{acc.openWorkOrders}</span>
+                          ) : (
+                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
+                          )}
+                        </td>
+                        <td className="tu-center">
+                          {acc.overdueWorkOrders > 0 ? (
+                            <span className="tu-badge tu-badge-danger">{acc.overdueWorkOrders}</span>
+                          ) : (
+                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
+                          )}
+                        </td>
+                        <td className="tu-center">
+                          {acc.poorHealthAssets > 0 ? (
+                            <span className="tu-badge tu-badge-warning">{acc.poorHealthAssets}</span>
+                          ) : (
+                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
+                          )}
+                        </td>
+                        <td className="tu-center" style={{ color: "var(--tu-text-body)" }}>
+                          {acc.checklistsDone}/{acc.checklistsTotal}
+                        </td>
+                        <td className="tu-center" style={{ color: "var(--tu-text-body)" }}>
+                          {acc.attendanceTotal > 0
+                            ? `${acc.attendancePresent}/${acc.attendanceTotal}`
+                            : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
 
         {/* Recent activity */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Recent Activity</h2>
-          </div>
-          {loading ? (
-            <div className="p-6 space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-10 bg-gray-100 rounded-lg animate-pulse" />
-              ))}
+        <section aria-labelledby="activity-heading">
+          <div className="tu-card" style={{ height: "100%" }}>
+            <div className="tu-card-header">
+              <h2 id="activity-heading" className="tu-card-title">Recent Activity</h2>
             </div>
-          ) : !data?.recentActivity.length ? (
-            <div className="p-8 text-center text-gray-400 text-sm">No recent activity.</div>
-          ) : (
-            <div className="divide-y divide-gray-50 max-h-[420px] overflow-y-auto">
-              {data.recentActivity.map((entry) => (
-                <div key={entry.id} className="px-5 py-3">
-                  <p className="text-sm text-gray-700 leading-snug">{entry.description}</p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    {entry.performedByName ?? "System"} · {timeAgo(entry.createdAt)}
-                  </p>
+            <div style={{ maxHeight: 440, overflowY: "auto" }} aria-live="polite" aria-atomic="false">
+              {loading ? (
+                <div style={{ padding: "16px 24px" }}>
+                  {Array.from({ length: 5 }).map((_, i) => (
+                    <div key={i} className="tu-skeleton" aria-hidden="true" style={{ height: 48, borderRadius: 6, marginBottom: 12 }} />
+                  ))}
                 </div>
-              ))}
+              ) : !data?.recentActivity.length ? (
+                <div style={{ padding: "32px 24px", textAlign: "center", color: "var(--tu-text-body)", fontSize: 14 }}>
+                  No recent activity.
+                </div>
+              ) : (
+                data.recentActivity.map((entry) => (
+                  <div key={entry.id} className="tu-activity-item">
+                    <p className="tu-activity-desc">{entry.description}</p>
+                    <p className="tu-activity-meta">
+                      <span>{entry.performedByName ?? "System"}</span>
+                      <span aria-hidden="true"> · </span>
+                      <time dateTime={entry.createdAt}>{timeAgo(entry.createdAt)}</time>
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        </section>
       </div>
     </div>
   );
