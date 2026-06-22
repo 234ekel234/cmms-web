@@ -75,6 +75,8 @@ function timeAgo(iso: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+type AccountEmployee = { id: string; name: string; position: string | null };
+
 export default function WorkOrderDetailPage() {
   const params = useParams();
   const accountId = params.accountId as string;
@@ -88,6 +90,18 @@ export default function WorkOrderDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+
+  // Assignment picker
+  const [accountEmployees, setAccountEmployees] = useState<AccountEmployee[]>([]);
+  const [showAssignPicker, setShowAssignPicker] = useState(false);
+  const [empSearch, setEmpSearch] = useState("");
+  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  // Edit mode for non-status fields
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "" });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const isClient = user?.role === "CLIENT";
   const canManage = user?.role !== "CLIENT";
@@ -105,6 +119,76 @@ export default function WorkOrderDetailPage() {
       setError(true);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function openAssignPicker() {
+    setShowAssignPicker(true);
+    setEmpSearch("");
+    if (accountEmployees.length === 0) {
+      try {
+        const res = await api.get(`/accounts/${accountId}/employees`);
+        setAccountEmployees(res.data);
+      } catch {
+        // silent
+      }
+    }
+  }
+
+  async function assignEmployee(empId: string) {
+    if (!order) return;
+    setAssigningId(empId);
+    try {
+      const res = await api.post(`/work-orders/${order.id}/assignments`, { employeeId: empId });
+      setOrder((prev) => prev ? { ...prev, assignments: [...prev.assignments, res.data] } : prev);
+    } catch {
+      // silent
+    } finally {
+      setAssigningId(null);
+    }
+  }
+
+  async function removeAssignment(empId: string) {
+    if (!order) return;
+    setRemovingId(empId);
+    try {
+      await api.delete(`/work-orders/${order.id}/assignments/${empId}`);
+      setOrder((prev) => prev ? { ...prev, assignments: prev.assignments.filter((a) => a.employeeId !== empId) } : prev);
+    } catch {
+      // silent
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  function openEdit() {
+    if (!order) return;
+    setEditForm({
+      priority: order.priority,
+      dueDate: order.dueDate ? order.dueDate.slice(0, 10) : "",
+      category: order.category ?? "",
+      estimatedMinutes: order.estimatedMinutes != null ? String(order.estimatedMinutes) : "",
+    });
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    if (!order) return;
+    setSavingEdit(true);
+    try {
+      const estMin = editForm.estimatedMinutes.trim();
+      const res = await api.patch(`/work-orders/${order.id}`, {
+        priority: editForm.priority,
+        dueDate: editForm.dueDate || null,
+        category: editForm.category.trim() || null,
+        estimatedMinutes: estMin ? Number(estMin) : null,
+      });
+      setOrder(res.data);
+      setEditing(false);
+    } catch {
+      // silent
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -190,10 +274,84 @@ export default function WorkOrderDetailPage() {
               </span>
             )}
           </div>
-          <span className={`rounded-full px-3 py-1 text-sm font-semibold shrink-0 ${cfg.cls}`}>
-            {cfg.label}
-          </span>
+          <div className="flex items-center gap-2 shrink-0">
+            {canManage && !isTerminal && (
+              <button
+                onClick={openEdit}
+                className="text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+              >
+                Edit
+              </button>
+            )}
+            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${cfg.cls}`}>
+              {cfg.label}
+            </span>
+          </div>
         </div>
+
+        {/* Inline edit form */}
+        {editing && (
+          <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Priority</label>
+                <select
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={editForm.priority}
+                  onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value as WorkOrderPriority }))}
+                >
+                  {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as WorkOrderPriority[]).map((p) => (
+                    <option key={p} value={p}>{PRIORITY_CONFIG[p].label}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+                <input
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={editForm.category}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
+                  placeholder="e.g. Electrical, HVAC"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Due Date</label>
+                <input
+                  type="date"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={editForm.dueDate}
+                  onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 mb-1">Est. Minutes</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={editForm.estimatedMinutes}
+                  onChange={(e) => setEditForm((f) => ({ ...f, estimatedMinutes: e.target.value }))}
+                  placeholder="e.g. 120"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setEditing(false)}
+                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEdit}
+                disabled={savingEdit}
+                className="px-3 py-1.5 text-xs text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+              >
+                {savingEdit ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Meta */}
         <div className="flex flex-wrap gap-2 mb-4">
@@ -227,18 +385,86 @@ export default function WorkOrderDetailPage() {
 
         {/* Assignees */}
         <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Assigned To</p>
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned To</p>
+            {canManage && !isTerminal && (
+              <button
+                onClick={openAssignPicker}
+                className="text-xs text-[#2166AC] hover:underline cursor-pointer"
+              >
+                + Add
+              </button>
+            )}
+          </div>
           {order.assignments.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {order.assignments.map((a) => (
-                <span key={a.id} className="text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 font-medium">
+                <span key={a.id} className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 font-medium">
                   {a.employee.name}
-                  {a.employee.position && <span className="text-gray-400"> · {a.employee.position}</span>}
+                  {a.employee.position && <span className="text-gray-400">· {a.employee.position}</span>}
+                  {canManage && !isTerminal && (
+                    <button
+                      onClick={() => removeAssignment(a.employeeId)}
+                      disabled={removingId === a.employeeId}
+                      className="text-gray-400 hover:text-red-500 cursor-pointer leading-none"
+                      aria-label={`Remove ${a.employee.name}`}
+                    >
+                      {removingId === a.employeeId ? "…" : "×"}
+                    </button>
+                  )}
                 </span>
               ))}
             </div>
           ) : (
             <p className="text-sm text-gray-400">No employees assigned</p>
+          )}
+
+          {/* Assign picker */}
+          {showAssignPicker && (
+            <div className="mt-3 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+              <div className="p-3 border-b border-gray-100">
+                <input
+                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  placeholder="Search employees…"
+                  value={empSearch}
+                  onChange={(e) => setEmpSearch(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="max-h-48 overflow-y-auto">
+                {accountEmployees
+                  .filter((e) => {
+                    const assigned = order.assignments.some((a) => a.employeeId === e.id);
+                    const match = !empSearch.trim() || e.name.toLowerCase().includes(empSearch.toLowerCase());
+                    return !assigned && match;
+                  })
+                  .map((e) => (
+                    <button
+                      key={e.id}
+                      onClick={() => assignEmployee(e.id)}
+                      disabled={assigningId === e.id}
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center justify-between cursor-pointer transition-colors"
+                    >
+                      <div>
+                        <span className="font-medium text-gray-800">{e.name}</span>
+                        {e.position && <span className="text-gray-400 text-xs ml-2">{e.position}</span>}
+                      </div>
+                      {assigningId === e.id && <span className="text-xs text-gray-400">…</span>}
+                    </button>
+                  ))}
+                {accountEmployees.filter((e) => !order.assignments.some((a) => a.employeeId === e.id)).length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">All employees assigned.</p>
+                )}
+              </div>
+              <div className="p-2 border-t border-gray-100">
+                <button
+                  onClick={() => setShowAssignPicker(false)}
+                  className="w-full text-xs text-gray-500 py-1.5 hover:bg-gray-50 rounded-lg cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
