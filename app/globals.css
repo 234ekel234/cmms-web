@@ -778,3 +778,5 @@ body {
 }
 .tu-btn-secondary:hover { background: var(--tu-bg-secondary); border-color: var(--tu-text-subtle); }
 .tu-btn-secondary:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+.tu-row-link:hover { color: var(--tu-text-brand) !important; text-decoration: underline !important; }

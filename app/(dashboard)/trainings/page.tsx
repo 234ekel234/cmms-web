@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
@@ -302,7 +303,11 @@ export default function TrainingsPage() {
                       <tbody>
                         {items.map((t) => (
                           <tr key={t.id}>
-                            <td className="tu-strong">{t.title}</td>
+                            <td className="tu-strong">
+                              <Link href={`/trainings/${t.id}`} style={{ color: "inherit", textDecoration: "none" }} className="tu-row-link">
+                                {t.title}
+                              </Link>
+                            </td>
                             <td style={{ color: "var(--tu-text-body)" }}>
                               {t.description ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                             </td>
