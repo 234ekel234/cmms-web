@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -54,6 +55,7 @@ export default function WorkOrdersPage() {
   const [error, setError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "ALL">("ALL");
   const [view, setView] = useState<"work" | "special">("work");
+  const [mode, setMode] = useState<"list" | "calendar">("list");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", description: "", priority: "MEDIUM" as WorkOrderPriority, category: "", dueDate: "", isSpecialProject: false });
   const [saving, setSaving] = useState(false);
@@ -124,20 +126,37 @@ export default function WorkOrdersPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">{view === "special" ? "Special Projects" : "Work Orders"}</h2>
-          {!loading && overdueCount > 0 && (
+          <h2 className="text-lg font-bold text-gray-900">{mode === "calendar" ? "Calendar" : view === "special" ? "Special Projects" : "Work Orders"}</h2>
+          {mode === "list" && !loading && overdueCount > 0 && (
             <p className="text-xs text-red-500 mt-0.5">{overdueCount} overdue</p>
           )}
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
-        >
-          + New
-        </button>
+        <div className="flex items-center gap-3">
+          {/* List / Calendar toggle */}
+          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+            {(["list", "calendar"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-3 py-2 text-sm font-semibold capitalize cursor-pointer transition-colors ${
+                  mode === m ? "bg-[#2166AC] text-white" : "bg-white text-gray-600 hover:text-[#2166AC]"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
+          >
+            + New
+          </button>
+        </div>
       </div>
 
       {/* View toggle */}
+      {mode === "list" && (
       <div className="flex gap-2 mb-4">
         {([
           { key: "work" as const, label: "Work Orders", count: workCount },
@@ -156,9 +175,10 @@ export default function WorkOrdersPage() {
           </button>
         ))}
       </div>
+      )}
 
       {/* Status filters */}
-      {!loading && (
+      {mode === "list" && !loading && (
         <div className="flex gap-2 mb-6 flex-wrap">
           {([
             { key: "ALL" as const, label: `All (${inView.length})` },
@@ -275,7 +295,15 @@ export default function WorkOrdersPage() {
         </div>
       )}
 
-      {loading ? (
+      {mode === "calendar" ? (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <WorkOrderCalendar
+            orders={orders}
+            loading={loading}
+            hrefFor={(wo) => `/accounts/${accountId}/work-orders/${wo.id}`}
+          />
+        </div>
+      ) : loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
         </div>
