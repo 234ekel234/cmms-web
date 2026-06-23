@@ -12,6 +12,7 @@ type Account = {
 };
 
 const TABS = [
+  { label: "Client Portal", path: "portal" },
   { label: "Work Orders", path: "work-orders" },
   { label: "Assets", path: "assets" },
   { label: "Employees", path: "employees" },
