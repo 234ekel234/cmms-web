@@ -854,6 +854,12 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 .tu-subrow-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--tu-text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tu-subrow-val { width: 64px; text-align: right; font-size: 12.5px; color: var(--tu-text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* Custom date range bar */
+.tu-custom-range { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 24px; background: var(--tu-bg-surface); border: 1px solid var(--tu-border); border-radius: 12px; box-shadow: var(--tu-shadow-xs); }
+.tu-custom-range .tu-input { width: auto; }
+.tu-range-sep { color: var(--tu-text-subtle); padding-bottom: 9px; }
+.tu-range-error { width: 100%; margin: 0; font-size: 13px; color: var(--tu-danger, #C70036); }
+
 /* Section heading with inline control */
 .tu-trend-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .tu-trend-section-head h2 { font-size: 15px; font-weight: 600; color: var(--tu-text-heading); margin: 0; }

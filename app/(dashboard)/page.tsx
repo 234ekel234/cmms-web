@@ -57,13 +57,23 @@ type DashboardData = {
   trendDays: number;
 };
 
-type Period = "today" | "week" | "month";
+type Period = "today" | "week" | "month" | "custom";
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Today",
   week: "This Week",
   month: "This Month",
+  custom: "Custom",
 };
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function fmtRange(iso: string) {
+  return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
 
 const WO_STATUS: { key: keyof DashboardData["workOrders"]; label: string; color: string }[] = [
   { key: "REQUESTED", label: "Requested", color: "#F59E0B" },
@@ -211,19 +221,29 @@ export default function DashboardPage() {
   const [period, setPeriod] = useState<Period>("today");
   const [trendWindow, setTrendWindow] = useState<number>(7);
   const [expandedFreq, setExpandedFreq] = useState<string | null>(null);
+  const [customFrom, setCustomFrom] = useState(todayISO);
+  const [customTo, setCustomTo] = useState(todayISO);
+  const [appliedRange, setAppliedRange] = useState<{ from: string; to: string } | null>(null);
+  const [customError, setCustomError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // In custom mode wait until a valid range has been applied.
+    if (period === "custom" && !appliedRange) return;
     fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, trendWindow]);
+  }, [period, trendWindow, appliedRange]);
 
   async function fetchDashboard() {
     setLoading(true);
     setError(false);
     try {
-      const res = await api.get("/dashboard", { params: { period, trendDays: trendWindow } });
+      const params: Record<string, string | number> =
+        period === "custom" && appliedRange
+          ? { from: appliedRange.from, to: appliedRange.to, trendDays: trendWindow }
+          : { period, trendDays: trendWindow };
+      const res = await api.get("/dashboard", { params });
       setData(res.data);
     } catch {
       setError(true);
@@ -231,6 +251,26 @@ export default function DashboardPage() {
       setLoading(false);
     }
   }
+
+  function handlePeriodChange(p: Period) {
+    setPeriod(p);
+    // Seed the range so custom fetches immediately with the default (today).
+    if (p === "custom" && !appliedRange) setAppliedRange({ from: customFrom, to: customTo });
+  }
+
+  function applyCustom() {
+    if (customFrom > customTo) {
+      setCustomError("From date must be on or before To date.");
+      return;
+    }
+    setCustomError("");
+    setAppliedRange({ from: customFrom, to: customTo });
+  }
+
+  const periodCaption =
+    period === "custom" && appliedRange
+      ? `${fmtRange(appliedRange.from)} – ${fmtRange(appliedRange.to)}`
+      : PERIOD_LABELS[period].toLowerCase();
 
   const wo = data?.workOrders;
   const openWOs = (wo?.REQUESTED ?? 0) + (wo?.PENDING ?? 0) + (wo?.IN_PROGRESS ?? 0);
@@ -294,7 +334,7 @@ export default function DashboardPage() {
       icon: <IconCheck />,
       value: loading ? "—" : `${checklistsDone}/${checklistsTotal}`,
       valueClass: checklistsBehind ? "tu-stat-warning" : "",
-      sub: `completed ${PERIOD_LABELS[period].toLowerCase()}`,
+      sub: `completed ${periodCaption}`,
       href: "/pm-checklists",
       cta: "Open checklists",
     },
@@ -314,7 +354,7 @@ export default function DashboardPage() {
             <button
               key={p}
               type="button"
-              onClick={() => setPeriod(p)}
+              onClick={() => handlePeriodChange(p)}
               className={`tu-period-pill${period === p ? " tu-active-pill" : ""}`}
               aria-pressed={period === p}
             >
@@ -323,6 +363,37 @@ export default function DashboardPage() {
           ))}
         </div>
       </div>
+
+      {period === "custom" && (
+        <div className="tu-custom-range" role="group" aria-label="Custom date range">
+          <div>
+            <label htmlFor="dash-from" className="tu-select-label">From</label>
+            <input
+              id="dash-from"
+              type="date"
+              className="tu-input"
+              value={customFrom}
+              max={customTo}
+              onChange={(e) => { setCustomFrom(e.target.value); setCustomError(""); }}
+            />
+          </div>
+          <span className="tu-range-sep" aria-hidden="true">–</span>
+          <div>
+            <label htmlFor="dash-to" className="tu-select-label">To</label>
+            <input
+              id="dash-to"
+              type="date"
+              className="tu-input"
+              value={customTo}
+              min={customFrom}
+              max={todayISO()}
+              onChange={(e) => { setCustomTo(e.target.value); setCustomError(""); }}
+            />
+          </div>
+          <button type="button" className="tu-btn-primary" onClick={applyCustom}>Apply</button>
+          {customError && <p className="tu-range-error" role="alert">{customError}</p>}
+        </div>
+      )}
 
       {error && (
         <div className="tu-error-banner" role="alert">
@@ -490,7 +561,7 @@ export default function DashboardPage() {
         <div className="tu-card">
           <div className="tu-card-header">
             <h2 className="tu-card-title">Attendance</h2>
-            <span className="tu-chart-cap">{PERIOD_LABELS[period].toLowerCase()}</span>
+            <span className="tu-chart-cap">{periodCaption}</span>
           </div>
           <div className="tu-card-body">
             <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
