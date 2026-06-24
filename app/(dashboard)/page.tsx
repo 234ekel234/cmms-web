@@ -28,10 +28,18 @@ type ActivityEntry = {
 
 type TrendPoint = { date: string; count: number };
 
+type FreqAccount = {
+  id: string;
+  name: string;
+  total: number;
+  completed: number;
+};
+
 type FreqBreakdown = {
   frequency: string;
   total: number;
   completed: number;
+  accounts?: FreqAccount[];
 };
 
 type DashboardData = {
@@ -99,6 +107,20 @@ function IconAlert() {
 }
 function IconCheck() {
   return <Svg><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></Svg>;
+}
+function IconChevron({ open }: { open: boolean }) {
+  return (
+    <svg className={`tu-freq-chevron${open ? " tu-open" : ""}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}
+function IconArrowRight() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+    </svg>
+  );
 }
 
 // ── Chart primitives ─────────────────────────────────────
@@ -187,19 +209,21 @@ function SkeletonRows({ count, cols }: { count: number; cols: number }) {
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [period, setPeriod] = useState<Period>("today");
+  const [trendWindow, setTrendWindow] = useState<number>(7);
+  const [expandedFreq, setExpandedFreq] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
+  }, [period, trendWindow]);
 
   async function fetchDashboard() {
     setLoading(true);
     setError(false);
     try {
-      const res = await api.get("/dashboard", { params: { period } });
+      const res = await api.get("/dashboard", { params: { period, trendDays: trendWindow } });
       setData(res.data);
     } catch {
       setError(true);
@@ -226,6 +250,55 @@ export default function DashboardPage() {
   const clTrend = data?.trends.checklistCompletions ?? [];
   const woTrendTotal = woTrend.reduce((s, d) => s + d.count, 0);
   const clTrendTotal = clTrend.reduce((s, d) => s + d.count, 0);
+
+  const kpis: {
+    label: string;
+    accent: string;
+    icon: React.ReactNode;
+    value: string;
+    valueClass?: string;
+    sub: string;
+    href?: string;
+    cta?: string;
+  }[] = [
+    {
+      label: "Open Work Orders",
+      accent: "#1447E6",
+      icon: <IconClipboard />,
+      value: loading ? "—" : String(openWOs),
+      valueClass: openWOs > 0 ? "tu-stat-brand" : "",
+      sub: loading ? " " : `${wo?.REQUESTED ?? 0} requested · ${wo?.IN_PROGRESS ?? 0} in progress`,
+      href: "/work-orders",
+      cta: "View work orders",
+    },
+    {
+      label: "Overdue",
+      accent: "#C70036",
+      icon: <IconAlert />,
+      value: loading ? "—" : String(overdue),
+      valueClass: overdue > 0 ? "tu-stat-danger" : "",
+      sub: "work orders past due date",
+      href: "/work-orders",
+      cta: overdue > 0 ? "Review overdue" : undefined,
+    },
+    {
+      label: "Attendance",
+      accent: "#10B981",
+      icon: <IconCheck />,
+      value: loading ? "—" : attendanceRate === null ? "—" : `${attendanceRate}%`,
+      sub: loading ? " " : attendanceTotal > 0 ? `${present} present · ${absent} absent` : "no shifts logged",
+    },
+    {
+      label: "PM Checklists",
+      accent: "#F97316",
+      icon: <IconCheck />,
+      value: loading ? "—" : `${checklistsDone}/${checklistsTotal}`,
+      valueClass: checklistsBehind ? "tu-stat-warning" : "",
+      sub: `completed ${PERIOD_LABELS[period].toLowerCase()}`,
+      href: "/pm-checklists",
+      cta: "Open checklists",
+    },
+  ];
 
   return (
     <div className="tu-page">
@@ -259,56 +332,52 @@ export default function DashboardPage() {
 
       {/* KPI cards */}
       <div className="tu-kpi-grid" aria-label="Key metrics">
-        <div className="tu-stat-card tu-accent" style={{ ["--tu-accent" as string]: "#1447E6" }}>
-          <div className="tu-stat-head">
-            <p className="tu-stat-label">Open Work Orders</p>
-            <span className="tu-stat-ico"><IconClipboard /></span>
-          </div>
-          <p className={`tu-stat-value${openWOs > 0 ? " tu-stat-brand" : ""}`} aria-live="polite">
-            {loading ? "—" : openWOs}
-          </p>
-          <p className="tu-stat-sub">
-            {loading ? " " : `${wo?.REQUESTED ?? 0} requested · ${wo?.IN_PROGRESS ?? 0} in progress`}
-          </p>
-        </div>
-
-        <div className="tu-stat-card tu-accent" style={{ ["--tu-accent" as string]: "#C70036" }}>
-          <div className="tu-stat-head">
-            <p className="tu-stat-label">Overdue</p>
-            <span className="tu-stat-ico"><IconAlert /></span>
-          </div>
-          <p className={`tu-stat-value${overdue > 0 ? " tu-stat-danger" : ""}`} aria-live="polite">
-            {loading ? "—" : overdue}
-          </p>
-          <p className="tu-stat-sub">work orders past due date</p>
-        </div>
-
-        <div className="tu-stat-card tu-accent" style={{ ["--tu-accent" as string]: "#10B981" }}>
-          <div className="tu-stat-head">
-            <p className="tu-stat-label">Attendance</p>
-            <span className="tu-stat-ico" style={{ ["--tu-accent" as string]: "#10B981" }}><IconCheck /></span>
-          </div>
-          <p className="tu-stat-value" aria-live="polite">
-            {loading ? "—" : attendanceRate === null ? "—" : `${attendanceRate}%`}
-          </p>
-          <p className="tu-stat-sub">
-            {loading ? " " : attendanceTotal > 0 ? `${present} present · ${absent} absent` : "no shifts logged"}
-          </p>
-        </div>
-
-        <div className="tu-stat-card tu-accent" style={{ ["--tu-accent" as string]: "#F97316" }}>
-          <div className="tu-stat-head">
-            <p className="tu-stat-label">PM Checklists</p>
-            <span className="tu-stat-ico" style={{ ["--tu-accent" as string]: "#F97316" }}><IconCheck /></span>
-          </div>
-          <p className={`tu-stat-value${checklistsBehind ? " tu-stat-warning" : ""}`} aria-live="polite">
-            {loading ? "—" : `${checklistsDone}/${checklistsTotal}`}
-          </p>
-          <p className="tu-stat-sub">completed {PERIOD_LABELS[period].toLowerCase()}</p>
-        </div>
+        {kpis.map((k) => {
+          const inner = (
+            <>
+              <div className="tu-stat-head">
+                <p className="tu-stat-label">{k.label}</p>
+                <span className="tu-stat-ico">{k.icon}</span>
+              </div>
+              <p className={`tu-stat-value${k.valueClass ? " " + k.valueClass : ""}`} aria-live="polite">
+                {k.value}
+              </p>
+              <p className="tu-stat-sub">{k.sub}</p>
+              {k.href && !loading && k.cta && (
+                <span className="tu-stat-cta">{k.cta} <IconArrowRight /></span>
+              )}
+            </>
+          );
+          const style = { ["--tu-accent" as string]: k.accent };
+          return k.href ? (
+            <Link key={k.label} href={k.href} className="tu-stat-card tu-accent" style={style}>
+              {inner}
+            </Link>
+          ) : (
+            <div key={k.label} className="tu-stat-card tu-accent" style={style}>
+              {inner}
+            </div>
+          );
+        })}
       </div>
 
       {/* Trend charts */}
+      <div className="tu-trend-section-head">
+        <h2>Activity Trends</h2>
+        <div className="tu-filter-group" role="group" aria-label="Select trend window">
+          {[7, 14, 30].map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => setTrendWindow(d)}
+              className={`tu-period-pill tu-pill-sm${trendWindow === d ? " tu-active-pill" : ""}`}
+              aria-pressed={trendWindow === d}
+            >
+              {d}d
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="tu-trend-grid">
         <div className="tu-card">
           <div className="tu-card-body">
@@ -471,15 +540,63 @@ export default function DashboardPage() {
                 const pct = f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0;
                 const done = f.completed >= f.total && f.total > 0;
                 const color = done ? "#10B981" : pct >= 50 ? "#1447E6" : "#F59E0B";
-                return (
-                  <div key={f.frequency} className="tu-freq-row">
-                    <span className="tu-freq-name">{f.frequency.replace(/_/g, " ").toLowerCase()}</span>
+                const label = f.frequency.replace(/_/g, " ").toLowerCase();
+                const accounts = f.accounts ?? [];
+                const expandable = accounts.length > 1;
+                const expanded = expandedFreq === f.frequency;
+                const panelId = `freq-panel-${f.frequency}`;
+
+                const bar = (
+                  <>
+                    <span className="tu-freq-name">{label}</span>
                     <div className="tu-freq-bar">
                       <div className="tu-progress">
                         <div style={{ width: `${pct}%`, background: color }} />
                       </div>
                     </div>
                     <span className="tu-freq-val">{f.completed}/{f.total} · {pct}%</span>
+                  </>
+                );
+
+                return (
+                  <div key={f.frequency}>
+                    {expandable ? (
+                      <button
+                        type="button"
+                        className="tu-freq-toggle"
+                        aria-expanded={expanded}
+                        aria-controls={panelId}
+                        onClick={() => setExpandedFreq(expanded ? null : f.frequency)}
+                      >
+                        <IconChevron open={expanded} />
+                        {bar}
+                      </button>
+                    ) : (
+                      <div className="tu-freq-row">
+                        <span className="tu-freq-spacer" />
+                        {bar}
+                      </div>
+                    )}
+                    {expandable && expanded && (
+                      <div id={panelId}>
+                        {accounts.map((a) => {
+                          const apct = a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0;
+                          const adone = a.completed >= a.total && a.total > 0;
+                          const acolor = adone ? "#10B981" : apct >= 50 ? "#1447E6" : "#F59E0B";
+                          return (
+                            <div key={a.id} className="tu-subrow">
+                              <span className="tu-subrow-name">{a.name}</span>
+                              <div className="tu-freq-bar">
+                                <div className="tu-progress">
+                                  <div style={{ width: `${apct}%`, background: acolor }} />
+                                </div>
+                              </div>
+                              <span className="tu-subrow-val">{a.completed}/{a.total} · {apct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 );
               })

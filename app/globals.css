@@ -836,3 +836,25 @@ body {
 .tu-ring-center-cap { font-size: 9px; font-weight: 600; letter-spacing: 0.06em; fill: var(--tu-text-subtle); text-transform: uppercase; }
 
 .tu-row-link:hover { color: var(--tu-text-brand) !important; text-decoration: underline !important; }
+
+/* Clickable KPI cards */
+a.tu-stat-card { text-decoration: none; color: inherit; transition: box-shadow 150ms ease, transform 150ms ease; }
+a.tu-stat-card:hover { box-shadow: var(--tu-shadow-lg); transform: translateY(-2px); }
+a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-stat-cta { margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--tu-text-brand); display: inline-flex; align-items: center; gap: 4px; }
+
+/* Expandable frequency drilldown */
+.tu-freq-toggle { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; padding: 13px 24px; border-bottom: 1px solid var(--tu-border); cursor: pointer; }
+.tu-freq-toggle:hover { background: var(--tu-bg-secondary); }
+.tu-freq-toggle:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
+.tu-freq-chevron { flex-shrink: 0; color: var(--tu-text-subtle); transition: transform 200ms ease; }
+.tu-freq-chevron.tu-open { transform: rotate(90deg); }
+.tu-freq-spacer { width: 16px; flex-shrink: 0; }
+.tu-subrow { display: flex; align-items: center; gap: 14px; padding: 9px 24px 9px 54px; background: var(--tu-bg-secondary); border-bottom: 1px solid var(--tu-border); }
+.tu-subrow-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--tu-text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tu-subrow-val { width: 64px; text-align: right; font-size: 12.5px; color: var(--tu-text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Section heading with inline control */
+.tu-trend-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.tu-trend-section-head h2 { font-size: 15px; font-weight: 600; color: var(--tu-text-heading); margin: 0; }
+.tu-pill-sm { padding: 4px 11px; font-size: 13px; }
