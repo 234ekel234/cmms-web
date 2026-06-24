@@ -5,6 +5,9 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import StatusPipeline from "@/components/StatusPipeline";
+
+const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -288,6 +291,15 @@ export default function WorkOrderDetailPage() {
             </span>
           </div>
         </div>
+
+        {/* Lifecycle pipeline */}
+        {order.status === "REJECTED" ? (
+          <div className="bg-red-50 rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-red-800">
+            This work order was rejected.
+          </div>
+        ) : (
+          <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+        )}
 
         {/* Inline edit form */}
         {editing && (

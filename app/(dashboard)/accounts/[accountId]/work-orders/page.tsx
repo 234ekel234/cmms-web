@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
+import StatusPipeline from "@/components/StatusPipeline";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -41,6 +42,17 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
 };
 
 const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "COMPLETED", "REJECTED"];
+
+// Allowed status transitions a manager/supervisor can apply from each state.
+const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
+  REQUESTED: ["PENDING", "REJECTED"],
+  PENDING: ["IN_PROGRESS", "REJECTED"],
+  IN_PROGRESS: ["COMPLETED", "PENDING"],
+  COMPLETED: [],
+  REJECTED: [],
+};
+
+const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -118,6 +130,7 @@ export default function WorkOrdersPage() {
   const isOverdue = (o: WorkOrder) => !!o.dueDate && o.status !== "COMPLETED" && o.status !== "REJECTED" && new Date(o.dueDate) < now;
   const overdueCount = inView.filter(isOverdue).length;
   const filtered = statusFilter === "ALL" ? inView : inView.filter((o) => o.status === statusFilter);
+  const sorted = [...filtered].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
   const workCount = orders.filter((o) => !o.isSpecialProject).length;
   const specialCount = orders.filter((o) => o.isSpecialProject).length;
 
@@ -313,104 +326,87 @@ export default function WorkOrdersPage() {
         </div>
       ) : (
         <div className="space-y-3">
-          {STATUS_ORDER.map((status) => {
-            const group = filtered.filter((o) => o.status === status);
-            if (!group.length) return null;
-            const cfg = STATUS_CONFIG[status];
-            return (
-              <div key={status}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.cls}`}>
-                    {cfg.label}
-                  </span>
-                  <span className="text-xs text-gray-400">{group.length}</span>
-                </div>
-                <div className="space-y-2">
-                  {group.map((order) => {
-                    const overdue = isOverdue(order);
-                    const priorityCfg = PRIORITY_CONFIG[order.priority];
-                    const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-                      REQUESTED: ["PENDING", "REJECTED"],
-                      PENDING: ["IN_PROGRESS", "REJECTED"],
-                      IN_PROGRESS: ["COMPLETED", "PENDING"],
-                      COMPLETED: [],
-                      REJECTED: [],
-                    };
-                    const nextStatuses = TRANSITIONS[order.status];
+          {sorted.map((order) => {
+            const overdue = isOverdue(order);
+            const priorityCfg = PRIORITY_CONFIG[order.priority];
+            const statusCfg = STATUS_CONFIG[order.status];
+            const isRejected = order.status === "REJECTED";
+            const nextStatuses = TRANSITIONS[order.status];
 
-                    return (
-                      <div key={order.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 min-w-0">
-                            <Link
-                              href={`/accounts/${accountId}/work-orders/${order.id}`}
-                              className="font-semibold text-gray-900 hover:text-[#2166AC] transition-colors text-sm leading-snug"
-                            >
-                              {order.title}
-                              {order.isSpecialProject && (
-                                <span className="ml-1.5 text-amber-600 text-xs">★ Special</span>
-                              )}
-                            </Link>
-                            <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${priorityCfg.cls}`}>
-                                {priorityCfg.label}
-                              </span>
-                              {order.category && (
-                                <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">
-                                  {order.category}
-                                </span>
-                              )}
-                              {order.dueDate && (
-                                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${overdue ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
-                                  {overdue ? "Overdue · " : "Due "}
-                                  {formatDate(order.dueDate)}
-                                </span>
-                              )}
-                              {order.asset && (
-                                <span className="text-xs text-[#2166AC]">› {order.asset.name}</span>
-                              )}
-                            </div>
-                            {order.assignments.length > 0 && (
-                              <p className="text-xs text-gray-400 mt-1">
-                                {order.assignments.map((a) => a.employee.name).join(", ")}
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex flex-col gap-1 items-end shrink-0">
-                            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.cls}`}>
-                              {cfg.label}
-                            </span>
-                            <span className="text-xs text-gray-400">{formatDate(order.createdAt)}</span>
-                          </div>
-                        </div>
-                        {/* Action buttons */}
-                        {!isClient && canManage && nextStatuses.length > 0 && (
-                          <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
-                            {nextStatuses.map((ns) => (
-                              <button
-                                key={ns}
-                                onClick={() => updateStatus(order.id, ns)}
-                                className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                  ns === "REJECTED"
-                                    ? "bg-red-50 text-red-600 hover:bg-red-100"
-                                    : ns === "COMPLETED"
-                                    ? "bg-green-50 text-green-700 hover:bg-green-100"
-                                    : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
-                                }`}
-                              >
-                                {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
-                                 ns === "PENDING" && order.status === "IN_PROGRESS" ? "Revert to Accepted" :
-                                 ns === "IN_PROGRESS" ? "Start" :
-                                 ns === "COMPLETED" ? "Mark Complete" :
-                                 ns === "REJECTED" ? "Reject" : ns}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+            return (
+              <div key={order.id} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 ${isRejected ? "opacity-90" : ""}`}>
+                {/* Top row: title + status pill */}
+                <div className="flex items-start justify-between gap-3 mb-2">
+                  <Link
+                    href={`/accounts/${accountId}/work-orders/${order.id}`}
+                    className={`flex-1 text-base font-bold leading-snug hover:text-[#2166AC] transition-colors ${isRejected ? "text-gray-500" : "text-gray-900"}`}
+                  >
+                    {order.title}
+                  </Link>
+                  <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${statusCfg.cls}`}>{statusCfg.label}</span>
                 </div>
+
+                {/* Meta row */}
+                <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                  {order.isSpecialProject && (
+                    <span className="rounded px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800">★ Special Project</span>
+                  )}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${priorityCfg.cls}`}>{priorityCfg.label}</span>
+                  {order.category && (
+                    <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">{order.category}</span>
+                  )}
+                  {order.dueDate && (
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${overdue ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+                      {overdue ? "Overdue · " : "Due "}
+                      {formatDate(order.dueDate)}
+                    </span>
+                  )}
+                  {order.asset && <span className="text-xs font-medium text-[#2166AC]">› {order.asset.name}</span>}
+                </div>
+
+                {order.description && (
+                  <p className="text-[13px] text-gray-600 leading-relaxed mb-3 line-clamp-2">{order.description}</p>
+                )}
+
+                {/* Pipeline or rejected banner */}
+                {isRejected ? (
+                  <div className="bg-red-50 rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-red-800">
+                    This work order was rejected.
+                  </div>
+                ) : (
+                  <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${statusCfg.label}`} />
+                )}
+
+                {/* Footer: assignment + created */}
+                <div className="flex items-center justify-between gap-2 text-[11px] text-gray-400">
+                  <span>{order.assignments.length > 0 ? order.assignments.map((a) => a.employee.name).join(", ") : "Unassigned"}</span>
+                  <span>Created {formatDate(order.createdAt)}</span>
+                </div>
+
+                {/* Action buttons */}
+                {!isClient && canManage && nextStatuses.length > 0 && (
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                    {nextStatuses.map((ns) => (
+                      <button
+                        key={ns}
+                        onClick={() => updateStatus(order.id, ns)}
+                        className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                          ns === "REJECTED"
+                            ? "bg-red-50 text-red-600 hover:bg-red-100"
+                            : ns === "COMPLETED"
+                            ? "bg-green-50 text-green-700 hover:bg-green-100"
+                            : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
+                        }`}
+                      >
+                        {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
+                         ns === "PENDING" && order.status === "IN_PROGRESS" ? "Revert to Accepted" :
+                         ns === "IN_PROGRESS" ? "Start" :
+                         ns === "COMPLETED" ? "Mark Complete" :
+                         ns === "REJECTED" ? "Reject" : ns}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
