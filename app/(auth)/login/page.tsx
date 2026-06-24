@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isAxiosError } from "axios";
 import api from "@/lib/api";
 import { saveSession } from "@/lib/auth";
 
@@ -28,8 +29,8 @@ export default function LoginPage() {
       const { token, user } = res.data;
       saveSession(token, user);
       router.push("/accounts");
-    } catch (err: any) {
-      setError(err?.response?.data?.error ?? "Incorrect email or password.");
+    } catch (err) {
+      setError((isAxiosError(err) && err.response?.data?.error) || "Incorrect email or password.");
     } finally {
       setLoading(false);
     }

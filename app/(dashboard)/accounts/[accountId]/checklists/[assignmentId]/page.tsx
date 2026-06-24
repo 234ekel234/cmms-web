@@ -428,7 +428,7 @@ export default function ChecklistFormPage() {
 
             {incompleteTitles.length > 0 && (
               <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
-                Incomplete (won't be saved): {incompleteTitles.join(", ")}
+                Incomplete (won&apos;t be saved): {incompleteTitles.join(", ")}
               </p>
             )}
             {saveMsg && (

@@ -143,7 +143,6 @@ export default function TrainingPage() {
           {filteredEmployees.map((emp) => {
             const completed = emp.trainingAssignments.filter((a) => a.status === "COMPLETED").length;
             const total = emp.trainingAssignments.length;
-            const assigned = emp.trainingAssignments.filter((a) => a.status === "ASSIGNED");
 
             return (
               <div key={emp.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
