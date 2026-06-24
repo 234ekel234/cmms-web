@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
@@ -61,11 +61,16 @@ function formatDate(iso: string) {
 export default function WorkOrdersPage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "ALL" | "OVERDUE">(() => {
+    const raw = searchParams.get("status")?.toUpperCase();
+    const valid = ["OVERDUE", "REQUESTED", "PENDING", "IN_PROGRESS", "COMPLETED", "REJECTED"];
+    return raw && valid.includes(raw) ? (raw as WorkOrderStatus | "OVERDUE") : "ALL";
+  });
   const [view, setView] = useState<"work" | "special">("work");
   const [mode, setMode] = useState<"list" | "calendar">("list");
   const [showForm, setShowForm] = useState(false);
@@ -129,7 +134,12 @@ export default function WorkOrdersPage() {
   const now = new Date();
   const isOverdue = (o: WorkOrder) => !!o.dueDate && o.status !== "COMPLETED" && o.status !== "REJECTED" && new Date(o.dueDate) < now;
   const overdueCount = inView.filter(isOverdue).length;
-  const filtered = statusFilter === "ALL" ? inView : inView.filter((o) => o.status === statusFilter);
+  const filtered =
+    statusFilter === "ALL"
+      ? inView
+      : statusFilter === "OVERDUE"
+      ? inView.filter(isOverdue)
+      : inView.filter((o) => o.status === statusFilter);
   const sorted = [...filtered].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
   const workCount = orders.filter((o) => !o.isSpecialProject).length;
   const specialCount = orders.filter((o) => o.isSpecialProject).length;
@@ -195,14 +205,17 @@ export default function WorkOrdersPage() {
         <div className="flex gap-2 mb-6 flex-wrap">
           {([
             { key: "ALL" as const, label: `All (${inView.length})` },
+            ...(overdueCount > 0
+              ? [{ key: "OVERDUE" as WorkOrderStatus | "ALL" | "OVERDUE", label: `Overdue (${overdueCount})` }]
+              : []),
             ...STATUS_ORDER.filter((s) => inView.some((o) => o.status === s)).map((s) => ({
-              key: s as WorkOrderStatus | "ALL",
+              key: s as WorkOrderStatus | "ALL" | "OVERDUE",
               label: `${STATUS_CONFIG[s].label} (${inView.filter((o) => o.status === s).length})`,
             })),
           ]).map((f) => (
             <button
               key={f.key}
-              onClick={() => setStatusFilter(f.key as WorkOrderStatus | "ALL")}
+              onClick={() => setStatusFilter(f.key as WorkOrderStatus | "ALL" | "OVERDUE")}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
                 statusFilter === f.key
                   ? "bg-[#2166AC] text-white border-[#2166AC]"

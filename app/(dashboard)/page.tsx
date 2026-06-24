@@ -218,6 +218,8 @@ function SkeletonRows({ count, cols }: { count: number; cols: number }) {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [accountList, setAccountList] = useState<{ id: string; name: string }[]>([]);
+  const [accountFilter, setAccountFilter] = useState<string>(""); // "" = all accounts
   const [period, setPeriod] = useState<Period>("today");
   const [trendWindow, setTrendWindow] = useState<number>(7);
   const [expandedFreq, setExpandedFreq] = useState<string | null>(null);
@@ -229,11 +231,15 @@ export default function DashboardPage() {
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    api.get("/accounts").then((res) => setAccountList(res.data)).catch(() => {});
+  }, []);
+
+  useEffect(() => {
     // In custom mode wait until a valid range has been applied.
     if (period === "custom" && !appliedRange) return;
     fetchDashboard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period, trendWindow, appliedRange]);
+  }, [period, trendWindow, appliedRange, accountFilter]);
 
   async function fetchDashboard() {
     setLoading(true);
@@ -243,6 +249,7 @@ export default function DashboardPage() {
         period === "custom" && appliedRange
           ? { from: appliedRange.from, to: appliedRange.to, trendDays: trendWindow }
           : { period, trendDays: trendWindow };
+      if (accountFilter) params.accountId = accountFilter;
       const res = await api.get("/dashboard", { params });
       setData(res.data);
     } catch {
@@ -291,6 +298,11 @@ export default function DashboardPage() {
   const woTrendTotal = woTrend.reduce((s, d) => s + d.count, 0);
   const clTrendTotal = clTrend.reduce((s, d) => s + d.count, 0);
 
+  // Deep-link targets are account-aware: when a single account is selected the
+  // cards jump straight into that account's pages, otherwise the global ones.
+  const woHref = accountFilter ? `/accounts/${accountFilter}/work-orders` : "/work-orders";
+  const checklistHref = accountFilter ? `/accounts/${accountFilter}/checklists` : "/pm-checklists";
+
   const kpis: {
     label: string;
     accent: string;
@@ -308,7 +320,7 @@ export default function DashboardPage() {
       value: loading ? "—" : String(openWOs),
       valueClass: openWOs > 0 ? "tu-stat-brand" : "",
       sub: loading ? " " : `${wo?.REQUESTED ?? 0} requested · ${wo?.IN_PROGRESS ?? 0} in progress`,
-      href: "/work-orders",
+      href: woHref,
       cta: "View work orders",
     },
     {
@@ -318,7 +330,7 @@ export default function DashboardPage() {
       value: loading ? "—" : String(overdue),
       valueClass: overdue > 0 ? "tu-stat-danger" : "",
       sub: "work orders past due date",
-      href: "/work-orders",
+      href: `${woHref}?status=overdue`,
       cta: overdue > 0 ? "Review overdue" : undefined,
     },
     {
@@ -335,7 +347,7 @@ export default function DashboardPage() {
       value: loading ? "—" : `${checklistsDone}/${checklistsTotal}`,
       valueClass: checklistsBehind ? "tu-stat-warning" : "",
       sub: `completed ${periodCaption}`,
-      href: "/pm-checklists",
+      href: checklistHref,
       cta: "Open checklists",
     },
   ];
@@ -346,21 +358,39 @@ export default function DashboardPage() {
       <div className="tu-page-header">
         <div>
           <h1 className="tu-page-title">Dashboard</h1>
-          <p className="tu-page-sub">Overview across all accounts</p>
+          <p className="tu-page-sub">
+            {accountFilter
+              ? accountList.find((a) => a.id === accountFilter)?.name ?? "Account overview"
+              : "Overview across all accounts"}
+          </p>
         </div>
 
-        <div className="tu-filter-group" role="group" aria-label="Select time period">
-          {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => handlePeriodChange(p)}
-              className={`tu-period-pill${period === p ? " tu-active-pill" : ""}`}
-              aria-pressed={period === p}
-            >
-              {PERIOD_LABELS[p]}
-            </button>
-          ))}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <select
+            className="tu-select"
+            aria-label="Filter by account"
+            value={accountFilter}
+            onChange={(e) => setAccountFilter(e.target.value)}
+          >
+            <option value="">All accounts</option>
+            {accountList.map((a) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+
+          <div className="tu-filter-group" role="group" aria-label="Select time period">
+            {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => handlePeriodChange(p)}
+                className={`tu-period-pill${period === p ? " tu-active-pill" : ""}`}
+                aria-pressed={period === p}
+              >
+                {PERIOD_LABELS[p]}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

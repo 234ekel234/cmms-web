@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 
@@ -24,17 +25,27 @@ type WorkOrder = {
 // Work order tagged with the account it belongs to (for the all-accounts calendar).
 type TaggedWorkOrder = WorkOrder & { accountId: string; accountName: string };
 
-type StatusFilter = "ALL" | WorkOrder["status"];
+type StatusFilter = "ALL" | "OVERDUE" | WorkOrder["status"];
 type View = "list" | "calendar";
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "ALL",         label: "All"         },
+  { key: "OVERDUE",     label: "Overdue"     },
   { key: "REQUESTED",   label: "Requested"   },
   { key: "PENDING",     label: "Pending"     },
   { key: "IN_PROGRESS", label: "In Progress" },
   { key: "COMPLETED",   label: "Completed"   },
   { key: "REJECTED",    label: "Rejected"    },
 ];
+
+function parseStatusParam(raw: string | null): StatusFilter {
+  if (!raw) return "ALL";
+  const up = raw.toUpperCase();
+  return (STATUS_TABS.some((t) => t.key === up) ? up : "ALL") as StatusFilter;
+}
+
+const isOverdue = (wo: { dueDate: string | null; status: WorkOrder["status"] }) =>
+  !!wo.dueDate && wo.status !== "COMPLETED" && wo.status !== "REJECTED" && new Date(wo.dueDate).getTime() < Date.now();
 
 const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> = {
   REQUESTED:   { cls: "tu-badge tu-badge-brand",   label: "Requested"   },
@@ -59,7 +70,8 @@ export default function WorkOrdersPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
+  const searchParams = useSearchParams();
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => parseStatusParam(searchParams.get("status")));
   const [view, setView] = useState<View>("list");
   const [loadingAccounts, setLoadingAccounts] = useState(true);
   const [loadingWOs, setLoadingWOs] = useState(false);
@@ -137,17 +149,14 @@ export default function WorkOrdersPage() {
     }
   }
 
-  const filtered =
-    statusFilter === "ALL"
-      ? workOrders
-      : workOrders.filter((wo) => wo.status === statusFilter);
+  const matchesFilter = (wo: WorkOrder, key: StatusFilter) =>
+    key === "ALL" ? true : key === "OVERDUE" ? isOverdue(wo) : wo.status === key;
+
+  const filtered = workOrders.filter((wo) => matchesFilter(wo, statusFilter));
 
   const counts = STATUS_TABS.reduce<Record<StatusFilter, number>>(
     (acc, tab) => {
-      acc[tab.key] =
-        tab.key === "ALL"
-          ? workOrders.length
-          : workOrders.filter((wo) => wo.status === tab.key).length;
+      acc[tab.key] = workOrders.filter((wo) => matchesFilter(wo, tab.key)).length;
       return acc;
     },
     {} as Record<StatusFilter, number>
@@ -155,7 +164,8 @@ export default function WorkOrdersPage() {
 
   // Status-filtered orders for the calendar (all accounts).
   const calFiltered = useMemo(
-    () => (statusFilter === "ALL" ? calOrders : calOrders.filter((wo) => wo.status === statusFilter)),
+    () => calOrders.filter((wo) => matchesFilter(wo, statusFilter)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [calOrders, statusFilter]
   );
 
@@ -226,7 +236,7 @@ export default function WorkOrdersPage() {
         <div className="tu-tab-group" role="tablist" aria-label="Filter by status">
           {STATUS_TABS.map((tab) => {
             const count = view === "calendar"
-              ? (tab.key === "ALL" ? calOrders.length : calOrders.filter((wo) => wo.status === tab.key).length)
+              ? calOrders.filter((wo) => matchesFilter(wo, tab.key)).length
               : counts[tab.key];
             return (
               <button
