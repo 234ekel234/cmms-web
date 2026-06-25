@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canAccessRoute } from "@/lib/rbac";
 
 type Account = {
   id: string;
@@ -28,8 +30,15 @@ const TABS = [
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const pathname = usePathname();
+  const { user } = useAuth();
   const accountId = params.accountId as string;
   const [account, setAccount] = useState<Account | null>(null);
+
+  // Only show tabs the current role is actually allowed to open (same rules
+  // as the route guard), so tab visibility never disagrees with access.
+  const visibleTabs = TABS.filter((tab) =>
+    canAccessRoute(user?.role, `/accounts/${accountId}/${tab.path}`)
+  );
 
   useEffect(() => {
     if (accountId) {
@@ -59,7 +68,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
 
         {/* Tab navigation */}
         <nav className="flex gap-1 overflow-x-auto">
-          {TABS.map((tab) => {
+          {visibleTabs.map((tab) => {
             const active = isActive(tab.path);
             return (
               <Link
