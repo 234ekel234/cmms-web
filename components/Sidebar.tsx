@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { canAccessRoute, type Role } from "@/lib/rbac";
 import { useState, useEffect, useRef } from "react";
 import api from "@/lib/api";
 
@@ -150,14 +151,12 @@ function IconX(p: React.SVGProps<SVGSVGElement>) {
 // ── Data ─────────────────────────────────────────────────
 
 type Account = { id: string; name: string };
-type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
 
 const NAV_ITEMS: {
   href: string;
   label: string;
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   badge?: boolean;
-  roles?: Role[];
 }[] = [
   { href: "/",               label: "Dashboard",     Icon: IconGrid      },
   { href: "/work-orders",    label: "Work Orders",   Icon: IconClipboard },
@@ -168,8 +167,8 @@ const NAV_ITEMS: {
   { href: "/trainings",      label: "Trainings",     Icon: IconGradCap   },
   { href: "/reports",        label: "Reports",       Icon: IconClipboard },
   { href: "/notifications",  label: "Notifications", Icon: IconBell, badge: true },
-  { href: "/users",          label: "Users",         Icon: IconUsers, roles: ["GENERAL_MANAGER", "MANAGER"] },
-  { href: "/settings",       label: "Settings",      Icon: IconGear     },
+  { href: "/users",          label: "Users",         Icon: IconUsers     },
+  { href: "/settings",       label: "Settings",      Icon: IconGear      },
 ];
 
 // ── Sidebar nav content (shared between desktop and mobile) ─
@@ -209,7 +208,7 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
       {/* Primary navigation */}
       <nav className="tu-nav" aria-label="Main navigation">
         <ul role="list">
-          {NAV_ITEMS.filter((item) => !item.roles || item.roles.includes(user?.role as Role)).map((item) => {
+          {NAV_ITEMS.filter((item) => canAccessRoute(user?.role as Role, item.href)).map((item) => {
             const active = isActive(item.href);
             const count = item.badge ? unreadCount : 0;
             return (
