@@ -15,9 +15,12 @@ type Asset = {
   category: string;
   status: AssetStatus;
   health: AssetHealth;
-  notes: string | null;
   serialNumber: string | null;
   location: string | null;
+  purchaseDate: string | null;
+  purchaseCost: number | null;
+  warrantyExpiry: string | null;
+  manufacturedDate: string | null;
   archivedAt: string | null;
   createdAt: string;
 };
@@ -30,6 +33,7 @@ type WorkOrder = {
   createdAt: string;
   completedAt: string | null;
   accountId: string;
+  assignments: { employee: { id: string; name: string } }[];
 };
 
 type PMLogLite = {
@@ -76,8 +80,55 @@ const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
   ANNUALLY:      { label: "Annually",      cls: "bg-green-50 text-green-700" },
 };
 
+const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
+  LOW:      { label: "Low",      cls: "bg-gray-100 text-gray-600" },
+  MEDIUM:   { label: "Medium",   cls: "bg-blue-50 text-blue-700" },
+  HIGH:     { label: "High",     cls: "bg-orange-50 text-orange-700" },
+  CRITICAL: { label: "Critical", cls: "bg-red-50 text-red-700" },
+};
+
 const fmtDate = (d: string) =>
   new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+const fmtCost = (n: number) =>
+  `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
+// One work-order row: title + priority, status, dates, and assignees.
+function WorkOrderRow({ wo }: { wo: WorkOrder }) {
+  const pr = PRIORITY_CONFIG[wo.priority] ?? { label: wo.priority, cls: "bg-gray-100 text-gray-600" };
+  const isClosed = ["COMPLETED", "REJECTED"].includes(wo.status);
+  const dateLabel =
+    isClosed && wo.completedAt ? `Completed ${fmtDate(wo.completedAt)}` : `Opened ${fmtDate(wo.createdAt)}`;
+  const assignees = (wo.assignments ?? []).map((a) => a.employee.name);
+  return (
+    <Link
+      href={`/accounts/${wo.accountId}/work-orders/${wo.id}`}
+      className="flex items-center justify-between gap-3 px-6 py-3 hover:bg-gray-50 transition-colors"
+    >
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-medium text-gray-800 truncate">{wo.title}</p>
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pr.cls}`}>{pr.label}</span>
+        </div>
+        <p className="text-xs text-gray-400 mt-0.5">
+          {dateLabel} · {assignees.length > 0 ? assignees.join(", ") : "Unassigned"}
+        </p>
+      </div>
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${WO_STATUS_CLS[wo.status] ?? "bg-gray-100 text-gray-600"}`}>
+        {WO_STATUS_LABELS[wo.status] ?? wo.status}
+      </span>
+    </Link>
+  );
+}
+
+// Warranty coverage relative to `now`, or null when no expiry is on file.
+function warrantyStatus(expiry: string | null, now: number) {
+  if (!expiry) return null;
+  const days = Math.ceil((new Date(expiry).getTime() - now) / 86_400_000);
+  if (days < 0) return { label: "Expired", cls: "bg-red-50 text-red-700" };
+  if (days <= 30) return { label: `Expires in ${days}d`, cls: "bg-amber-50 text-amber-700" };
+  return { label: "Under warranty", cls: "bg-green-50 text-green-700" };
+}
 
 export default function AssetDetailPage() {
   const params = useParams();
@@ -90,9 +141,9 @@ export default function AssetDetailPage() {
   const [error, setError] = useState(false);
   const [editHealth, setEditHealth] = useState(false);
   const [editStatus, setEditStatus] = useState(false);
-  const [editNotes, setEditNotes] = useState(false);
-  const [notesVal, setNotesVal] = useState("");
   const [saving, setSaving] = useState(false);
+  // Captured once at mount so warranty/age math stays pure across re-renders.
+  const [now] = useState(() => Date.now());
 
   useEffect(() => { fetchAsset(); }, [assetId]);
 
@@ -108,7 +159,6 @@ export default function AssetDetailPage() {
       setAsset(assetRes.data);
       setWorkOrders(woRes.data);
       setPmChecklists(pmRes.data);
-      setNotesVal(assetRes.data.notes ?? "");
     } catch {
       setError(true);
     } finally {
@@ -124,7 +174,6 @@ export default function AssetDetailPage() {
       setAsset(res.data);
       setEditHealth(false);
       setEditStatus(false);
-      setEditNotes(false);
     } catch {
       // silent
     } finally {
@@ -169,6 +218,11 @@ export default function AssetDetailPage() {
   const hCfg = HEALTH_CONFIG[asset.health];
   const openWOs = workOrders.filter((w) => !["COMPLETED", "REJECTED"].includes(w.status));
   const closedWOs = workOrders.filter((w) => ["COMPLETED", "REJECTED"].includes(w.status));
+  const warranty = warrantyStatus(asset.warrantyExpiry, now);
+  const lastServiced = workOrders
+    .filter((w) => w.status === "COMPLETED" && w.completedAt)
+    .map((w) => w.completedAt as string)
+    .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -262,41 +316,57 @@ export default function AssetDetailPage() {
           )}
         </div>
 
-        {/* Notes */}
-        <div className="mb-4">
-          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Notes</p>
-          {editNotes ? (
-            <div>
-              <textarea
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC] resize-none mb-2"
-                rows={3}
-                value={notesVal}
-                onChange={(e) => setNotesVal(e.target.value)}
-                placeholder="Add notes about this asset..."
-              />
-              <div className="flex gap-2">
-                <button onClick={() => setEditNotes(false)} className="px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg cursor-pointer">Cancel</button>
-                <button onClick={() => updateAsset({ notes: notesVal || null } as Partial<Asset>)} disabled={saving} className="px-3 py-1.5 text-xs text-white bg-[#2166AC] rounded-lg cursor-pointer disabled:opacity-50">
-                  {saving ? "Saving..." : "Save"}
-                </button>
+        {/* Details */}
+        <div className="pt-4 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Details</p>
+          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
+            {[
+              { label: "Serial No.", value: asset.serialNumber },
+              { label: "Location", value: asset.location },
+              { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
+              { label: "Purchased", value: asset.purchaseDate ? fmtDate(asset.purchaseDate) : null },
+              { label: "Purchase Cost", value: asset.purchaseCost != null ? fmtCost(asset.purchaseCost) : null },
+              { label: "Registered", value: fmtDate(asset.createdAt) },
+            ].map((f) => (
+              <div key={f.label}>
+                <dt className="font-semibold text-gray-400">{f.label}</dt>
+                <dd className="text-gray-700 mt-0.5">{f.value ?? <span className="text-gray-300">—</span>}</dd>
               </div>
+            ))}
+            <div>
+              <dt className="font-semibold text-gray-400">Warranty</dt>
+              <dd className="mt-0.5">
+                {asset.warrantyExpiry ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-gray-700">{fmtDate(asset.warrantyExpiry)}</span>
+                    {warranty && (
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${warranty.cls}`}>
+                        {warranty.label}
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-300">—</span>
+                )}
+              </dd>
             </div>
-          ) : (
-            <div className="flex items-start gap-2">
-              <p className="text-sm text-gray-600 flex-1">{asset.notes ?? <span className="text-gray-400">No notes.</span>}</p>
-              <button onClick={() => setEditNotes(true)} className="text-xs text-[#2166AC] hover:underline cursor-pointer shrink-0">
-                {asset.notes ? "Edit" : "Add"}
-              </button>
-            </div>
-          )}
+          </dl>
         </div>
+      </div>
 
-        {/* Other info */}
-        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100 text-xs text-gray-500">
-          {asset.serialNumber && <div><span className="font-semibold text-gray-400">Serial:</span> {asset.serialNumber}</div>}
-          {asset.location && <div><span className="font-semibold text-gray-400">Location:</span> {asset.location}</div>}
-          <div><span className="font-semibold text-gray-400">Created:</span> {new Date(asset.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-        </div>
+      {/* Quick stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        {[
+          { label: "Open Work Orders", value: String(openWOs.length), accent: openWOs.length > 0 ? "text-[#2166AC]" : "text-gray-800" },
+          { label: "Total Work Orders", value: String(workOrders.length), accent: "text-gray-800" },
+          { label: "Last Serviced", value: lastServiced ? fmtDate(lastServiced) : "—", accent: "text-gray-800" },
+          { label: "PM Checklists", value: String(pmChecklists.length), accent: "text-gray-800" },
+        ].map((s) => (
+          <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{s.label}</p>
+            <p className={`text-lg font-bold mt-1 ${s.accent}`}>{s.value}</p>
+          </div>
+        ))}
       </div>
 
       {/* PM checklists */}
@@ -341,29 +411,37 @@ export default function AssetDetailPage() {
 
       {/* Work orders */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold text-gray-700">Work Orders ({workOrders.length})</h2>
+          {workOrders.length > 0 && (
+            <p className="text-xs text-gray-400">{openWOs.length} open · {closedWOs.length} closed</p>
+          )}
         </div>
         {workOrders.length === 0 ? (
           <p className="px-6 py-6 text-sm text-gray-400">No work orders for this asset.</p>
         ) : (
-          <div className="divide-y divide-gray-100">
-            {[...openWOs, ...closedWOs].map((wo) => (
-              <Link
-                key={wo.id}
-                href={`/accounts/${wo.accountId}/work-orders/${wo.id}`}
-                className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
-              >
-                <div>
-                  <p className="text-sm font-medium text-gray-800">{wo.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">{fmtDate(wo.createdAt)}</p>
+          <>
+            {openWOs.length > 0 && (
+              <>
+                <p className="px-6 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">
+                  Open ({openWOs.length})
+                </p>
+                <div className="divide-y divide-gray-100">
+                  {openWOs.map((wo) => <WorkOrderRow key={wo.id} wo={wo} />)}
                 </div>
-                <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${WO_STATUS_CLS[wo.status] ?? "bg-gray-100 text-gray-600"}`}>
-                  {WO_STATUS_LABELS[wo.status] ?? wo.status}
-                </span>
-              </Link>
-            ))}
-          </div>
+              </>
+            )}
+            {closedWOs.length > 0 && (
+              <>
+                <p className="px-6 pt-3 pb-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide border-t border-gray-100">
+                  History ({closedWOs.length})
+                </p>
+                <div className="divide-y divide-gray-100">
+                  {closedWOs.map((wo) => <WorkOrderRow key={wo.id} wo={wo} />)}
+                </div>
+              </>
+            )}
+          </>
         )}
       </div>
     </div>
