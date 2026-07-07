@@ -85,6 +85,32 @@ function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
+// Compact chip label for the history strip, per frequency.
+function shortPeriodLabel(date: Date, frequency: string): string {
+  const y = date.getUTCFullYear(), m = date.getUTCMonth(), d = date.getUTCDate();
+  switch (frequency) {
+    case "WEEKLY":        return `${MONTHS[m]} ${d}`;
+    case "MONTHLY":       return `${MONTHS[m]} '${String(y).slice(2)}`;
+    case "QUARTERLY":     return `Q${Math.floor(m / 3) + 1} '${String(y).slice(2)}`;
+    case "SEMI_ANNUALLY": return `H${Math.floor(m / 6) + 1} '${String(y).slice(2)}`;
+    case "ANNUALLY":      return `${y}`;
+    default:              return `${MONTHS[m]} ${d}`; // DAILY
+  }
+}
+
+// How many recent occurrences the history strip shows, per frequency.
+const HISTORY_COUNTS: Record<string, number> = {
+  DAILY: 14, WEEKLY: 8, MONTHLY: 12, QUARTERLY: 6, SEMI_ANNUALLY: 4, ANNUALLY: 5,
+};
+
+type OccStatus = "done" | "partial" | "missed" | "due";
+const OCC_CONFIG: Record<OccStatus, { bg: string; dot: string; text: string; label: string }> = {
+  done:    { bg: "bg-green-50", dot: "bg-green-500", text: "text-green-700", label: "Done" },
+  partial: { bg: "bg-amber-50", dot: "bg-amber-500", text: "text-amber-700", label: "Partial" },
+  missed:  { bg: "bg-red-50",   dot: "bg-red-400",   text: "text-red-600",   label: "Missed" },
+  due:     { bg: "bg-white",    dot: "bg-gray-300",  text: "text-gray-400",  label: "Due" },
+};
+
 export default function ChecklistFormPage() {
   const params = useParams();
   const router = useRouter();
@@ -104,6 +130,8 @@ export default function ChecklistFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState("");
+  // Captured once so the history window stays stable across re-renders.
+  const [nowMs] = useState(() => Date.now());
 
   useEffect(() => { fetchData(); }, [assignmentId]);
 
@@ -252,6 +280,26 @@ export default function ChecklistFormPage() {
   const { total, completeCount, incompleteTitles } = sectionStats();
   const progressPct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
 
+  // Recent occurrences (newest first): match each expected period to its log,
+  // marking past periods with no log as "missed" and the current one as "due".
+  const currentStart = getPeriodStart(new Date(nowMs), checklist.frequency).getTime();
+  const selectedStart = getPeriodStart(selectedDate, checklist.frequency).getTime();
+  const historyCount = HISTORY_COUNTS[checklist.frequency] ?? 8;
+  const history: { time: number; date: Date; status: OccStatus }[] = [];
+  {
+    let d = getPeriodStart(new Date(nowMs), checklist.frequency);
+    for (let i = 0; i < historyCount; i++) {
+      const t = d.getTime();
+      const log = allLogs.find((l) => new Date(l.scheduledDate).getTime() === t) ?? null;
+      const status: OccStatus = log
+        ? (log.isDraft ? "partial" : "done")
+        : (t >= currentStart ? "due" : "missed");
+      history.push({ time: t, date: d, status });
+      d = stepPeriod(d, checklist.frequency, -1);
+    }
+  }
+  const doneCount = history.filter((h) => h.status === "done").length;
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
@@ -318,6 +366,39 @@ export default function ChecklistFormPage() {
         >
           ›
         </button>
+      </div>
+
+      {/* History strip — recent occurrences at a glance, click to open one */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+            History · last {historyCount} {freq.label.toLowerCase()}
+          </p>
+          <p className="text-xs text-gray-400">{doneCount}/{historyCount} completed</p>
+        </div>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {history.map(({ time, date, status }) => {
+            const cfg = OCC_CONFIG[status];
+            const selected = time === selectedStart;
+            return (
+              <button
+                key={time}
+                type="button"
+                onClick={() => { setSelectedDate(date); setError(null); setSaveMsg(""); }}
+                aria-current={selected ? "true" : undefined}
+                className={`shrink-0 w-[68px] rounded-lg px-2 py-2 text-center transition-colors cursor-pointer ${cfg.bg} ${
+                  selected ? "border-2 border-[#2166AC]" : "border border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                <span className={`block w-2 h-2 rounded-full mx-auto mb-1 ${cfg.dot}`} aria-hidden="true" />
+                <span className="block text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                  {shortPeriodLabel(date, checklist.frequency)}
+                </span>
+                <span className={`block text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isEditing && isPastPeriod() && (
