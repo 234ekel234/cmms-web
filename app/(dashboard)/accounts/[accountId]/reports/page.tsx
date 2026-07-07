@@ -49,12 +49,12 @@ const PERIOD_LABELS: Record<Period, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  COMPLETED: "Completed", IN_PROGRESS: "In Progress", PENDING: "Accepted",
+  COMPLETED: "Completed", IN_PROGRESS: "In Progress", ON_HOLD: "On Hold", PENDING: "Accepted",
   REQUESTED: "Requested", REJECTED: "Rejected",
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLETED: "#16a34a", IN_PROGRESS: "#f59e0b", PENDING: "#3b82f6",
+  COMPLETED: "#16a34a", IN_PROGRESS: "#f59e0b", ON_HOLD: "#64748b", PENDING: "#3b82f6",
   REQUESTED: "#a855f7", REJECTED: "#ef4444",
 };
 

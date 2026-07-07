@@ -10,7 +10,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
-type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type WorkOrder = {
@@ -37,6 +37,7 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
   REQUESTED:   { label: "Requested",   cls: "bg-purple-50 text-purple-700" },
   PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
   IN_PROGRESS: { label: "In Progress", cls: "bg-amber-50 text-amber-700" },
+  ON_HOLD:     { label: "On Hold",     cls: "bg-slate-100 text-slate-700" },
   COMPLETED:   { label: "Completed",   cls: "bg-green-50 text-green-700" },
   REJECTED:    { label: "Rejected",    cls: "bg-red-50 text-red-700" },
 };
@@ -51,7 +52,8 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
 const VALID_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   REQUESTED:   ["PENDING", "REJECTED"],
   PENDING:     ["IN_PROGRESS", "REJECTED"],
-  IN_PROGRESS: ["COMPLETED", "PENDING"],
+  IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
+  ON_HOLD:     ["IN_PROGRESS", "REJECTED"],
   COMPLETED:   [],
   REJECTED:    [],
 };
@@ -554,12 +556,16 @@ export default function WorkOrderDetailPage() {
                         ? "bg-red-50 text-red-600 hover:bg-red-100"
                         : ns === "COMPLETED"
                         ? "bg-green-50 text-green-700 hover:bg-green-100"
+                        : ns === "ON_HOLD"
+                        ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
                         : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
                     }`}
                   >
                     {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
                      ns === "PENDING" && order.status === "IN_PROGRESS" ? "Revert to Accepted" :
+                     ns === "IN_PROGRESS" && order.status === "ON_HOLD" ? "Resume Work" :
                      ns === "IN_PROGRESS" ? "Start Work" :
+                     ns === "ON_HOLD" ? "Put On Hold" :
                      ns === "COMPLETED" ? "Mark as Complete" :
                      ns === "REJECTED" ? "Reject" : ns}
                   </button>

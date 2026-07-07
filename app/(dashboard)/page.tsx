@@ -43,7 +43,7 @@ type FreqBreakdown = {
 };
 
 type DashboardData = {
-  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; COMPLETED: number; REJECTED: number };
+  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; ON_HOLD: number; COMPLETED: number; REJECTED: number };
   assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
   overdueWorkOrders: number;
   poorHealthAssets: number;
@@ -79,6 +79,7 @@ const WO_STATUS: { key: keyof DashboardData["workOrders"]; label: string; color:
   { key: "REQUESTED", label: "Requested", color: "#F59E0B" },
   { key: "PENDING", label: "Pending", color: "#6366F1" },
   { key: "IN_PROGRESS", label: "In Progress", color: "#2166AC" },
+  { key: "ON_HOLD", label: "On Hold", color: "#64748B" },
   { key: "COMPLETED", label: "Completed", color: "#10B981" },
   { key: "REJECTED", label: "Rejected", color: "#94A3B8" },
 ];
@@ -280,7 +281,7 @@ export default function DashboardPage() {
       : PERIOD_LABELS[period].toLowerCase();
 
   const wo = data?.workOrders;
-  const openWOs = (wo?.REQUESTED ?? 0) + (wo?.PENDING ?? 0) + (wo?.IN_PROGRESS ?? 0);
+  const openWOs = (wo?.REQUESTED ?? 0) + (wo?.PENDING ?? 0) + (wo?.IN_PROGRESS ?? 0) + (wo?.ON_HOLD ?? 0);
   const totalWOs = WO_STATUS.reduce((s, x) => s + (wo?.[x.key] ?? 0), 0);
   const totalAssets = (data?.assets.OPERATIONAL ?? 0) + (data?.assets.UNDER_MAINTENANCE ?? 0);
   const overdue = data?.overdueWorkOrders ?? 0;

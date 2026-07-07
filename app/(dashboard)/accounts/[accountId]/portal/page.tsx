@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import StatusPipeline from "@/components/StatusPipeline";
 
 // ── Types ────────────────────────────────────────────────
-type Status = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+type Status = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
 type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type Comment = { id: string; body: string; authorName: string; createdAt: string };
@@ -33,6 +33,7 @@ const CLIENT_STATUS: Record<Status, { label: string; cls: string }> = {
   REQUESTED:   { label: "Submitted",   cls: "bg-purple-50 text-purple-700" },
   PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
   IN_PROGRESS: { label: "In Progress", cls: "bg-amber-50 text-amber-700" },
+  ON_HOLD:     { label: "On Hold",     cls: "bg-slate-100 text-slate-700" },
   COMPLETED:   { label: "Completed",   cls: "bg-green-50 text-green-700" },
   REJECTED:    { label: "Declined",    cls: "bg-red-50 text-red-700" },
 };
@@ -50,7 +51,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ];
 
 function filterOrders(orders: WorkOrder[], filter: FilterKey): WorkOrder[] {
-  if (filter === "active") return orders.filter((o) => o.status === "REQUESTED" || o.status === "PENDING" || o.status === "IN_PROGRESS");
+  if (filter === "active") return orders.filter((o) => o.status === "REQUESTED" || o.status === "PENDING" || o.status === "IN_PROGRESS" || o.status === "ON_HOLD");
   if (filter === "completed") return orders.filter((o) => o.status === "COMPLETED");
   if (filter === "declined") return orders.filter((o) => o.status === "REJECTED");
   return orders;

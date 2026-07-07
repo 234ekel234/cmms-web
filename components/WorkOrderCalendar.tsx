@@ -7,7 +7,7 @@ import Link from "next/link";
 export type CalendarOrder = {
   id: string;
   title: string;
-  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
   dueDate: string | null;
 };
 
@@ -22,6 +22,7 @@ const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string;
   REQUESTED:   { bg: "#eef6ff", fg: "#2166AC", label: "Requested"   },
   PENDING:     { bg: "#fef3c7", fg: "#92400e", label: "Pending"     },
   IN_PROGRESS: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
+  ON_HOLD:     { bg: "#f1f5f9", fg: "#475569", label: "On Hold"     },
   COMPLETED:   { bg: "#dcfce7", fg: "#166534", label: "Completed"   },
   REJECTED:    { bg: "#fee2e2", fg: "#991b1b", label: "Rejected"    },
 };

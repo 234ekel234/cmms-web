@@ -20,7 +20,7 @@ type AccountSummary = {
 };
 
 type DashboardData = {
-  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; COMPLETED: number; REJECTED: number };
+  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; ON_HOLD: number; COMPLETED: number; REJECTED: number };
   assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
   overdueWorkOrders: number;
   poorHealthAssets: number;
@@ -282,6 +282,7 @@ export default function ReportsPage() {
               { label: "Requested",   key: "REQUESTED",   color: "#a855f7" },
               { label: "Accepted",    key: "PENDING",     color: "#3b82f6" },
               { label: "In Progress", key: "IN_PROGRESS", color: "#f59e0b" },
+              { label: "On Hold",     key: "ON_HOLD",     color: "#64748b" },
               { label: "Completed",   key: "COMPLETED",   color: "#16a34a" },
               { label: "Rejected",    key: "REJECTED",    color: "#ef4444" },
             ].map(({ label, key, color }) => {

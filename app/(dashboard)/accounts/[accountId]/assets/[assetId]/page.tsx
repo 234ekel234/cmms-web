@@ -62,13 +62,14 @@ const WO_STATUS_CLS: Record<string, string> = {
   REQUESTED:   "bg-purple-50 text-purple-700",
   PENDING:     "bg-blue-50 text-blue-700",
   IN_PROGRESS: "bg-amber-50 text-amber-700",
+  ON_HOLD:     "bg-slate-100 text-slate-700",
   COMPLETED:   "bg-green-50 text-green-700",
   REJECTED:    "bg-red-50 text-red-700",
 };
 
 const WO_STATUS_LABELS: Record<string, string> = {
   REQUESTED: "Requested", PENDING: "Accepted", IN_PROGRESS: "In Progress",
-  COMPLETED: "Completed", REJECTED: "Rejected",
+  ON_HOLD: "On Hold", COMPLETED: "Completed", REJECTED: "Rejected",
 };
 
 const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {

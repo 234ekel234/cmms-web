@@ -12,7 +12,7 @@ type WorkOrder = {
   id: string;
   title: string;
   description: string | null;
-  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
   dueDate: string | null;
   category: string | null;
@@ -34,6 +34,7 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "REQUESTED",   label: "Requested"   },
   { key: "PENDING",     label: "Pending"     },
   { key: "IN_PROGRESS", label: "In Progress" },
+  { key: "ON_HOLD",     label: "On Hold"     },
   { key: "COMPLETED",   label: "Completed"   },
   { key: "REJECTED",    label: "Rejected"    },
 ];
@@ -51,6 +52,7 @@ const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> 
   REQUESTED:   { cls: "tu-badge tu-badge-brand",   label: "Requested"   },
   PENDING:     { cls: "tu-badge tu-badge-warning",  label: "Pending"     },
   IN_PROGRESS: { cls: "tu-badge tu-badge-brand",    label: "In Progress" },
+  ON_HOLD:     { cls: "tu-badge tu-badge-neutral",  label: "On Hold"     },
   COMPLETED:   { cls: "tu-badge tu-badge-success",  label: "Completed"   },
   REJECTED:    { cls: "tu-badge tu-badge-danger",   label: "Rejected"    },
 };

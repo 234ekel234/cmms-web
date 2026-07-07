@@ -1,11 +1,12 @@
 "use client";
 
-export type PipelineStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "COMPLETED" | "REJECTED";
+export type PipelineStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
 
 const PROGRESS: Record<PipelineStatus, number> = {
   REQUESTED: 1,
   PENDING: 2,
   IN_PROGRESS: 3,
+  ON_HOLD: 3, // paused at the in-progress stage; the badge conveys "On Hold"
   COMPLETED: 4,
   REJECTED: -1,
 };
