@@ -49,6 +49,21 @@ export default function UsersPage() {
   const [formError, setFormError] = useState("");
 
   const isManager = me?.role === "GENERAL_MANAGER" || me?.role === "MANAGER";
+  // Only a General Manager can provision privileged (Manager / GM) accounts,
+  // via the GM-only POST /users endpoint. Managers can still add front-line
+  // staff (Supervisor / Client) through public self-registration.
+  const isGM = me?.role === "GENERAL_MANAGER";
+  const ROLE_OPTIONS: { value: Role; label: string }[] = isGM
+    ? [
+        { value: "MANAGER", label: "Manager" },
+        { value: "SUPERVISOR", label: "Supervisor" },
+        { value: "CLIENT", label: "Client" },
+        { value: "GENERAL_MANAGER", label: "General Manager" },
+      ]
+    : [
+        { value: "SUPERVISOR", label: "Supervisor" },
+        { value: "CLIENT", label: "Client" },
+      ];
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -75,7 +90,10 @@ export default function UsersPage() {
     setFormError("");
     setSaving(true);
     try {
-      await api.post("/auth/register", {
+      // GMs provision through the privileged endpoint (any role); everyone
+      // else uses public self-registration (Supervisor / Client only).
+      const endpoint = isGM ? "/users" : "/auth/register";
+      await api.post(endpoint, {
         name: form.name.trim(),
         email: form.email.trim().toLowerCase(),
         password: form.password,
@@ -180,11 +198,14 @@ export default function UsersPage() {
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
               >
-                <option value="SUPERVISOR">Supervisor</option>
-                <option value="CLIENT">Client</option>
+                {ROLE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
               </select>
               <p style={{ fontSize: 11, color: "var(--tu-text-subtle)", marginTop: 4 }}>
-                Manager-level accounts are provisioned by an admin.
+                {isGM
+                  ? "Managers and General Managers have full administrative access."
+                  : "Manager-level accounts are provisioned by an admin."}
               </p>
             </div>
             {formError && (
