@@ -27,12 +27,14 @@ export default function StatusPipeline({
   ariaLabel?: string;
 }) {
   const progress = PROGRESS[status];
+  const onHold = status === "ON_HOLD";
   return (
     <div className="flex items-start my-4" role="img" aria-label={ariaLabel ?? `Progress: step ${progress} of ${steps.length}`}>
       {steps.map((step, i) => {
         const stepNum = i + 1;
         const done = progress >= stepNum;
         const active = progress === stepNum;
+        const paused = active && onHold; // sitting on this step, but work is paused
         return (
           <div key={step} className="flex-1 flex flex-col items-center relative">
             {i < steps.length - 1 && (
@@ -40,17 +42,24 @@ export default function StatusPipeline({
             )}
             <span
               className={`relative z-10 flex items-center justify-center w-[22px] h-[22px] rounded-full text-[11px] font-bold ${
-                active
+                paused
+                  ? "bg-white border-[3px] border-slate-400"
+                  : active
                   ? "bg-white border-[3px] border-[#2166AC]"
                   : done
                   ? "bg-[#2166AC] border-2 border-[#2166AC] text-white"
                   : "bg-gray-200 border-2 border-gray-200 text-transparent"
               }`}
             >
-              {active ? <span className="w-2 h-2 rounded-full bg-[#2166AC]" /> : done ? "✓" : ""}
+              {paused ? (
+                <span className="flex gap-[2px]" aria-hidden="true">
+                  <span className="w-[3px] h-[9px] rounded-sm bg-slate-500" />
+                  <span className="w-[3px] h-[9px] rounded-sm bg-slate-500" />
+                </span>
+              ) : active ? <span className="w-2 h-2 rounded-full bg-[#2166AC]" /> : done ? "✓" : ""}
             </span>
-            <span className={`mt-1.5 text-[9px] font-semibold text-center ${done ? "text-[#2166AC]" : "text-gray-400"}`}>
-              {step}
+            <span className={`mt-1.5 text-[9px] font-semibold text-center ${paused ? "text-slate-600" : done ? "text-[#2166AC]" : "text-gray-400"}`}>
+              {paused ? "On Hold" : step}
             </span>
           </div>
         );

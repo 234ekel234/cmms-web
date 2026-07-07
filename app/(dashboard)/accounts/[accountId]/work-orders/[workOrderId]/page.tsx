@@ -299,7 +299,18 @@ export default function WorkOrderDetailPage() {
             This work order was rejected.
           </div>
         ) : (
-          <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+          <>
+            {order.status === "ON_HOLD" && (
+              <div className="flex items-center justify-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-2.5 my-2.5 text-[13px] font-semibold text-slate-700">
+                <span className="flex gap-[3px]" aria-hidden="true">
+                  <span className="w-[3px] h-3.5 rounded-sm bg-slate-500" />
+                  <span className="w-[3px] h-3.5 rounded-sm bg-slate-500" />
+                </span>
+                On hold — work is paused. Resume it to continue.
+              </div>
+            )}
+            <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+          </>
         )}
 
         {/* Inline edit form */}
