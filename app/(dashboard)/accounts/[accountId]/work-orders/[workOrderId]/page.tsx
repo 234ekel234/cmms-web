@@ -27,6 +27,7 @@ type WorkOrder = {
   isSpecialProject: boolean;
   estimatedMinutes: number | null;
   actualSeconds: number;
+  timerStartedAt: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
   comments: { id: string; body: string; authorName: string; createdAt: string }[];
@@ -71,6 +72,15 @@ function formatHM(minutes: number) {
   return `${rem}m`;
 }
 
+// Live timer display, H:MM:SS.
+function formatTimer(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
@@ -109,6 +119,50 @@ export default function WorkOrderDetailPage() {
   const [editForm, setEditForm] = useState({ priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
 
+  // Man-hour time tracking
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  const [timerBusy, setTimerBusy] = useState(false);
+  const [editingEst, setEditingEst] = useState(false);
+  const [estHrs, setEstHrs] = useState("");
+  const [estMins, setEstMins] = useState("");
+  const timerRunning = order?.status === "IN_PROGRESS" && order?.timerStartedAt != null;
+
+  // Tick once a second only while the timer is actively running.
+  useEffect(() => {
+    if (!timerRunning) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [timerRunning]);
+
+  async function toggleTimer() {
+    if (!order) return;
+    setTimerBusy(true);
+    try {
+      const action = order.timerStartedAt ? "pause" : "resume";
+      const res = await api.post(`/work-orders/${order.id}/timer`, { action });
+      setOrder((prev) => prev ? { ...prev, status: res.data.status, timerStartedAt: res.data.timerStartedAt, actualSeconds: res.data.actualSeconds } : prev);
+    } catch {
+      // silent
+    } finally {
+      setTimerBusy(false);
+    }
+  }
+
+  async function saveEstimate() {
+    if (!order) return;
+    const h = estHrs.trim() === "" ? 0 : parseInt(estHrs, 10);
+    const m = estMins.trim() === "" ? 0 : parseInt(estMins, 10);
+    if (isNaN(h) || isNaN(m) || h < 0 || m < 0 || m > 59) return;
+    const total = h * 60 + m;
+    try {
+      const res = await api.patch(`/work-orders/${order.id}`, { estimatedMinutes: total || null });
+      setOrder((prev) => prev ? { ...prev, estimatedMinutes: res.data.estimatedMinutes } : prev);
+      setEditingEst(false);
+    } catch {
+      // silent
+    }
+  }
+
   const isClient = user?.role === "CLIENT";
   const canManage = user?.role !== "CLIENT";
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
@@ -119,8 +173,13 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setError(false);
     try {
-      const res = await api.get(`/work-orders/${workOrderId}`);
-      setOrder(res.data);
+      // There's no single-work-order GET endpoint; the account list is the
+      // source of truth (it includes asset, comments, assignments, and the
+      // man-hour/timer fields), so find this order within it.
+      const res = await api.get(`/accounts/${accountId}/work-orders`);
+      const found = res.data.find((w: WorkOrder) => w.id === workOrderId);
+      if (!found) { setError(true); return; }
+      setOrder(found);
     } catch {
       setError(true);
     } finally {
@@ -502,13 +561,89 @@ export default function WorkOrderDetailPage() {
           )}
         </div>
 
-        {/* Man-hours */}
-        {(order.estimatedMinutes != null || order.actualSeconds > 0) && (
-          <div className="text-xs text-gray-500 mb-4">
-            Time: {formatHM(order.actualSeconds / 60)}
-            {order.estimatedMinutes != null && ` / ${formatHM(order.estimatedMinutes)} est.`}
-          </div>
-        )}
+        {/* Time tracking (man-hours) */}
+        {["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(order.status) && (() => {
+          const liveSeconds = order.actualSeconds + (timerRunning && order.timerStartedAt
+            ? Math.floor((nowTick - new Date(order.timerStartedAt).getTime()) / 1000)
+            : 0);
+          const actualMinutes = liveSeconds / 60;
+          const estMin = order.estimatedMinutes;
+          const pct = estMin && estMin > 0 ? Math.min((actualMinutes / estMin) * 100, 100) : null;
+          const overBudget = estMin != null && actualMinutes > estMin;
+          const isDone = order.status === "COMPLETED";
+          return (
+            <div className="border border-gray-100 rounded-xl p-4 mb-4">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Time Tracking · Man-Hours</p>
+
+              {/* Expected */}
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <span className="text-sm text-gray-500">Expected</span>
+                {editingEst ? (
+                  <div className="flex items-center gap-1.5">
+                    <input type="number" min={0} value={estHrs} onChange={(e) => setEstHrs(e.target.value)} placeholder="0"
+                      className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2166AC]" />
+                    <span className="text-xs text-gray-400">h</span>
+                    <input type="number" min={0} max={59} value={estMins} onChange={(e) => setEstMins(e.target.value)} placeholder="0"
+                      className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2166AC]" />
+                    <span className="text-xs text-gray-400">m</span>
+                    <button onClick={saveEstimate} className="ml-1 text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-2.5 py-1 hover:bg-[#1a5490] cursor-pointer">Save</button>
+                    <button onClick={() => setEditingEst(false)} className="text-xs text-gray-500 px-1 cursor-pointer">Cancel</button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gray-800">{estMin != null ? formatHM(estMin) : "Not set"}</span>
+                    {canManage && (
+                      <button
+                        onClick={() => { setEstHrs(estMin != null ? String(Math.floor(estMin / 60)) : ""); setEstMins(estMin != null ? String(estMin % 60) : ""); setEditingEst(true); }}
+                        className="text-xs text-[#2166AC] hover:underline cursor-pointer"
+                      >
+                        {estMin != null ? "Edit" : "Set"}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Live timer / actual */}
+              <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{isDone ? "Actual" : "Elapsed"}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${overBudget ? "text-red-600" : "text-gray-900"}`}>{formatTimer(liveSeconds)}</p>
+                </div>
+                {!isDone && (
+                  <span className={`text-xs font-semibold ${timerRunning ? "text-green-600" : "text-slate-500"}`}>
+                    {timerRunning ? "● Running" : "❚❚ Paused"}
+                  </span>
+                )}
+              </div>
+
+              {/* Budget progress */}
+              {pct != null && (
+                <div className="mt-3">
+                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-1.5 rounded-full ${overBudget ? "bg-red-500" : "bg-[#2166AC]"}`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {formatHM(actualMinutes)} of {formatHM(estMin!)} {overBudget ? "· over budget" : ""}
+                  </p>
+                </div>
+              )}
+
+              {/* Timer control (only while actively in progress) */}
+              {canManage && order.status === "IN_PROGRESS" && (
+                <button
+                  onClick={toggleTimer}
+                  disabled={timerBusy}
+                  className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
+                    order.timerStartedAt ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
+                  }`}
+                >
+                  {timerBusy ? "…" : order.timerStartedAt ? "❚❚ Pause Timer" : "▶ Resume Timer"}
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Completed info */}
         {order.status === "COMPLETED" && (
