@@ -198,7 +198,7 @@ export default function AccountsPage() {
                 <tr key={acc.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4">
                     <Link
-                      href={`/accounts/${acc.id}/work-orders`}
+                      href={`/accounts/${acc.id}`}
                       className="font-semibold text-gray-800 hover:text-[#2166AC] transition-colors"
                     >
                       {acc.name}
