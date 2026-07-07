@@ -46,6 +46,8 @@ export default function EmployeesPage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<EmployeeStatus | "ALL">("ALL");
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [sortKey, setSortKey] = useState<"name" | "recent" | "status">("name");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
@@ -137,15 +139,51 @@ export default function EmployeesPage() {
     }
   }
 
-  const filtered = employees.filter((e) => {
-    const matchSearch =
-      !search.trim() ||
-      e.name.toLowerCase().includes(search.toLowerCase()) ||
-      e.position?.toLowerCase().includes(search.toLowerCase()) ||
-      (e.categories ?? []).some((c) => c.toLowerCase().includes(search.toLowerCase()));
-    const matchStatus = statusFilter === "ALL" || e.status === statusFilter;
-    return matchSearch && matchStatus;
-  });
+  // Skills present across the registry, so the filter only offers categories
+  // that actually exist on someone (not the full COMMON_CATEGORIES wishlist).
+  const allCategories = Array.from(
+    new Set(employees.flatMap((e) => e.categories ?? []))
+  ).sort((a, b) => a.localeCompare(b));
+
+  function toggleCategory(cat: string) {
+    setCategoryFilter((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  }
+
+  const filtersActive =
+    search.trim() !== "" || statusFilter !== "ALL" || categoryFilter.length > 0;
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("ALL");
+    setCategoryFilter([]);
+  }
+
+  const filtered = employees
+    .filter((e) => {
+      const matchSearch =
+        !search.trim() ||
+        e.name.toLowerCase().includes(search.toLowerCase()) ||
+        e.position?.toLowerCase().includes(search.toLowerCase()) ||
+        (e.categories ?? []).some((c) => c.toLowerCase().includes(search.toLowerCase()));
+      const matchStatus = statusFilter === "ALL" || e.status === statusFilter;
+      // Match any selected skill (OR) — "show me electricians or plumbers".
+      const matchCategory =
+        categoryFilter.length === 0 ||
+        (e.categories ?? []).some((c) => categoryFilter.includes(c));
+      return matchSearch && matchStatus && matchCategory;
+    })
+    .sort((a, b) => {
+      if (sortKey === "recent") {
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+      if (sortKey === "status") {
+        if (a.status !== b.status) return a.status === "REGULAR" ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   const regularCount = employees.filter((e) => e.status === "REGULAR").length;
   const probCount = employees.filter((e) => e.status === "PROBATIONARY").length;
@@ -278,7 +316,7 @@ export default function EmployeesPage() {
       )}
 
       {/* Filters */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 12, marginBottom: 12, alignItems: "center", flexWrap: "wrap" }}>
         <input
           className="tu-input"
           style={{ width: 240 }}
@@ -298,7 +336,71 @@ export default function EmployeesPage() {
             </button>
           ))}
         </div>
+        <select
+          className="tu-select"
+          style={{ minWidth: 160, marginLeft: "auto" }}
+          value={sortKey}
+          onChange={(e) => setSortKey(e.target.value as typeof sortKey)}
+          aria-label="Sort employees"
+        >
+          <option value="name">Sort: Name (A–Z)</option>
+          <option value="recent">Sort: Newest first</option>
+          <option value="status">Sort: Status</option>
+        </select>
       </div>
+
+      {/* Skill / category filter */}
+      {allCategories.length > 0 && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ fontSize: 12, fontWeight: 600, color: "var(--tu-text-subtle)", marginRight: 2 }}>
+            Skills:
+          </span>
+          {allCategories.map((cat) => {
+            const on = categoryFilter.includes(cat);
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => toggleCategory(cat)}
+                aria-pressed={on}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: "3px 10px",
+                  borderRadius: 9999,
+                  cursor: "pointer",
+                  border: "1px solid",
+                  borderColor: on ? "var(--tu-text-brand)" : "var(--tu-border)",
+                  background: on ? "var(--tu-bg-brand-soft)" : "var(--tu-bg-surface)",
+                  color: on ? "var(--tu-text-brand)" : "var(--tu-text-body)",
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Result count + clear */}
+      {!loading && (
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+          <span style={{ fontSize: 13, color: "var(--tu-text-subtle)" }}>
+            {filtersActive
+              ? `Showing ${filtered.length} of ${employees.length}`
+              : `${employees.length} employee${employees.length === 1 ? "" : "s"}`}
+          </span>
+          {filtersActive && (
+            <button
+              type="button"
+              onClick={clearFilters}
+              style={{ fontSize: 13, fontWeight: 600, color: "var(--tu-text-brand)", background: "none", border: "none", cursor: "pointer" }}
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Table */}
       <div className="tu-card">
