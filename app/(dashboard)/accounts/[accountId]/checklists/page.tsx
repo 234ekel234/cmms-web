@@ -48,10 +48,23 @@ function getThisPeriodLog(logs: PMLog[], frequency: string): PMLog | null {
   return logs.find((l) => new Date(l.scheduledDate) >= periodStart) ?? null;
 }
 
-function isCompletedThisPeriod(logs: PMLog[], frequency: string): boolean {
-  const log = getThisPeriodLog(logs, frequency);
-  return !!log && !log.isDraft;
+type ChecklistState = "completed" | "draft" | "unanswered";
+
+// This-period state of an assignment: finalized log = completed, a draft log =
+// draft, no log yet = unanswered.
+function statusOf(a: Assignment): ChecklistState {
+  const log = getThisPeriodLog(a.logs, a.checklist.frequency);
+  if (log && !log.isDraft) return "completed";
+  if (log) return "draft";
+  return "unanswered";
 }
+
+const STATUS_ORDER: ChecklistState[] = ["completed", "draft", "unanswered"];
+const STATUS_META: Record<ChecklistState, { label: string; activeCls: string }> = {
+  completed:  { label: "Completed",  activeCls: "bg-green-600 text-white border-green-600" },
+  draft:      { label: "Draft",      activeCls: "bg-amber-500 text-white border-amber-500" },
+  unanswered: { label: "Unanswered", activeCls: "bg-gray-600 text-white border-gray-600" },
+};
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -62,6 +75,7 @@ export default function ChecklistsPage() {
   const accountId = params.accountId as string;
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
 
   useEffect(() => { fetchAssignments(); }, [accountId]);
 
@@ -86,9 +100,9 @@ export default function ChecklistsPage() {
     }
   }
 
-  const general = assignments.filter((a) => !a.asset);
-  const assetPM = assignments.filter((a) => !!a.asset);
-  const totalDone = assignments.filter((a) => isCompletedThisPeriod(a.logs, a.checklist.frequency)).length;
+  const byStatus: Record<ChecklistState, Assignment[]> = { completed: [], draft: [], unanswered: [] };
+  for (const a of assignments) byStatus[statusOf(a)].push(a);
+  const totalDone = byStatus.completed.length;
 
   function renderCard(a: Assignment) {
     const freqCfg = FREQUENCY_CONFIG[a.checklist.frequency] ?? { label: a.checklist.frequency, cls: "bg-gray-100 text-gray-600" };
@@ -175,26 +189,51 @@ export default function ChecklistsPage() {
         </div>
       ) : (
         <div>
-          {general.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">General</p>
-                <p className="text-xs text-gray-400">
-                  {general.filter((a) => isCompletedThisPeriod(a.logs, a.checklist.frequency)).length}/{general.length}
+          {/* Status filter pills */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            <button
+              type="button"
+              onClick={() => setStatusFilter("ALL")}
+              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                statusFilter === "ALL" ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+              }`}
+            >
+              All ({assignments.length})
+            </button>
+            {STATUS_ORDER.map((key) => {
+              const active = statusFilter === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setStatusFilter(key)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                    active ? STATUS_META[key].activeCls : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  }`}
+                >
+                  {STATUS_META[key].label} ({byStatus[key].length})
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Status-grouped sections */}
+          {STATUS_ORDER.filter((key) => statusFilter === "ALL" || statusFilter === key).map((key) => {
+            const list = byStatus[key];
+            if (list.length === 0) return null;
+            return (
+              <div key={key} className="mb-6">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
+                  {STATUS_META[key].label} ({list.length})
                 </p>
+                <div className="space-y-3">{list.map(renderCard)}</div>
               </div>
-              <div className="space-y-3">{general.map(renderCard)}</div>
-            </div>
-          )}
-          {assetPM.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">Asset PM</p>
-                <p className="text-xs text-gray-400">
-                  {assetPM.filter((a) => isCompletedThisPeriod(a.logs, a.checklist.frequency)).length}/{assetPM.length}
-                </p>
-              </div>
-              <div className="space-y-3">{assetPM.map(renderCard)}</div>
+            );
+          })}
+
+          {statusFilter !== "ALL" && byStatus[statusFilter].length === 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-sm">
+              No {STATUS_META[statusFilter].label.toLowerCase()} checklists this period.
             </div>
           )}
         </div>
