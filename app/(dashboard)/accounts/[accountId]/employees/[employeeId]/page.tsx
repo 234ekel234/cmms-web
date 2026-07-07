@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 type EmployeeStatus = "REGULAR" | "PROBATIONARY";
 type EmployeeCategory = "ELECTRICAL" | "MECHANICAL" | "PLUMBING" | "CIVIL" | "GENERAL";
@@ -144,13 +145,12 @@ export default function EmployeeDetailPage() {
 
   return (
     <div className="p-8 max-w-3xl space-y-5">
-      {/* Back */}
-      <Link
-        href={`/accounts/${accountId}/employees`}
-        className="text-sm text-[#2166AC] font-semibold hover:underline"
-      >
-        ← Employees
-      </Link>
+      <Breadcrumbs
+        items={[
+          { label: "Employees", href: `/accounts/${accountId}/employees` },
+          { label: employee.name },
+        ]}
+      />
 
       {/* Profile card */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">

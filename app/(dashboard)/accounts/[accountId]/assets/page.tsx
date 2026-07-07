@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
+import AssetImportModal from "@/components/AssetImportModal";
 
 type AssetHealth = "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 
@@ -39,6 +40,7 @@ export default function AssetsPage() {
   const [form, setForm] = useState({ name: "", category: "", health: "GOOD" as AssetHealth });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [showImport, setShowImport] = useState(false);
 
   useEffect(() => { fetchAssets(); }, [accountId, showArchived]);
 
@@ -91,12 +93,20 @@ export default function AssetsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-gray-900">Assets</h2>
-        <button
-          onClick={() => setShowForm(true)}
-          className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
-        >
-          + Add Asset
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowImport(true)}
+            className="bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors cursor-pointer"
+          >
+            Import CSV
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
+          >
+            + Add Asset
+          </button>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -252,6 +262,19 @@ export default function AssetsPage() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {showImport && (
+        <AssetImportModal
+          accountId={accountId}
+          onClose={() => setShowImport(false)}
+          onImported={(created) => {
+            setAssets((prev) => [
+              ...prev,
+              ...created.map((a) => ({ ...a, openWorkOrders: 0, lastCompletedAt: null, archivedAt: null })),
+            ]);
+          }}
+        />
       )}
     </div>
   );

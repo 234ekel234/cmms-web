@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 type PMItem = { id?: string; label: string };
 type PMSection = { id?: string; title: string; answerOptions: string[]; items: PMItem[] };
@@ -159,11 +159,12 @@ export default function EditChecklistPage() {
   return (
     <div className="p-8 max-w-3xl mx-auto pb-32">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/pm-checklists" className="text-sm text-[#2166AC] font-semibold hover:underline shrink-0">
-          ← PM Checklists
-        </Link>
-      </div>
+      <Breadcrumbs
+        items={[
+          { label: "PM Checklists", href: "/pm-checklists" },
+          { label: name || "Checklist" },
+        ]}
+      />
 
       {/* Name + frequency */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-5">

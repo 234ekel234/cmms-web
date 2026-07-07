@@ -6,6 +6,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline from "@/components/StatusPipeline";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -257,14 +258,12 @@ export default function WorkOrderDetailPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
-      <div className="mb-6">
-        <Link
-          href={`/accounts/${accountId}/work-orders`}
-          className="text-xs text-gray-400 hover:text-[#2166AC] transition-colors"
-        >
-          ← Work Orders
-        </Link>
-      </div>
+      <Breadcrumbs
+        items={[
+          { label: "Work Orders", href: `/accounts/${accountId}/work-orders` },
+          { label: order.title },
+        ]}
+      />
 
       {/* Main card */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
@@ -392,7 +391,15 @@ export default function WorkOrderDetailPage() {
 
         {/* Asset */}
         {order.asset && (
-          <p className="text-sm text-[#2166AC] mb-4">Asset: {order.asset.name}</p>
+          <p className="text-sm mb-4">
+            <span className="text-gray-500">Asset: </span>
+            <Link
+              href={`/accounts/${accountId}/assets/${order.asset.id}`}
+              className="text-[#2166AC] hover:underline"
+            >
+              {order.asset.name}
+            </Link>
+          </p>
         )}
 
         {/* Assignees */}
@@ -412,7 +419,9 @@ export default function WorkOrderDetailPage() {
             <div className="flex flex-wrap gap-2">
               {order.assignments.map((a) => (
                 <span key={a.id} className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 font-medium">
-                  {a.employee.name}
+                  <Link href={`/accounts/${accountId}/employees/${a.employee.id}`} className="hover:text-[#2166AC] hover:underline">
+                    {a.employee.name}
+                  </Link>
                   {a.employee.position && <span className="text-gray-400">· {a.employee.position}</span>}
                   {canManage && !isTerminal && (
                     <button

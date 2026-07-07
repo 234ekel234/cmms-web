@@ -78,7 +78,7 @@ function fmtRange(iso: string) {
 const WO_STATUS: { key: keyof DashboardData["workOrders"]; label: string; color: string }[] = [
   { key: "REQUESTED", label: "Requested", color: "#F59E0B" },
   { key: "PENDING", label: "Pending", color: "#6366F1" },
-  { key: "IN_PROGRESS", label: "In Progress", color: "#1447E6" },
+  { key: "IN_PROGRESS", label: "In Progress", color: "#2166AC" },
   { key: "COMPLETED", label: "Completed", color: "#10B981" },
   { key: "REJECTED", label: "Rejected", color: "#94A3B8" },
 ];
@@ -315,7 +315,7 @@ export default function DashboardPage() {
   }[] = [
     {
       label: "Open Work Orders",
-      accent: "#1447E6",
+      accent: "#2166AC",
       icon: <IconClipboard />,
       value: loading ? "—" : String(openWOs),
       valueClass: openWOs > 0 ? "tu-stat-brand" : "",
@@ -509,7 +509,7 @@ export default function DashboardPage() {
             {loading ? (
               <div className="tu-skeleton" style={{ height: 72, borderRadius: 6 }} aria-hidden="true" />
             ) : (
-              <BarChart data={clTrend} color="#1447E6" />
+              <BarChart data={clTrend} color="#2166AC" />
             )}
           </div>
         </div>
@@ -640,7 +640,7 @@ export default function DashboardPage() {
               data?.checklistBreakdown.map((f) => {
                 const pct = f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0;
                 const done = f.completed >= f.total && f.total > 0;
-                const color = done ? "#10B981" : pct >= 50 ? "#1447E6" : "#F59E0B";
+                const color = done ? "#10B981" : pct >= 50 ? "#2166AC" : "#F59E0B";
                 const label = f.frequency.replace(/_/g, " ").toLowerCase();
                 const accounts = f.accounts ?? [];
                 const expandable = accounts.length > 1;
@@ -683,7 +683,7 @@ export default function DashboardPage() {
                         {accounts.map((a) => {
                           const apct = a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0;
                           const adone = a.completed >= a.total && a.total > 0;
-                          const acolor = adone ? "#10B981" : apct >= 50 ? "#1447E6" : "#F59E0B";
+                          const acolor = adone ? "#10B981" : apct >= 50 ? "#2166AC" : "#F59E0B";
                           return (
                             <div key={a.id} className="tu-subrow">
                               <span className="tu-subrow-name">{a.name}</span>
@@ -746,7 +746,7 @@ export default function DashboardPage() {
                           <Link
                             href={`/accounts/${acc.id}/work-orders`}
                             style={{ color: "inherit", textDecoration: "none" }}
-                            className="hover:text-[#1447e6] transition-colors"
+                            className="hover:text-[#2166AC] transition-colors"
                           >
                             {acc.name}
                           </Link>

@@ -119,7 +119,7 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#2166AC] hover:text-blue-800"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#2166AC] hover:text-[#1a5490]"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -129,7 +129,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full bg-[#2166AC] hover:bg-blue-800 disabled:opacity-50 text-white font-semibold rounded-lg py-3 text-sm transition cursor-pointer disabled:cursor-not-allowed mt-1"
+              className="w-full bg-[#2166AC] hover:bg-[#1a5490] disabled:opacity-50 text-white font-semibold rounded-lg py-3 text-sm transition cursor-pointer disabled:cursor-not-allowed mt-1"
             >
               {loading ? "Signing in…" : "Sign In"}
             </button>

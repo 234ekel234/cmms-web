@@ -1,5 +1,6 @@
 import { AuthProvider } from "@/context/AuthContext";
 import Sidebar from "@/components/Sidebar";
+import CommandPalette from "@/components/CommandPalette";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -9,6 +10,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1 overflow-y-auto">
           {children}
         </main>
+        <CommandPalette />
       </div>
     </AuthProvider>
   );

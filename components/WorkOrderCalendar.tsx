@@ -19,7 +19,7 @@ type Props<T extends CalendarOrder> = {
 };
 
 const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string; label: string }> = {
-  REQUESTED:   { bg: "#eef6ff", fg: "#1447e6", label: "Requested"   },
+  REQUESTED:   { bg: "#eef6ff", fg: "#2166AC", label: "Requested"   },
   PENDING:     { bg: "#fef3c7", fg: "#92400e", label: "Pending"     },
   IN_PROGRESS: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
   COMPLETED:   { bg: "#dcfce7", fg: "#166534", label: "Completed"   },

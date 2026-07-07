@@ -118,11 +118,11 @@ function IconLogOut(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function IconChevronUpDown(p: React.SVGProps<SVGSVGElement>) {
+function IconSearch(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
-      <polyline points="18 15 12 9 6 15" transform="translate(0,-2)"/>
-      <polyline points="18 9 12 15 6 9" transform="translate(0,2)"/>
+      <circle cx="11" cy="11" r="8"/>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
     </svg>
   );
 }
@@ -173,7 +173,15 @@ const NAV_ITEMS: {
 
 // ── Sidebar nav content (shared between desktop and mobile) ─
 
-function NavContent({ user, logout }: { user: { name: string; email: string; role?: string } | null; logout: () => void }) {
+function NavContent({
+  user,
+  logout,
+  onNavigate,
+}: {
+  user: { name: string; email: string; role?: string } | null;
+  logout: () => void;
+  onNavigate?: () => void;
+}) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -189,6 +197,13 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
     return href === "/" ? pathname === "/" : pathname.startsWith(href);
   }
 
+  // When switching accounts, keep the user on the same sub-section they're
+  // already viewing (e.g. Assets → other account's Assets) rather than always
+  // dumping them on Work Orders. Falls back to work-orders off account pages.
+  const accountTabMatch = pathname.match(/^\/accounts\/[^/]+\/([^/]+)/);
+  const accountSubPath = accountTabMatch ? accountTabMatch[1] : "work-orders";
+  const activeAccountId = pathname.match(/^\/accounts\/([^/]+)/)?.[1];
+
   const initial = user?.name?.[0]?.toUpperCase() ?? "?";
 
   return (
@@ -200,10 +215,19 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
           <span className="tu-user-name">{user?.name}</span>
           <span className="tu-user-email">{user?.email}</span>
         </div>
-        <button className="tu-chevron-btn" aria-label="Switch account" type="button">
-          <IconChevronUpDown />
-        </button>
       </div>
+
+      {/* Global search trigger (opens the ⌘K command palette) */}
+      <button
+        type="button"
+        onClick={() => { onNavigate?.(); window.dispatchEvent(new CustomEvent("open-command-palette")); }}
+        className="tu-nav-item"
+        style={{ width: "100%", justifyContent: "flex-start", color: "#6b7280" }}
+      >
+        <span className="tu-nav-icon"><IconSearch /></span>
+        <span style={{ flex: 1, textAlign: "left" }}>Search…</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
+      </button>
 
       {/* Primary navigation */}
       <nav className="tu-nav" aria-label="Main navigation">
@@ -215,6 +239,7 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   className={`tu-nav-item${active ? " tu-active" : ""}`}
                   aria-current={active ? "page" : undefined}
                 >
@@ -263,21 +288,26 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
         <div className="tu-section">
           <p className="tu-section-heading">Accounts</p>
           <ul role="list">
-            {accounts.map((acc) => (
-              <li key={acc.id}>
-                <Link
-                  href={`/accounts/${acc.id}/work-orders`}
-                  className="tu-project-item"
-                >
-                  <span
-                    className="tu-project-dot"
-                    style={{ backgroundColor: "#2166AC" }}
-                    aria-hidden="true"
-                  />
-                  <span className="tu-project-name">{acc.name}</span>
-                </Link>
-              </li>
-            ))}
+            {accounts.map((acc) => {
+              const active = acc.id === activeAccountId;
+              return (
+                <li key={acc.id}>
+                  <Link
+                    href={`/accounts/${acc.id}/${accountSubPath}`}
+                    onClick={onNavigate}
+                    className={`tu-project-item${active ? " tu-active" : ""}`}
+                    aria-current={active ? "page" : undefined}
+                  >
+                    <span
+                      className="tu-project-dot"
+                      style={{ backgroundColor: active ? "#2166AC" : "#94a3b8" }}
+                      aria-hidden="true"
+                    />
+                    <span className="tu-project-name">{acc.name}</span>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
@@ -289,7 +319,7 @@ function NavContent({ user, logout }: { user: { name: string; email: string; rol
       <div className="tu-utility-group">
         <ul role="list">
           <li>
-            <button className="tu-utility-item" type="button" onClick={logout}>
+            <button className="tu-utility-item" type="button" onClick={() => { onNavigate?.(); logout(); }}>
               <IconLogOut />
               Sign out
             </button>
@@ -366,7 +396,7 @@ export default function Sidebar() {
           </button>
         </div>
         <div className="tu-inner">
-          <NavContent user={user} logout={logout} />
+          <NavContent user={user} logout={logout} onNavigate={() => setDrawerOpen(false)} />
         </div>
       </aside>
 

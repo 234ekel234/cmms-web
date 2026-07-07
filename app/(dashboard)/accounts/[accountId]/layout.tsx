@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useParams, usePathname } from "next/navigation";
 import api from "@/lib/api";
@@ -33,6 +33,14 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   const { user } = useAuth();
   const accountId = params.accountId as string;
   const [account, setAccount] = useState<Account | null>(null);
+  const activeTabRef = useRef<HTMLAnchorElement>(null);
+
+  // Keep the active tab visible: when the overflowing tab bar can't fit every
+  // tab (mobile, or deep tabs like Members/Attendance), scroll the current one
+  // into view instead of leaving it clipped off the right edge.
+  useEffect(() => {
+    activeTabRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
 
   // Only show tabs the current role is actually allowed to open (same rules
   // as the route guard), so tab visibility never disagrees with access.
@@ -73,7 +81,9 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
             return (
               <Link
                 key={tab.path}
+                ref={active ? activeTabRef : undefined}
                 href={`/accounts/${accountId}/${tab.path}`}
+                aria-current={active ? "page" : undefined}
                 className={`px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   active
                     ? "border-[#2166AC] text-[#2166AC]"

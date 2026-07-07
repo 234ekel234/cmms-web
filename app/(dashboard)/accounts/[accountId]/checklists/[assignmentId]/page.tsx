@@ -260,12 +260,17 @@ export default function ChecklistFormPage() {
           href={`/accounts/${accountId}/checklists`}
           className="text-[#2166AC] text-sm font-semibold hover:underline shrink-0"
         >
-          ← Back
+          ← Checklists
         </Link>
         <div className="flex-1 min-w-0">
           <h2 className="text-sm font-bold text-gray-900 truncate">{checklist.name}</h2>
           {assignment.asset && (
-            <p className="text-xs text-[#2166AC]">› {assignment.asset.name}</p>
+            <Link
+              href={`/accounts/${accountId}/assets/${assignment.asset.id}`}
+              className="text-xs text-[#2166AC] hover:underline"
+            >
+              › {assignment.asset.name}
+            </Link>
           )}
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${freq.cls}`}>

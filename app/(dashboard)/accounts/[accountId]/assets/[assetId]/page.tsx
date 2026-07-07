@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import Breadcrumbs from "@/components/Breadcrumbs";
 
 type AssetHealth = "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 type AssetStatus = "OPERATIONAL" | "UNDER_MAINTENANCE";
@@ -31,6 +32,21 @@ type WorkOrder = {
   accountId: string;
 };
 
+type PMLogLite = {
+  id: string;
+  scheduledDate: string;
+  completedAt: string;
+  isDraft: boolean;
+  isLate: boolean;
+};
+
+type PMChecklistAssignment = {
+  id: string;
+  isActive: boolean;
+  checklist: { id: string; name: string; frequency: string };
+  logs: PMLogLite[];
+};
+
 const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
   GOOD:           { label: "Good",           cls: "bg-green-50 text-green-700" },
   FAIR:           { label: "Fair",           cls: "bg-amber-50 text-amber-700" },
@@ -51,12 +67,25 @@ const WO_STATUS_LABELS: Record<string, string> = {
   COMPLETED: "Completed", REJECTED: "Rejected",
 };
 
+const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
+  DAILY:         { label: "Daily",         cls: "bg-blue-50 text-blue-700" },
+  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
+  MONTHLY:       { label: "Monthly",       cls: "bg-amber-50 text-amber-700" },
+  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
+  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
+  ANNUALLY:      { label: "Annually",      cls: "bg-green-50 text-green-700" },
+};
+
+const fmtDate = (d: string) =>
+  new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
 export default function AssetDetailPage() {
   const params = useParams();
   const accountId = params.accountId as string;
   const assetId = params.assetId as string;
   const [asset, setAsset] = useState<Asset | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+  const [pmChecklists, setPmChecklists] = useState<PMChecklistAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [editHealth, setEditHealth] = useState(false);
@@ -71,12 +100,14 @@ export default function AssetDetailPage() {
     setLoading(true);
     setError(false);
     try {
-      const [assetRes, woRes] = await Promise.all([
+      const [assetRes, woRes, pmRes] = await Promise.all([
         api.get(`/assets/${assetId}`),
         api.get(`/assets/${assetId}/work-orders`).catch(() => ({ data: [] })),
+        api.get(`/assets/${assetId}/pm-checklists`).catch(() => ({ data: [] })),
       ]);
       setAsset(assetRes.data);
       setWorkOrders(woRes.data);
+      setPmChecklists(pmRes.data);
       setNotesVal(assetRes.data.notes ?? "");
     } catch {
       setError(true);
@@ -141,11 +172,12 @@ export default function AssetDetailPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <div className="mb-6">
-        <Link href={`/accounts/${accountId}/assets`} className="text-xs text-gray-400 hover:text-[#2166AC] transition-colors">
-          ← Assets
-        </Link>
-      </div>
+      <Breadcrumbs
+        items={[
+          { label: "Assets", href: `/accounts/${accountId}/assets` },
+          { label: asset.name },
+        ]}
+      />
 
       {/* Main info card */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
@@ -267,12 +299,54 @@ export default function AssetDetailPage() {
         </div>
       </div>
 
-      {/* Work orders */}
-      {workOrders.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-sm font-semibold text-gray-700">Work Orders ({workOrders.length})</h2>
+      {/* PM checklists */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700">PM Checklists ({pmChecklists.length})</h2>
+        </div>
+        {pmChecklists.length === 0 ? (
+          <p className="px-6 py-6 text-sm text-gray-400">No PM checklists assigned to this asset.</p>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {pmChecklists.map((pm) => {
+              const freq = FREQUENCY_CONFIG[pm.checklist.frequency] ?? { label: pm.checklist.frequency, cls: "bg-gray-100 text-gray-600" };
+              const last = pm.logs[0];
+              return (
+                <Link
+                  key={pm.id}
+                  href={`/accounts/${accountId}/checklists/${pm.id}`}
+                  className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-gray-800">{pm.checklist.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {last ? `Last done ${fmtDate(last.completedAt)}${last.isDraft ? " (draft)" : ""}` : "Never completed"}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {!pm.isActive && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-500">Inactive</span>
+                    )}
+                    {last?.isLate && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-red-50 text-red-700">Late</span>
+                    )}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${freq.cls}`}>{freq.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
+        )}
+      </div>
+
+      {/* Work orders */}
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-sm font-semibold text-gray-700">Work Orders ({workOrders.length})</h2>
+        </div>
+        {workOrders.length === 0 ? (
+          <p className="px-6 py-6 text-sm text-gray-400">No work orders for this asset.</p>
+        ) : (
           <div className="divide-y divide-gray-100">
             {[...openWOs, ...closedWOs].map((wo) => (
               <Link
@@ -282,9 +356,7 @@ export default function AssetDetailPage() {
               >
                 <div>
                   <p className="text-sm font-medium text-gray-800">{wo.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(wo.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{fmtDate(wo.createdAt)}</p>
                 </div>
                 <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${WO_STATUS_CLS[wo.status] ?? "bg-gray-100 text-gray-600"}`}>
                   {WO_STATUS_LABELS[wo.status] ?? wo.status}
@@ -292,8 +364,8 @@ export default function AssetDetailPage() {
               </Link>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
