@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import api from "@/lib/api";
 
-type Health = "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+type Health = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 type Status = "OPERATIONAL" | "UNDER_MAINTENANCE";
 
 type ImportedAsset = { id: string; name: string; category: string; status: Status; health: Health };
@@ -28,7 +28,7 @@ const COLUMNS = [
 ] as const;
 
 const STATUS_VALUES: Status[] = ["OPERATIONAL", "UNDER_MAINTENANCE"];
-const HEALTH_VALUES: Health[] = ["GOOD", "FAIR", "POOR", "OUT_OF_SERVICE"];
+const HEALTH_VALUES: Health[] = ["NEW", "GOOD", "FAIR", "POOR", "OUT_OF_SERVICE"];
 
 // Minimal RFC4180-ish parser: handles quoted fields, embedded commas, "" escapes,
 // and both \n and \r\n line endings. Good enough for spreadsheet-exported CSVs.

@@ -6,7 +6,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import Breadcrumbs from "@/components/Breadcrumbs";
 
-type AssetHealth = "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 type AssetStatus = "OPERATIONAL" | "UNDER_MAINTENANCE";
 
 type Asset = {
@@ -52,6 +52,7 @@ type PMChecklistAssignment = {
 };
 
 const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
+  NEW:            { label: "New",            cls: "bg-blue-50 text-blue-700" },
   GOOD:           { label: "Good",           cls: "bg-green-50 text-green-700" },
   FAIR:           { label: "Fair",           cls: "bg-amber-50 text-amber-700" },
   POOR:           { label: "Poor",           cls: "bg-orange-50 text-orange-700" },

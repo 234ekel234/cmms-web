@@ -6,7 +6,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import AssetImportModal from "@/components/AssetImportModal";
 
-type AssetHealth = "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 
 type Asset = {
   id: string;
@@ -20,13 +20,15 @@ type Asset = {
 };
 
 const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
+  NEW:            { label: "New",            cls: "bg-blue-50 text-blue-700" },
   GOOD:           { label: "Good",           cls: "bg-green-50 text-green-700" },
   FAIR:           { label: "Fair",           cls: "bg-amber-50 text-amber-700" },
   POOR:           { label: "Poor",           cls: "bg-orange-50 text-orange-700" },
   OUT_OF_SERVICE: { label: "Out of Service", cls: "bg-red-50 text-red-700" },
 };
 
-const HEALTH_RANK: Record<AssetHealth, number> = { OUT_OF_SERVICE: 0, POOR: 1, FAIR: 2, GOOD: 3 };
+// Ascending — the health sort puts the worst-off assets first.
+const HEALTH_RANK: Record<AssetHealth, number> = { OUT_OF_SERVICE: 0, POOR: 1, FAIR: 2, GOOD: 3, NEW: 4 };
 
 export default function AssetsPage() {
   const params = useParams();

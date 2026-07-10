@@ -27,6 +27,7 @@ const WO_STATUS: { key: string; label: string; cls: string }[] = [
 ];
 
 const HEALTH: { key: string; label: string; cls: string }[] = [
+  { key: "NEW",            label: "New",            cls: "bg-blue-500" },
   { key: "GOOD",           label: "Good",           cls: "bg-green-500" },
   { key: "FAIR",           label: "Fair",           cls: "bg-amber-500" },
   { key: "POOR",           label: "Poor",           cls: "bg-orange-500" },
