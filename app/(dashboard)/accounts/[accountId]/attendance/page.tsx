@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import api from "@/lib/api";
 
 type ShiftTemplate = {
@@ -190,8 +191,17 @@ export default function AttendancePage() {
 
   if (shiftTemplates.length === 0) {
     return (
-      <div className="p-8 text-center text-gray-400 text-sm py-16">
-        No shift templates configured for this account.
+      <div className="p-8 text-center py-16">
+        <p className="text-sm text-gray-500 font-medium">No shifts yet</p>
+        <p className="text-xs text-gray-400 mt-1 mb-4">
+          Attendance is tracked per shift. Add one on the Schedule tab to get started.
+        </p>
+        <Link
+          href={`/accounts/${accountId}/schedule`}
+          className="inline-block text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-4 py-2 hover:bg-[#1a5490]"
+        >
+          Go to Schedule
+        </Link>
       </div>
     );
   }

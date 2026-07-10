@@ -12,6 +12,10 @@ type Account = {
   createdAt: string;
 };
 
+type ShiftInput = { name: string; startTime: string; endTime: string };
+
+const DEFAULT_SHIFT: ShiftInput = { name: "Day Shift", startTime: "08:00", endTime: "17:00" };
+
 export default function AccountsPage() {
   const { user } = useAuth();
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -20,9 +24,9 @@ export default function AccountsPage() {
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [shiftName, setShiftName] = useState("Day Shift");
-  const [shiftStart, setShiftStart] = useState("08:00");
-  const [shiftEnd, setShiftEnd] = useState("17:00");
+  // The API requires at least one shift on an account, so the form always
+  // starts with one row and never lets the last one be removed.
+  const [shifts, setShifts] = useState<ShiftInput[]>([{ ...DEFAULT_SHIFT }]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -45,24 +49,42 @@ export default function AccountsPage() {
     }
   }
 
+  function updateShift(index: number, field: keyof ShiftInput, value: string) {
+    setShifts((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
+  }
+
+  function addShift() {
+    setShifts((prev) => [...prev, { name: "", startTime: "", endTime: "" }]);
+  }
+
+  function removeShift(index: number) {
+    setShifts((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== index)));
+  }
+
   async function createAccount() {
     if (!name.trim()) { setFormError("Account name is required."); return; }
-    if (!shiftName.trim()) { setFormError("Shift name is required."); return; }
+
+    for (const [i, s] of shifts.entries()) {
+      if (!s.name.trim()) { setFormError(`Shift ${i + 1}: name is required.`); return; }
+      if (!s.startTime || !s.endTime) { setFormError(`Shift ${i + 1}: start and end time are required.`); return; }
+      if (s.startTime === s.endTime) { setFormError(`Shift ${i + 1}: start and end time cannot be the same.`); return; }
+    }
+    const names = shifts.map((s) => s.name.trim().toLowerCase());
+    if (new Set(names).size !== names.length) { setFormError("Shift names must be unique."); return; }
+
     setFormError("");
     setSaving(true);
     try {
       const res = await api.post("/accounts", {
         name: name.trim(),
         description: description.trim() || null,
-        shifts: [{ name: shiftName.trim(), startTime: shiftStart, endTime: shiftEnd }],
+        shifts: shifts.map((s) => ({ name: s.name.trim(), startTime: s.startTime, endTime: s.endTime })),
       });
       setAccounts((prev) => [res.data, ...prev]);
       setShowForm(false);
       setName("");
       setDescription("");
-      setShiftName("Day Shift");
-      setShiftStart("08:00");
-      setShiftEnd("17:00");
+      setShifts([{ ...DEFAULT_SHIFT }]);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to create account.");
@@ -111,36 +133,67 @@ export default function AccountsPage() {
               />
             </div>
             <div className="border-t border-gray-100 pt-4">
-              <p className="text-xs font-semibold text-gray-500 mb-3">First Shift Template</p>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Shift Name</label>
-                  <input
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
-                    value={shiftName}
-                    onChange={(e) => setShiftName(e.target.value)}
-                    placeholder="Day Shift"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">Start Time</label>
-                  <input
-                    type="time"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
-                    value={shiftStart}
-                    onChange={(e) => setShiftStart(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs text-gray-500 mb-1">End Time</label>
-                  <input
-                    type="time"
-                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
-                    value={shiftEnd}
-                    onChange={(e) => setShiftEnd(e.target.value)}
-                  />
-                </div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500">Shifts *</p>
+                <button
+                  type="button"
+                  onClick={addShift}
+                  className="text-xs font-semibold text-[#2166AC] hover:underline cursor-pointer"
+                >
+                  + Add Shift
+                </button>
               </div>
+
+              <div className="space-y-3">
+                {shifts.map((s, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-end">
+                    <div>
+                      <label htmlFor={`shift-name-${i}`} className="block text-xs text-gray-500 mb-1">Shift Name</label>
+                      <input
+                        id={`shift-name-${i}`}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                        value={s.name}
+                        onChange={(e) => updateShift(i, "name", e.target.value)}
+                        placeholder="e.g. Day Shift"
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`shift-start-${i}`} className="block text-xs text-gray-500 mb-1">Start Time</label>
+                      <input
+                        id={`shift-start-${i}`}
+                        type="time"
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                        value={s.startTime}
+                        onChange={(e) => updateShift(i, "startTime", e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor={`shift-end-${i}`} className="block text-xs text-gray-500 mb-1">End Time</label>
+                      <input
+                        id={`shift-end-${i}`}
+                        type="time"
+                        className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                        value={s.endTime}
+                        onChange={(e) => updateShift(i, "endTime", e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeShift(i)}
+                      disabled={shifts.length === 1}
+                      aria-label={`Remove shift ${i + 1}`}
+                      title={shifts.length === 1 ? "An account needs at least one shift" : "Remove shift"}
+                      className="px-3 py-2 text-sm text-gray-400 border border-gray-200 rounded-lg hover:text-red-500 hover:border-red-200 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-gray-400 mt-2">
+                An account needs at least one shift. Overnight shifts are fine — set the end time earlier than the start.
+              </p>
             </div>
             {formError && <p className="text-red-500 text-xs">{formError}</p>}
             <div className="flex gap-3 justify-end">

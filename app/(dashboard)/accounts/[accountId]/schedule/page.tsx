@@ -102,6 +102,12 @@ export default function SchedulePage() {
   const [copying, setCopying] = useState(false);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
+  // Add-shift form
+  const [showShiftForm, setShowShiftForm] = useState(false);
+  const [shiftForm, setShiftForm] = useState({ name: "", startTime: "", endTime: "" });
+  const [savingShift, setSavingShift] = useState(false);
+  const [shiftError, setShiftError] = useState("");
+
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayStr = toDateString(new Date());
 
@@ -202,6 +208,37 @@ export default function SchedulePage() {
     }
   }
 
+  function openShiftForm() {
+    setShiftForm({ name: "", startTime: "", endTime: "" });
+    setShiftError("");
+    setShowShiftForm(true);
+  }
+
+  async function createShiftTemplate() {
+    const name = shiftForm.name.trim();
+    if (!name) { setShiftError("Shift name is required."); return; }
+    if (!shiftForm.startTime || !shiftForm.endTime) { setShiftError("Start and end time are required."); return; }
+    if (shiftForm.startTime === shiftForm.endTime) { setShiftError("Start and end time cannot be the same."); return; }
+
+    setShiftError("");
+    setSavingShift(true);
+    try {
+      const res = await api.post(`/accounts/${accountId}/shift-templates`, {
+        name,
+        startTime: shiftForm.startTime,
+        endTime: shiftForm.endTime,
+      });
+      // Keep the same startTime ordering the API returns the list in.
+      setShiftTemplates((prev) => [...prev, res.data].sort((a, b) => a.startTime.localeCompare(b.startTime)));
+      setShowShiftForm(false);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setShiftError(e?.response?.data?.error ?? "Failed to create shift.");
+    } finally {
+      setSavingShift(false);
+    }
+  }
+
   async function copyToNextWeek() {
     if (copying) return;
     setCopying(true);
@@ -273,10 +310,87 @@ export default function SchedulePage() {
           >
             {copying ? "Copying..." : "Copy →"}
           </button>
+          {!showShiftForm && (
+            <button
+              onClick={openShiftForm}
+              className="text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-3 py-1.5 hover:bg-[#1a5490] cursor-pointer"
+            >
+              + Add Shift
+            </button>
+          )}
         </div>
 
+        {showShiftForm && (
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">New Shift</h3>
+            <div className="flex flex-wrap gap-3 items-end">
+              <div className="flex-1 min-w-[180px]">
+                <label htmlFor="shift-name" className="block text-xs font-semibold text-gray-500 mb-1">Name *</label>
+                <input
+                  id="shift-name"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={shiftForm.name}
+                  onChange={(e) => setShiftForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="e.g. Morning"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label htmlFor="shift-start" className="block text-xs font-semibold text-gray-500 mb-1">Start *</label>
+                <input
+                  id="shift-start"
+                  type="time"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={shiftForm.startTime}
+                  onChange={(e) => setShiftForm((f) => ({ ...f, startTime: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="shift-end" className="block text-xs font-semibold text-gray-500 mb-1">End *</label>
+                <input
+                  id="shift-end"
+                  type="time"
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={shiftForm.endTime}
+                  onChange={(e) => setShiftForm((f) => ({ ...f, endTime: e.target.value }))}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setShowShiftForm(false); setShiftError(""); }}
+                  className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-white cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={createShiftTemplate}
+                  disabled={savingShift}
+                  className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+                >
+                  {savingShift ? "Saving…" : "Create"}
+                </button>
+              </div>
+            </div>
+            <p className="text-xs text-gray-400 mt-2">An overnight shift is fine — set the end time earlier than the start (e.g. 22:00 to 06:00).</p>
+            {shiftError && <p className="text-red-500 text-xs mt-2">{shiftError}</p>}
+          </div>
+        )}
+
         {shiftTemplates.length === 0 ? (
-          <div className="px-6 py-8 text-center text-gray-400 text-sm">No shift templates configured.</div>
+          <div className="px-6 py-10 text-center">
+            <p className="text-sm text-gray-500 font-medium">No shifts yet</p>
+            <p className="text-xs text-gray-400 mt-1 mb-4">
+              Add a shift to start scheduling employees and tracking attendance for this account.
+            </p>
+            {!showShiftForm && (
+              <button
+                onClick={openShiftForm}
+                className="text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-4 py-2 hover:bg-[#1a5490] cursor-pointer"
+              >
+                + Add Shift
+              </button>
+            )}
+          </div>
         ) : loading ? (
           <div className="p-6 space-y-3">
             {[1, 2].map((i) => <div key={i} className="h-16 bg-gray-100 rounded animate-pulse" />)}
