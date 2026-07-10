@@ -26,6 +26,8 @@ type WorkOrder = {
   assignments: { employeeId: string; employee: { id: string; name: string } }[];
 };
 
+type AccountEmployee = { id: string; name: string; position: string | null };
+
 const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
   REQUESTED:   { label: "Requested",   cls: "bg-purple-50 text-purple-700" },
   PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
@@ -44,6 +46,8 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
 
 const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "REJECTED"];
 
+const isTerminal = (o: WorkOrder) => o.status === "COMPLETED" || o.status === "REJECTED";
+
 // Allowed status transitions a manager/supervisor can apply from each state.
 const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   REQUESTED: ["PENDING", "REJECTED"],
@@ -55,6 +59,18 @@ const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
 };
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
+
+const EMPTY_FORM = {
+  title: "",
+  description: "",
+  priority: "MEDIUM" as WorkOrderPriority,
+  category: "",
+  dueDate: "",
+  assetId: "",
+  estHours: "",
+  estMinutes: "",
+  isSpecialProject: false,
+};
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -75,16 +91,33 @@ export default function WorkOrdersPage() {
   });
   const [view, setView] = useState<"work" | "special">("work");
   const [mode, setMode] = useState<"list" | "calendar">("list");
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", priority: "MEDIUM" as WorkOrderPriority, category: "", dueDate: "", isSpecialProject: false });
+  // An `assetId` query param means we arrived from an asset page's "New Work
+  // Order" action, so open the form with that asset already selected.
+  const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId"));
+  const [form, setForm] = useState({ ...EMPTY_FORM, assetId: searchParams.get("assetId") ?? "" });
+  const [assets, setAssets] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+
+  // Inline employee assignment (modal opened from a work-order row)
+  const [assigningOrder, setAssigningOrder] = useState<WorkOrder | null>(null);
+  const [employees, setEmployees] = useState<AccountEmployee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = useState(false);
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [assignError, setAssignError] = useState("");
 
   const isClient = user?.role === "CLIENT";
   const canManage = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER" || user?.role === "SUPERVISOR";
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
   useEffect(() => { fetchOrders(); }, [accountId]);
+
+  useEffect(() => {
+    api
+      .get(`/accounts/${accountId}/assets`)
+      .then((res) => setAssets(res.data))
+      .catch(() => setAssets([]));
+  }, [accountId]);
 
   async function fetchOrders() {
     setLoading(true);
@@ -99,22 +132,75 @@ export default function WorkOrdersPage() {
     }
   }
 
+  async function openAssignModal(order: WorkOrder) {
+    setAssigningOrder(order);
+    setAssignError("");
+    if (employees.length === 0) {
+      setEmployeesLoading(true);
+      try {
+        const res = await api.get(`/accounts/${accountId}/employees`);
+        setEmployees(res.data);
+      } catch {
+        setAssignError("Failed to load employees.");
+      } finally {
+        setEmployeesLoading(false);
+      }
+    }
+  }
+
+  // Assign on click, unassign on click-again — mirrors the mobile Orders tab.
+  async function toggleAssignment(order: WorkOrder, emp: AccountEmployee) {
+    if (togglingId) return;
+    const assigned = order.assignments.some((a) => a.employeeId === emp.id);
+    setTogglingId(emp.id);
+    setAssignError("");
+    try {
+      let assignments: WorkOrder["assignments"];
+      if (assigned) {
+        await api.delete(`/work-orders/${order.id}/assignments/${emp.id}`);
+        assignments = order.assignments.filter((a) => a.employeeId !== emp.id);
+      } else {
+        const res = await api.post(`/work-orders/${order.id}/assignments`, { employeeId: emp.id });
+        assignments = [...order.assignments, res.data];
+      }
+      const updated = { ...order, assignments };
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? updated : o)));
+      setAssigningOrder(updated);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setAssignError(e?.response?.data?.error ?? `Failed to ${assigned ? "remove" : "assign"} ${emp.name}.`);
+    } finally {
+      setTogglingId(null);
+    }
+  }
+
   async function createWorkOrder() {
     if (!form.title.trim()) { setFormError("Title is required."); return; }
+
+    const hrs = form.estHours.trim() === "" ? 0 : parseInt(form.estHours, 10);
+    const mins = form.estMinutes.trim() === "" ? 0 : parseInt(form.estMinutes, 10);
+    if (isNaN(hrs) || isNaN(mins) || hrs < 0 || mins < 0 || mins > 59) {
+      setFormError("Enter valid expected hours and minutes (0–59).");
+      return;
+    }
+    const estimatedMinutes = hrs * 60 + mins;
+
     setFormError("");
     setSaving(true);
     try {
       const res = await api.post(`/accounts/${accountId}/work-orders`, {
         title: form.title.trim(),
         description: form.description.trim() || null,
+        assetId: form.assetId || null,
         priority: form.priority,
         category: form.category.trim() || null,
         dueDate: form.dueDate || null,
+        estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : null,
         isSpecialProject: form.isSpecialProject,
       });
       setOrders((prev) => [res.data, ...prev]);
       setShowForm(false);
-      setForm({ title: "", description: "", priority: "MEDIUM", category: "", dueDate: "", isSpecialProject: false });
+      setForm({ ...EMPTY_FORM });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to create work order.");
@@ -285,6 +371,43 @@ export default function WorkOrdersPage() {
                 onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
               />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Asset</label>
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                value={form.assetId}
+                onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
+              >
+                <option value="">No asset</option>
+                {assets.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 mb-1">Expected Time</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  aria-label="Expected hours"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={form.estHours}
+                  onChange={(e) => setForm((f) => ({ ...f, estHours: e.target.value }))}
+                  placeholder="Hours"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={59}
+                  aria-label="Expected minutes"
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  value={form.estMinutes}
+                  onChange={(e) => setForm((f) => ({ ...f, estMinutes: e.target.value }))}
+                  placeholder="Minutes"
+                />
+              </div>
+            </div>
             {isManager && (
               <div className="flex items-center gap-2">
                 <input
@@ -301,7 +424,7 @@ export default function WorkOrdersPage() {
           {formError && <p className="text-red-500 text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button
-              onClick={() => { setShowForm(false); setFormError(""); }}
+              onClick={() => { setShowForm(false); setFormError(""); setForm({ ...EMPTY_FORM }); }}
               className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
             >
               Cancel
@@ -394,8 +517,20 @@ export default function WorkOrdersPage() {
 
                 {/* Footer: assignment + created */}
                 <div className="flex items-center justify-between gap-2 text-[11px] text-gray-400">
-                  <span>{order.assignments.length > 0 ? order.assignments.map((a) => a.employee.name).join(", ") : "Unassigned"}</span>
-                  <span>Created {formatDate(order.createdAt)}</span>
+                  <span className="flex items-center gap-2 min-w-0">
+                    <span className="truncate">
+                      {order.assignments.length > 0 ? order.assignments.map((a) => a.employee.name).join(", ") : "Unassigned"}
+                    </span>
+                    {!isClient && canManage && !isTerminal(order) && (
+                      <button
+                        onClick={() => openAssignModal(order)}
+                        className="shrink-0 text-[11px] font-semibold text-[#2166AC] hover:underline cursor-pointer"
+                      >
+                        {order.assignments.length > 0 ? "Edit" : "+ Assign"}
+                      </button>
+                    )}
+                  </span>
+                  <span className="shrink-0">Created {formatDate(order.createdAt)}</span>
                 </div>
 
                 {/* Action buttons */}
@@ -429,6 +564,73 @@ export default function WorkOrdersPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Assign-employees modal */}
+      {assigningOrder && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          onClick={() => setAssigningOrder(null)}
+          role="presentation"
+        >
+          <div
+            className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Assign employees"
+          >
+            <div className="p-5 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-800">Assign Employees</h3>
+              <p className="text-xs text-gray-400 mt-0.5 truncate">{assigningOrder.title}</p>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {employeesLoading ? (
+                <p className="text-sm text-gray-400 text-center py-10">Loading employees…</p>
+              ) : employees.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-10">No employees on this account.</p>
+              ) : (
+                employees.map((emp) => {
+                  const assigned = assigningOrder.assignments.some((a) => a.employeeId === emp.id);
+                  return (
+                    <button
+                      key={emp.id}
+                      onClick={() => toggleAssignment(assigningOrder, emp)}
+                      disabled={togglingId !== null}
+                      aria-pressed={assigned}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-gray-50 disabled:opacity-60 cursor-pointer transition-colors"
+                    >
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-gray-800 truncate">{emp.name}</span>
+                        {emp.position && <span className="block text-xs text-gray-400">{emp.position}</span>}
+                      </span>
+                      <span
+                        className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs font-bold ${
+                          assigned ? "bg-[#2166AC] border-[#2166AC] text-white" : "border-gray-300 text-transparent"
+                        }`}
+                        aria-hidden="true"
+                      >
+                        {togglingId === emp.id ? "…" : "✓"}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+
+            {assignError && <p className="text-red-500 text-xs px-5 py-2">{assignError}</p>}
+
+            <div className="p-4 border-t border-gray-100 flex justify-end">
+              <button
+                onClick={() => setAssigningOrder(null)}
+                className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

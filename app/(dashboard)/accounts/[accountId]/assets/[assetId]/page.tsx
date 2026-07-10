@@ -244,17 +244,27 @@ export default function AssetDetailPage() {
               <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 rounded-full px-2 py-0.5">Archived</span>
             )}
           </div>
-          <button
-            onClick={toggleArchive}
-            disabled={saving}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-              asset.archivedAt
-                ? "border-green-200 text-green-700 hover:bg-green-50"
-                : "border-gray-200 text-gray-500 hover:bg-gray-50"
-            }`}
-          >
-            {asset.archivedAt ? "Unarchive" : "Archive"}
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            {!asset.archivedAt && (
+              <Link
+                href={`/accounts/${accountId}/work-orders?assetId=${asset.id}`}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[#2166AC] hover:bg-[#1a5490] transition-colors"
+              >
+                + New Work Order
+              </Link>
+            )}
+            <button
+              onClick={toggleArchive}
+              disabled={saving}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
+                asset.archivedAt
+                  ? "border-green-200 text-green-700 hover:bg-green-50"
+                  : "border-gray-200 text-gray-500 hover:bg-gray-50"
+              }`}
+            >
+              {asset.archivedAt ? "Unarchive" : "Archive"}
+            </button>
+          </div>
         </div>
 
         {/* Health */}
