@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import AccountFilter from "@/components/AccountFilter";
 
 type Account = { id: string; name: string };
 
@@ -11,17 +12,22 @@ type Asset = {
   name: string;
   category: string;
   status: "OPERATIONAL" | "UNDER_MAINTENANCE";
-  health: "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+  health: "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
   serialNumber: string | null;
   location: string | null;
   openWorkOrders: number;
   lastCompletedAt: string | null;
   archivedAt: string | null;
+  accountId: string;
+  account: Account;
 };
 
 type HealthFilter = "ALL" | Asset["health"];
+type StatusFilter = "ALL" | Asset["status"];
+type SortKey = "NAME" | "ACCOUNT" | "HEALTH" | "OPEN_WOS" | "LAST_MAINT";
 
 const HEALTH_BADGE: Record<Asset["health"], { cls: string; label: string }> = {
+  NEW:             { cls: "tu-badge tu-badge-brand",    label: "New"            },
   GOOD:            { cls: "tu-badge tu-badge-success",  label: "Good"           },
   FAIR:            { cls: "tu-badge tu-badge-warning",  label: "Fair"           },
   POOR:            { cls: "tu-badge tu-badge-danger",   label: "Poor"           },
@@ -33,114 +39,155 @@ const STATUS_BADGE: Record<Asset["status"], { cls: string; label: string }> = {
   UNDER_MAINTENANCE: { cls: "tu-badge tu-badge-warning", label: "Under Maintenance" },
 };
 
+const HEALTH_TABS: { key: HealthFilter; label: string }[] = [
+  { key: "ALL",            label: "All"            },
+  { key: "NEW",            label: "New"            },
+  { key: "GOOD",           label: "Good"           },
+  { key: "FAIR",           label: "Fair"           },
+  { key: "POOR",           label: "Poor"           },
+  { key: "OUT_OF_SERVICE", label: "Out of Service" },
+];
+
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "NAME",       label: "Name (A–Z)"          },
+  { key: "ACCOUNT",    label: "Account (A–Z)"       },
+  { key: "HEALTH",     label: "Health (worst first)" },
+  { key: "OPEN_WOS",   label: "Open work orders"    },
+  { key: "LAST_MAINT", label: "Least recently maintained" },
+];
+
+// Worst first, so a descending sort surfaces failing equipment at the top.
+const HEALTH_RANK: Record<Asset["health"], number> = {
+  OUT_OF_SERVICE: 5, POOR: 4, FAIR: 3, GOOD: 2, NEW: 1,
+};
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 export default function AssetsPage() {
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [selectedAccountId, setSelectedAccountId] = useState("");
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [loadingAccounts, setLoadingAccounts] = useState(true);
-  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
   const [healthFilter, setHealthFilter] = useState<HealthFilter>("ALL");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
   const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("NAME");
   const [showArchived, setShowArchived] = useState(false);
 
-  useEffect(() => { fetchAccounts(); }, []);
-  useEffect(() => { if (selectedAccountId) fetchAssets(); }, [selectedAccountId, showArchived]);
+  // Archived assets are excluded server-side unless asked for, so this refetches.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [assetRes, acctRes] = await Promise.all([
+          api.get("/assets", { params: { includeArchived: showArchived } }),
+          api.get("/accounts"),
+        ]);
+        if (cancelled) return;
+        setAssets(assetRes.data);
+        setAccounts(acctRes.data);
+      } catch {
+        if (cancelled) return;
+        setError("Failed to load assets.");
+        setAssets([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showArchived]);
 
-  async function fetchAccounts() {
-    setLoadingAccounts(true);
-    try {
-      const res = await api.get("/accounts");
-      const list: Account[] = res.data;
-      setAccounts(list);
-      if (list.length > 0) setSelectedAccountId(list[0].id);
-    } catch {
-      // silent
-    } finally {
-      setLoadingAccounts(false);
-    }
+  // Everything except the health filter, so health tab counts reflect the rest.
+  const preHealth = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return assets.filter((a) => {
+      const matchAccount = selectedAccounts.size === 0 || selectedAccounts.has(a.accountId);
+      const matchStatus = statusFilter === "ALL" || a.status === statusFilter;
+      const matchSearch =
+        !q ||
+        a.name.toLowerCase().includes(q) ||
+        a.category.toLowerCase().includes(q) ||
+        a.account.name.toLowerCase().includes(q) ||
+        !!a.location?.toLowerCase().includes(q) ||
+        !!a.serialNumber?.toLowerCase().includes(q);
+      return matchAccount && matchStatus && matchSearch;
+    });
+  }, [assets, selectedAccounts, statusFilter, search]);
+
+  const healthCounts = useMemo(
+    () => Object.fromEntries(
+      HEALTH_TABS.map((t) => [t.key, t.key === "ALL" ? preHealth.length : preHealth.filter((a) => a.health === t.key).length])
+    ) as Record<HealthFilter, number>,
+    [preHealth]
+  );
+
+  const sorted = useMemo(() => {
+    const rows = preHealth.filter((a) => healthFilter === "ALL" || a.health === healthFilter);
+    rows.sort((a, b) => {
+      switch (sortKey) {
+        case "ACCOUNT":
+          return a.account.name.localeCompare(b.account.name) || a.name.localeCompare(b.name);
+        case "HEALTH":
+          return HEALTH_RANK[b.health] - HEALTH_RANK[a.health] || a.name.localeCompare(b.name);
+        case "OPEN_WOS":
+          return b.openWorkOrders - a.openWorkOrders || a.name.localeCompare(b.name);
+        case "LAST_MAINT":
+          // Never-maintained assets are the most urgent, so they sort first.
+          if (!a.lastCompletedAt && !b.lastCompletedAt) return a.name.localeCompare(b.name);
+          if (!a.lastCompletedAt) return -1;
+          if (!b.lastCompletedAt) return 1;
+          return new Date(a.lastCompletedAt).getTime() - new Date(b.lastCompletedAt).getTime();
+        case "NAME":
+        default:
+          return a.name.localeCompare(b.name);
+      }
+    });
+    return rows;
+  }, [preHealth, healthFilter, sortKey]);
+
+  const poorCount = assets.filter((a) => a.health === "POOR" || a.health === "OUT_OF_SERVICE").length;
+  const underMaintenanceCount = assets.filter((a) => a.status === "UNDER_MAINTENANCE").length;
+
+  const activeFilterCount =
+    (selectedAccounts.size > 0 ? 1 : 0) +
+    (healthFilter !== "ALL" ? 1 : 0) +
+    (statusFilter !== "ALL" ? 1 : 0) +
+    (search.trim() ? 1 : 0);
+
+  function resetFilters() {
+    setSelectedAccounts(new Set());
+    setHealthFilter("ALL");
+    setStatusFilter("ALL");
+    setSearch("");
   }
-
-  async function fetchAssets() {
-    setLoadingAssets(true);
-    try {
-      const res = await api.get(`/accounts/${selectedAccountId}/assets`, {
-        params: { includeArchived: showArchived },
-      });
-      setAssets(res.data);
-    } catch {
-      setAssets([]);
-    } finally {
-      setLoadingAssets(false);
-    }
-  }
-
-  const HEALTH_TABS: { key: HealthFilter; label: string }[] = [
-    { key: "ALL",            label: "All"           },
-    { key: "GOOD",           label: "Good"          },
-    { key: "FAIR",           label: "Fair"          },
-    { key: "POOR",           label: "Poor"          },
-    { key: "OUT_OF_SERVICE", label: "Out of Service"},
-  ];
-
-  const activeAssets = showArchived ? assets : assets.filter((a) => !a.archivedAt);
-
-  const filtered = activeAssets.filter((a) => {
-    const matchHealth = healthFilter === "ALL" || a.health === healthFilter;
-    const matchSearch = !search.trim() ||
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.category.toLowerCase().includes(search.toLowerCase()) ||
-      a.location?.toLowerCase().includes(search.toLowerCase()) ||
-      a.serialNumber?.toLowerCase().includes(search.toLowerCase());
-    return matchHealth && matchSearch;
-  });
-
-  const healthCounts = HEALTH_TABS.reduce<Record<HealthFilter, number>>((acc, tab) => {
-    acc[tab.key] = tab.key === "ALL"
-      ? activeAssets.length
-      : activeAssets.filter((a) => a.health === tab.key).length;
-    return acc;
-  }, {} as Record<HealthFilter, number>);
-
-  const poorCount = activeAssets.filter((a) => a.health === "POOR" || a.health === "OUT_OF_SERVICE").length;
-  const underMaintenanceCount = activeAssets.filter((a) => a.status === "UNDER_MAINTENANCE").length;
 
   return (
     <div className="tu-page">
-      {/* Header */}
       <div className="tu-page-header">
         <div>
           <h1 className="tu-page-title">Assets</h1>
-          <p className="tu-page-sub">Equipment and facility asset registry</p>
+          <p className="tu-page-sub">Equipment and facility registry across all your accounts</p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          {!loadingAccounts && accounts.length > 0 && (
-            <div>
-              <label htmlFor="account-select" className="tu-select-label">Account</label>
-              <select
-                id="account-select"
-                className="tu-select"
-                value={selectedAccountId}
-                onChange={(e) => { setSelectedAccountId(e.target.value); setHealthFilter("ALL"); setSearch(""); }}
-              >
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-            </div>
+        <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
+          {!loading && accounts.length > 1 && (
+            <AccountFilter accounts={accounts} selected={selectedAccounts} onChange={setSelectedAccounts} />
           )}
         </div>
       </div>
 
-      {/* KPI strip */}
-      {!loadingAssets && activeAssets.length > 0 && (
+      {error && <div className="tu-error-banner" role="alert">{error}</div>}
+
+      {!loading && assets.length > 0 && (
         <div className="tu-kpi-grid" style={{ marginBottom: 24 }}>
           <div className="tu-stat-card">
             <p className="tu-stat-label">Total Assets</p>
-            <p className="tu-stat-value">{activeAssets.length}</p>
+            <p className="tu-stat-value">{assets.length}</p>
             <p className="tu-stat-sub">in registry</p>
           </div>
           <div className="tu-stat-card">
@@ -157,17 +204,13 @@ export default function AssetsPage() {
           </div>
           <div className="tu-stat-card">
             <p className="tu-stat-label">Open Work Orders</p>
-            <p className="tu-stat-value">
-              {activeAssets.reduce((s, a) => s + a.openWorkOrders, 0)}
-            </p>
+            <p className="tu-stat-value">{assets.reduce((s, a) => s + a.openWorkOrders, 0)}</p>
             <p className="tu-stat-sub">across all assets</p>
           </div>
         </div>
       )}
 
-      {/* Card */}
       <div className="tu-card">
-        {/* Health tabs */}
         <div className="tu-tab-group" role="tablist" aria-label="Filter by health">
           {HEALTH_TABS.map((tab) => (
             <button
@@ -187,6 +230,7 @@ export default function AssetsPage() {
                     fontWeight: 600,
                     color: healthFilter === tab.key ? "var(--tu-text-brand)" : "var(--tu-text-subtle)",
                   }}
+                  aria-label={`${healthCounts[tab.key]} items`}
                 >
                   {healthCounts[tab.key]}
                 </span>
@@ -195,35 +239,68 @@ export default function AssetsPage() {
           ))}
         </div>
 
-        {/* Search + archive toggle */}
-        <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--tu-border)", display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--tu-border)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <input
+            id="asset-search"
             className="tu-input"
-            style={{ width: 240 }}
+            style={{ width: 280 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, category, location…"
+            placeholder="Search name, category, account, location…"
+            aria-label="Search assets"
           />
+
+          <select
+            id="asset-status"
+            className="tu-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            aria-label="Filter by status"
+          >
+            <option value="ALL">All statuses</option>
+            <option value="OPERATIONAL">Operational</option>
+            <option value="UNDER_MAINTENANCE">Under Maintenance</option>
+          </select>
+
+          <select
+            id="asset-sort"
+            className="tu-select"
+            value={sortKey}
+            onChange={(e) => setSortKey(e.target.value as SortKey)}
+            aria-label="Sort assets"
+          >
+            {SORT_OPTIONS.map((s) => (
+              <option key={s.key} value={s.key}>{s.label}</option>
+            ))}
+          </select>
+
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--tu-text-body)", cursor: "pointer", userSelect: "none" }}>
             <input
               type="checkbox"
               checked={showArchived}
               onChange={(e) => setShowArchived(e.target.checked)}
-              style={{ width: 14, height: 14 }}
+              style={{ width: 16, height: 16, borderRadius: 4 }}
             />
             Show archived
           </label>
+
+          {activeFilterCount > 0 && (
+            <button type="button" className="tu-btn-secondary" onClick={resetFilters}>
+              Clear filters
+            </button>
+          )}
+
           <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--tu-text-subtle)" }}>
-            {filtered.length} asset{filtered.length !== 1 ? "s" : ""}
+            {sorted.length} asset{sorted.length !== 1 ? "s" : ""}
           </span>
         </div>
 
-        {/* Table */}
         <div style={{ overflowX: "auto" }}>
           <table className="tu-table" aria-label="Assets">
             <thead>
               <tr>
                 <th scope="col">Name</th>
+                <th scope="col">Account</th>
                 <th scope="col">Category</th>
                 <th scope="col">Health</th>
                 <th scope="col">Status</th>
@@ -233,33 +310,37 @@ export default function AssetsPage() {
               </tr>
             </thead>
             <tbody>
-              {loadingAccounts || loadingAssets ? (
+              {loading ? (
                 Array.from({ length: 4 }).map((_, i) => (
                   <tr key={i} aria-hidden="true">
-                    {Array.from({ length: 7 }).map((__, j) => (
+                    {Array.from({ length: 8 }).map((__, j) => (
                       <td key={j} style={{ padding: "14px 24px" }}>
                         <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
                       </td>
                     ))}
                   </tr>
                 ))
-              ) : filtered.length === 0 ? (
+              ) : assets.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                    {activeAssets.length === 0
-                      ? "No assets for this account."
-                      : "No assets match your search."}
+                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
+                    No assets yet.
+                  </td>
+                </tr>
+              ) : sorted.length === 0 ? (
+                <tr>
+                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
+                    No assets match these filters.
                   </td>
                 </tr>
               ) : (
-                filtered.map((asset) => {
+                sorted.map((asset) => {
                   const health = HEALTH_BADGE[asset.health];
                   const status = STATUS_BADGE[asset.status];
                   return (
                     <tr key={asset.id} style={asset.archivedAt ? { opacity: 0.5 } : undefined}>
                       <td className="tu-strong">
                         <Link
-                          href={`/accounts/${selectedAccountId}/assets/${asset.id}`}
+                          href={`/accounts/${asset.accountId}/assets/${asset.id}`}
                           style={{ color: "inherit", textDecoration: "none" }}
                           className="tu-row-link"
                         >
@@ -267,6 +348,11 @@ export default function AssetsPage() {
                           {asset.archivedAt && (
                             <span className="tu-badge tu-badge-neutral" style={{ marginLeft: 6, fontSize: 10 }}>Archived</span>
                           )}
+                        </Link>
+                      </td>
+                      <td>
+                        <Link href={`/accounts/${asset.accountId}`} className="tu-row-link" style={{ color: "var(--tu-text-brand)", textDecoration: "none" }}>
+                          {asset.account.name}
                         </Link>
                       </td>
                       <td style={{ color: "var(--tu-text-body)" }}>{asset.category}</td>
