@@ -11,6 +11,7 @@ type Employee = {
   position: string | null;
   status: EmployeeStatus;
   categories: string[];
+  isReliever: boolean;
   createdAt: string;
 };
 
@@ -56,6 +57,7 @@ export default function EmployeesPage() {
     status: "REGULAR" as EmployeeStatus,
     categories: [] as string[],
     catInput: "",
+    isReliever: false,
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -78,14 +80,14 @@ export default function EmployeesPage() {
 
   function openCreate() {
     setEditId(null);
-    setForm({ name: "", position: "", status: "REGULAR", categories: [], catInput: "" });
+    setForm({ name: "", position: "", status: "REGULAR", categories: [], catInput: "", isReliever: false });
     setFormError("");
     setShowForm(true);
   }
 
   function openEdit(emp: Employee) {
     setEditId(emp.id);
-    setForm({ name: emp.name, position: emp.position ?? "", status: emp.status, categories: emp.categories ?? [], catInput: "" });
+    setForm({ name: emp.name, position: emp.position ?? "", status: emp.status, categories: emp.categories ?? [], catInput: "", isReliever: emp.isReliever });
     setFormError("");
     setShowForm(true);
   }
@@ -110,6 +112,7 @@ export default function EmployeesPage() {
         position: form.position.trim() || null,
         status: form.status,
         categories: form.categories,
+        isReliever: form.isReliever,
       };
       if (editId) {
         const res = await api.put(`/employees/${editId}`, payload);
@@ -246,6 +249,17 @@ export default function EmployeesPage() {
               >
                 <option value="REGULAR">Regular</option>
                 <option value="PROBATIONARY">Probationary</option>
+              </select>
+            </div>
+            <div>
+              <label className="tu-label">Type</label>
+              <select
+                className="tu-select"
+                value={form.isReliever ? "RELIEVER" : "DEDICATED"}
+                onChange={(e) => setForm((f) => ({ ...f, isReliever: e.target.value === "RELIEVER" }))}
+              >
+                <option value="DEDICATED">Regular — one account</option>
+                <option value="RELIEVER">Reliever — multiple accounts</option>
               </select>
             </div>
             <div style={{ gridColumn: "span 2" }}>
@@ -440,6 +454,11 @@ export default function EmployeesPage() {
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>
                           {st.label}
                         </span>
+                        {emp.isReliever && (
+                          <span className="ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
+                            Reliever
+                          </span>
+                        )}
                       </td>
                       <td>
                         {(emp.categories ?? []).length > 0 ? (

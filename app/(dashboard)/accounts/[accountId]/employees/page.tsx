@@ -10,6 +10,7 @@ type Employee = {
   name: string;
   position: string | null;
   status: "PROBATIONARY" | "REGULAR";
+  isReliever: boolean;
   openWorkOrders: number;
   occupied: boolean;
   attendance: { present: number; absent: number; total: number; rate: number | null } | null;
@@ -20,6 +21,7 @@ type GlobalEmployee = {
   name: string;
   position: string | null;
   status: "PROBATIONARY" | "REGULAR";
+  isReliever: boolean;
 };
 
 function attColor(rate: number | null) {
@@ -41,6 +43,7 @@ export default function EmployeesPage() {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState("");
   const [unassigning, setUnassigning] = useState<string | null>(null);
   // Filters for the assigned-employee list (separate from the assign modal's search).
   const [listSearch, setListSearch] = useState("");
@@ -66,6 +69,7 @@ export default function EmployeesPage() {
     setShowAssign(true);
     setSearch("");
     setSelectedIds([]);
+    setAssignError("");
     setRegistryLoading(true);
     try {
       const res = await api.get("/employees");
@@ -93,12 +97,14 @@ export default function EmployeesPage() {
   async function assignSelected() {
     if (selectedIds.length === 0) { setShowAssign(false); return; }
     setAssigning(true);
+    setAssignError("");
     try {
       const res = await api.post(`/accounts/${accountId}/employees`, { employeeIds: selectedIds });
       setEmployees((prev) => [...prev, ...res.data].sort((a, b) => a.name.localeCompare(b.name)));
       setShowAssign(false);
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setAssignError(e?.response?.data?.error ?? "Failed to assign. Regular employees can only belong to one account.");
     } finally {
       setAssigning(false);
     }
@@ -222,6 +228,11 @@ export default function EmployeesPage() {
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${emp.status === "REGULAR" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
                       {emp.status === "REGULAR" ? "Regular" : "Probationary"}
                     </span>
+                    {emp.isReliever && (
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
+                        Reliever
+                      </span>
+                    )}
                     {emp.occupied && (
                       <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-orange-50 text-orange-700">
                         Occupied
@@ -290,7 +301,14 @@ export default function EmployeesPage() {
                         }`}
                       >
                         <div>
-                          <p className="text-sm font-semibold text-gray-800">{emp.name}</p>
+                          <p className="text-sm font-semibold text-gray-800">
+                            {emp.name}
+                            {emp.isReliever && (
+                              <span className="ml-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold bg-indigo-50 text-indigo-700">
+                                Reliever
+                              </span>
+                            )}
+                          </p>
                           {emp.position && <p className="text-xs text-gray-400">{emp.position}</p>}
                         </div>
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${sel ? "bg-[#2166AC] border-[#2166AC]" : "border-gray-300"}`}>
@@ -302,6 +320,9 @@ export default function EmployeesPage() {
                 </div>
               )}
             </div>
+            {assignError && (
+              <p className="text-red-600 text-xs mb-3 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{assignError}</p>
+            )}
             <button
               onClick={assignSelected}
               disabled={assigning}
