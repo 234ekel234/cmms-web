@@ -37,6 +37,19 @@ type ReportData = {
     completedLogs: number;
     byFrequency: { frequency: string; assigned: number; completed: number }[];
   };
+  checklistResponses: {
+    id: string;
+    checklistName: string;
+    assetName: string | null;
+    completions: number;
+    inProgress: number;
+    lateCount: number;
+    sections: {
+      title: string;
+      answerOptions: string[];
+      items: { id: string; label: string; answers: Record<string, number> }[];
+    }[];
+  }[];
   employees: EmployeePerf[];
 };
 
@@ -100,6 +113,21 @@ function BarRow({ label, count, total, color }: { label: string; count: number; 
       <span className="text-sm font-semibold text-gray-700 w-8 text-right">{count}</span>
     </div>
   );
+}
+
+// Colour PM answer options: green for pass-like, red for fail-like, grey for
+// N/A, otherwise cycle a neutral palette so options stay distinguishable.
+const ANSWER_PALETTE = ["#3b82f6", "#a855f7", "#0891b2", "#d97706", "#db2777"];
+function answerColor(opt: string, idx: number) {
+  const o = opt.toLowerCase();
+  if (/(^ok$|pass|good|yes|done|compliant)/.test(o)) return "#16a34a";
+  if (/(^ng$|fail|bad|^no$|poor|defect|not)/.test(o)) return "#ef4444";
+  if (/(n\/?a|skip)/.test(o)) return "#94a3b8";
+  return ANSWER_PALETTE[idx % ANSWER_PALETTE.length];
+}
+
+function freqLabel(frequency: string) {
+  return frequency.replace("_", "-").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export default function ReportsPage() {
@@ -272,37 +300,94 @@ export default function ReportsPage() {
           </div>
 
           {/* Checklists */}
-          <div>
-            <h3 className="text-sm font-bold text-gray-700 mb-3">PM Checklists</h3>
-            <div className="flex gap-3 mb-4 flex-wrap">
-              <StatCard label="Assigned" value={data.checklists.assigned} />
-              <StatCard label="Completions" value={data.checklists.completedLogs} color="text-[#2166AC]" />
-            </div>
-            {data.checklists.byFrequency.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                      <th className="px-4 py-3 text-left">Frequency</th>
-                      <th className="px-4 py-3 text-center">Assigned</th>
-                      <th className="px-4 py-3 text-center">Completed</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {data.checklists.byFrequency.map(({ frequency, assigned, completed }) => (
-                      <tr key={frequency} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">
-                          {frequency.replace("_", "-").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
-                        </td>
-                        <td className="px-4 py-3 text-center text-gray-600">{assigned}</td>
-                        <td className="px-4 py-3 text-center text-[#2166AC] font-semibold">{completed}</td>
-                      </tr>
+          {(() => {
+            const responses = data.checklistResponses ?? [];
+            const totalLate = responses.reduce((s, c) => s + c.lateCount, 0);
+            const totalDrafts = responses.reduce((s, c) => s + c.inProgress, 0);
+            const completions = data.checklists.completedLogs;
+            const onTimeRate = completions > 0 ? Math.round(((completions - totalLate) / completions) * 100) : null;
+            const withData = responses.filter((c) => c.completions > 0);
+            return (
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-3">PM Checklists</h3>
+                <div className="flex gap-3 mb-4 flex-wrap">
+                  <StatCard label="Assigned" value={data.checklists.assigned} />
+                  <StatCard label="Completions" value={completions} color="text-[#2166AC]" />
+                  <StatCard label="On-time" value={onTimeRate != null ? `${onTimeRate}%` : "—"} color="text-green-600" />
+                  <StatCard label="Late" value={totalLate} color={totalLate > 0 ? "text-red-600" : undefined} />
+                  <StatCard label="In progress" value={totalDrafts} />
+                </div>
+
+                {data.checklists.byFrequency.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          <th className="px-4 py-3 text-left">Frequency</th>
+                          <th className="px-4 py-3 text-center">Assigned</th>
+                          <th className="px-4 py-3 text-center">Completed</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {data.checklists.byFrequency.map(({ frequency, assigned, completed }) => (
+                          <tr key={frequency} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-800">{freqLabel(frequency)}</td>
+                            <td className="px-4 py-3 text-center text-gray-600">{assigned}</td>
+                            <td className="px-4 py-3 text-center text-[#2166AC] font-semibold">{completed}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Per-checklist response breakdown (Google-Forms style) */}
+                {withData.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Response breakdown</p>
+                    {withData.map((cl) => (
+                      <details key={cl.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden group">
+                        <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none hover:bg-gray-50">
+                          <span className="min-w-0">
+                            <span className="font-semibold text-gray-800">{cl.checklistName}</span>
+                            {cl.assetName && <span className="text-sm text-gray-400"> · {cl.assetName}</span>}
+                          </span>
+                          <span className="flex items-center gap-2 shrink-0 text-xs font-semibold">
+                            <span className="rounded-full px-2 py-0.5 bg-blue-50 text-[#2166AC]">{cl.completions} done</span>
+                            {cl.inProgress > 0 && <span className="rounded-full px-2 py-0.5 bg-gray-100 text-gray-600">{cl.inProgress} draft{cl.inProgress > 1 ? "s" : ""}</span>}
+                            {cl.lateCount > 0 && <span className="rounded-full px-2 py-0.5 bg-red-50 text-red-600">{cl.lateCount} late</span>}
+                            <span className="text-gray-300 transition-transform group-open:rotate-180" aria-hidden="true">▾</span>
+                          </span>
+                        </summary>
+                        <div className="px-4 pb-4 pt-1 border-t border-gray-100">
+                          {cl.sections.map((sec, si) => (
+                            <div key={si} className="mt-4 first:mt-2">
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">{sec.title}</p>
+                              {sec.items.map((item) => {
+                                const itemTotal = Object.values(item.answers).reduce((a, b) => a + b, 0);
+                                return (
+                                  <div key={item.id} className="mb-4 last:mb-1">
+                                    <p className="text-sm text-gray-700 mb-2">{item.label}</p>
+                                    {itemTotal === 0 ? (
+                                      <p className="text-xs text-gray-400">No responses</p>
+                                    ) : (
+                                      sec.answerOptions.map((opt, oi) => (
+                                        <BarRow key={opt} label={opt} count={item.answers[opt] ?? 0} total={itemTotal} color={answerColor(opt, oi)} />
+                                      ))
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
                     ))}
-                  </tbody>
-                </table>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Employee Performance */}
           <div>
