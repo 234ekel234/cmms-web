@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import StatusPipeline from "@/components/StatusPipeline";
+import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 
 // ── Types ────────────────────────────────────────────────
 type Status = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
@@ -345,13 +346,17 @@ export default function ClientPortalPage() {
             </div>
             <div>
               <label htmlFor="req-category" className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
-              <input
+              <select
                 id="req-category"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="e.g. Electrical, Plumbing"
-              />
+              >
+                <option value="">Select category…</option>
+                {WORK_ORDER_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             {assets.length > 0 && (
               <div className="col-span-2">

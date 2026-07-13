@@ -7,6 +7,7 @@ import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
+import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -464,12 +465,16 @@ export default function WorkOrdersPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
-              <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+              <select
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                placeholder="e.g. Electrical, HVAC"
-              />
+              >
+                <option value="">Select category…</option>
+                {WORK_ORDER_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 mb-1">Due Date</label>
