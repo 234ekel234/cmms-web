@@ -21,6 +21,9 @@ type WorkOrder = {
   dueDate: string | null;
   isSpecialProject: boolean;
   type: "INTERNAL" | "EXTERNAL";
+  estimatedMinutes: number | null;
+  actualSeconds: number;
+  timerStartedAt: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
   assignments: { employeeId: string; employee: { id: string; name: string } }[];
@@ -45,6 +48,19 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
 };
 
 const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "REJECTED"];
+
+// Highest first, so Critical rises to the top of a priority-based sort.
+const PRIORITY_RANK: Record<WorkOrderPriority, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
+
+type SortKey = "SMART" | "STATUS" | "NEWEST" | "DUE_SOON" | "PRIORITY" | "TITLE";
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "SMART",    label: "Smart (urgency)" },
+  { key: "STATUS",   label: "Status"          },
+  { key: "NEWEST",   label: "Newest"          },
+  { key: "DUE_SOON", label: "Due soonest"     },
+  { key: "PRIORITY", label: "Priority"        },
+  { key: "TITLE",    label: "Title A–Z"       },
+];
 
 const isTerminal = (o: WorkOrder) => o.status === "COMPLETED" || o.status === "REJECTED";
 
@@ -76,6 +92,25 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+// Man-hours as a compact "Nh Nm" string.
+function formatHM(minutes: number) {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h && rem) return `${h}h ${rem}m`;
+  if (h) return `${h}h`;
+  return `${rem}m`;
+}
+
+// Live timer display, H:MM:SS.
+function formatTimer(totalSeconds: number) {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
 export default function WorkOrdersPage() {
   const params = useParams();
   const accountId = params.accountId as string;
@@ -90,6 +125,7 @@ export default function WorkOrdersPage() {
     return raw && valid.includes(raw) ? (raw as WorkOrderStatus | "OVERDUE") : "ALL";
   });
   const [view, setView] = useState<"work" | "special">("work");
+  const [sortKey, setSortKey] = useState<SortKey>("SMART");
   const [mode, setMode] = useState<"list" | "calendar">("list");
   // An `assetId` query param means we arrived from an asset page's "New Work
   // Order" action, so open the form with that asset already selected.
@@ -105,12 +141,24 @@ export default function WorkOrdersPage() {
   const [employeesLoading, setEmployeesLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState("");
+  const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
+
+  // Ticks once a second so running work-order timers stay live — but only while
+  // at least one order is actually IN_PROGRESS with a running timer.
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const isClient = user?.role === "CLIENT";
   const canManage = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER" || user?.role === "SUPERVISOR";
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
   useEffect(() => { fetchOrders(); }, [accountId]);
+
+  useEffect(() => {
+    const anyRunning = orders.some((o) => o.status === "IN_PROGRESS" && o.timerStartedAt);
+    if (!anyRunning) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [orders]);
 
   useEffect(() => {
     api
@@ -218,6 +266,20 @@ export default function WorkOrdersPage() {
     }
   }
 
+  async function toggleTimer(order: WorkOrder) {
+    setTimerBusyId(order.id);
+    try {
+      const action = order.timerStartedAt ? "pause" : "resume";
+      const res = await api.post(`/work-orders/${order.id}/timer`, { action });
+      // Merge so any field the timer response omits is preserved.
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...res.data } : o)));
+    } catch {
+      // silent
+    } finally {
+      setTimerBusyId(null);
+    }
+  }
+
   const inView = orders.filter((o) => view === "special" ? o.isSpecialProject : !o.isSpecialProject);
   const now = new Date();
   const isOverdue = (o: WorkOrder) => !!o.dueDate && o.status !== "COMPLETED" && o.status !== "REJECTED" && new Date(o.dueDate) < now;
@@ -228,7 +290,41 @@ export default function WorkOrdersPage() {
       : statusFilter === "OVERDUE"
       ? inView.filter(isOverdue)
       : inView.filter((o) => o.status === statusFilter);
-  const sorted = [...filtered].sort((a, b) => STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status));
+  const sorted = [...filtered].sort((a, b) => {
+    switch (sortKey) {
+      case "STATUS":
+        return STATUS_ORDER.indexOf(a.status) - STATUS_ORDER.indexOf(b.status);
+      case "NEWEST":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "DUE_SOON":
+        if (!a.dueDate && !b.dueDate) return 0;
+        if (!a.dueDate) return 1;
+        if (!b.dueDate) return -1;
+        return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      case "PRIORITY":
+        return PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority];
+      case "TITLE":
+        return a.title.localeCompare(b.title);
+      case "SMART":
+      default: {
+        // Closed orders sink; among open ones: priority, then overdue-first,
+        // then soonest due, then newest.
+        const term = (isTerminal(a) ? 1 : 0) - (isTerminal(b) ? 1 : 0);
+        if (term !== 0) return term;
+        const prio = PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority];
+        if (prio !== 0) return prio;
+        const overdue = (isOverdue(a) ? 0 : 1) - (isOverdue(b) ? 0 : 1);
+        if (overdue !== 0) return overdue;
+        if (a.dueDate || b.dueDate) {
+          if (!a.dueDate) return 1;
+          if (!b.dueDate) return -1;
+          const due = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+          if (due !== 0) return due;
+        }
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      }
+    }
+  });
   const workCount = orders.filter((o) => !o.isSpecialProject).length;
   const specialCount = orders.filter((o) => o.isSpecialProject).length;
 
@@ -313,6 +409,19 @@ export default function WorkOrdersPage() {
               {f.label}
             </button>
           ))}
+          <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+            Sort
+            <select
+              value={sortKey}
+              onChange={(e) => setSortKey(e.target.value as SortKey)}
+              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 cursor-pointer"
+              aria-label="Sort work orders"
+            >
+              {SORT_OPTIONS.map((s) => (
+                <option key={s.key} value={s.key}>{s.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
       )}
 
@@ -500,6 +609,53 @@ export default function WorkOrdersPage() {
                     </span>
                   )}
                   {order.asset && <span className="text-xs font-medium text-[#2166AC]">› {order.asset.name}</span>}
+                  {(() => {
+                    const running = order.status === "IN_PROGRESS" && order.timerStartedAt != null;
+                    const liveSeconds =
+                      order.actualSeconds +
+                      (running && order.timerStartedAt
+                        ? Math.floor((nowTick - new Date(order.timerStartedAt).getTime()) / 1000)
+                        : 0);
+                    const est = order.estimatedMinutes;
+                    const hasData = est != null || order.actualSeconds > 0 || running;
+                    if (!hasData) return null;
+                    const over = est != null && liveSeconds / 60 > est;
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full text-xs font-semibold ${
+                          running ? "px-2.5 py-1 bg-green-50 text-green-700" : `px-2 py-0.5 ${over ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`
+                        }`}
+                        title={running ? "Timer running" : over ? "Over estimated man-hours" : "Logged / estimated man-hours"}
+                      >
+                        {running ? (
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true" />
+                        ) : (
+                          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M12 7v5l3 2" />
+                          </svg>
+                        )}
+                        <span className={running ? "text-base font-bold tabular-nums leading-none" : undefined}>
+                          {running ? formatTimer(liveSeconds) : liveSeconds > 0 ? formatHM(liveSeconds / 60) : "0m"}
+                        </span>
+                        {est != null && <span className="opacity-70">/ {formatHM(est)}</span>}
+                      </span>
+                    );
+                  })()}
+                  {order.status === "IN_PROGRESS" && !isClient && canManage && (
+                    <button
+                      onClick={() => toggleTimer(order)}
+                      disabled={timerBusyId === order.id}
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold cursor-pointer transition-colors disabled:opacity-50 ${
+                        order.timerStartedAt
+                          ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                          : "bg-green-600 text-white hover:bg-green-700"
+                      }`}
+                      title={order.timerStartedAt ? "Pause timer" : "Resume timer"}
+                    >
+                      {timerBusyId === order.id ? "…" : order.timerStartedAt ? "❚❚ Pause" : "▶ Resume"}
+                    </button>
+                  )}
                 </div>
 
                 {order.description && (

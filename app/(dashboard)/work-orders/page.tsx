@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
 
@@ -18,6 +19,9 @@ type WorkOrder = {
   dueDate: string | null;
   category: string | null;
   isSpecialProject: boolean;
+  estimatedMinutes: number | null;
+  actualSeconds: number;
+  timerStartedAt: string | null;
   accountId: string;
   account: Account;
   asset: { id: string; name: string } | null;
@@ -27,7 +31,7 @@ type WorkOrder = {
 
 type StatusFilter = "ALL" | "OVERDUE" | WorkOrder["status"];
 type PriorityFilter = "ALL" | NonNullable<WorkOrder["priority"]>;
-type SortKey = "NEWEST" | "OLDEST" | "DUE_SOON" | "PRIORITY" | "TITLE" | "ACCOUNT";
+type SortKey = "SMART" | "NEWEST" | "OLDEST" | "DUE_SOON" | "PRIORITY" | "TITLE" | "ACCOUNT";
 type View = "list" | "calendar";
 
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
@@ -42,6 +46,7 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "SMART",    label: "Smart (urgency)"   },
   { key: "NEWEST",   label: "Newest first"      },
   { key: "OLDEST",   label: "Oldest first"      },
   { key: "DUE_SOON", label: "Due date (soonest)" },
@@ -64,6 +69,30 @@ function parseStatusParam(raw: string | null): StatusFilter {
 const isOverdue = (wo: { dueDate: string | null; status: WorkOrder["status"] }) =>
   !!wo.dueDate && wo.status !== "COMPLETED" && wo.status !== "REJECTED" && new Date(wo.dueDate).getTime() < Date.now();
 
+const isTerminal = (wo: WorkOrder) => wo.status === "COMPLETED" || wo.status === "REJECTED";
+
+// "Smart" triage sort: closed orders sink; among open ones rank by priority
+// (Critical first), then overdue-first, then soonest due, then newest.
+function smartCompare(a: WorkOrder, b: WorkOrder) {
+  const term = (isTerminal(a) ? 1 : 0) - (isTerminal(b) ? 1 : 0);
+  if (term !== 0) return term;
+
+  const prio = (b.priority ? PRIORITY_RANK[b.priority] : 0) - (a.priority ? PRIORITY_RANK[a.priority] : 0);
+  if (prio !== 0) return prio;
+
+  const overdue = (isOverdue(a) ? 0 : 1) - (isOverdue(b) ? 0 : 1);
+  if (overdue !== 0) return overdue;
+
+  if (a.dueDate || b.dueDate) {
+    if (!a.dueDate) return 1;
+    if (!b.dueDate) return -1;
+    const due = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    if (due !== 0) return due;
+  }
+
+  return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+}
+
 const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> = {
   REQUESTED:   { cls: "tu-badge tu-badge-brand",   label: "Requested"   },
   PENDING:     { cls: "tu-badge tu-badge-warning",  label: "Pending"     },
@@ -84,10 +113,23 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
+// Man-hours as a compact "Nh Nm" string.
+function formatHM(minutes: number) {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h && rem) return `${h}h ${rem}m`;
+  if (h) return `${h}h`;
+  return `${rem}m`;
+}
+
 export default function WorkOrdersPage() {
   const searchParams = useSearchParams();
+  const { user } = useAuth();
+  const isClient = user?.role === "CLIENT";
 
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +138,7 @@ export default function WorkOrdersPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => parseStatusParam(searchParams.get("status")));
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("NEWEST");
+  const [sortKey, setSortKey] = useState<SortKey>("SMART");
   const [view, setView] = useState<View>("list");
 
   useEffect(() => {
@@ -160,6 +202,8 @@ export default function WorkOrdersPage() {
     const rows = [...filtered];
     rows.sort((a, b) => {
       switch (sortKey) {
+        case "SMART":
+          return smartCompare(a, b);
         case "OLDEST":
           return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
         case "DUE_SOON":
@@ -193,6 +237,20 @@ export default function WorkOrdersPage() {
     setPriorityFilter("ALL");
     setSearch("");
     setStatusFilter("ALL");
+  }
+
+  async function toggleTimer(wo: WorkOrder) {
+    setTimerBusyId(wo.id);
+    try {
+      const action = wo.timerStartedAt ? "pause" : "resume";
+      const res = await api.post(`/work-orders/${wo.id}/timer`, { action });
+      // Merge: the timer response omits `account`, which the table needs.
+      setWorkOrders((prev) => prev.map((o) => (o.id === wo.id ? { ...o, ...res.data } : o)));
+    } catch {
+      // silent
+    } finally {
+      setTimerBusyId(null);
+    }
   }
 
   return (
@@ -328,6 +386,7 @@ export default function WorkOrdersPage() {
                   <th scope="col">Status</th>
                   <th scope="col">Priority</th>
                   <th scope="col">Due Date</th>
+                  <th scope="col" title="Actual logged / Estimated">Man-Hours</th>
                   <th scope="col">Assigned To</th>
                 </tr>
               </thead>
@@ -335,7 +394,7 @@ export default function WorkOrdersPage() {
                 {loading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} aria-hidden="true">
-                      {Array.from({ length: 7 }).map((__, j) => (
+                      {Array.from({ length: 8 }).map((__, j) => (
                         <td key={j} style={{ padding: "14px 24px" }}>
                           <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
                         </td>
@@ -344,13 +403,13 @@ export default function WorkOrdersPage() {
                   ))
                 ) : workOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
                       No work orders yet.
                     </td>
                   </tr>
                 ) : sorted.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
+                    <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
                       No work orders match these filters.
                     </td>
                   </tr>
@@ -393,6 +452,55 @@ export default function WorkOrdersPage() {
                         </td>
                         <td style={{ color: overdue ? "var(--tu-danger)" : "var(--tu-text-body)", fontWeight: overdue ? 500 : undefined }}>
                           {wo.dueDate ? <time dateTime={wo.dueDate}>{formatDate(wo.dueDate)}</time> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        </td>
+                        <td style={{ color: "var(--tu-text-body)", whiteSpace: "nowrap" }}>
+                          {(() => {
+                            const est = wo.estimatedMinutes;
+                            const running = wo.timerStartedAt != null;
+                            const actualMin =
+                              wo.actualSeconds / 60 +
+                              (running ? (Date.now() - new Date(wo.timerStartedAt!).getTime()) / 60000 : 0);
+                            const hasActual = wo.actualSeconds > 0 || running;
+                            if (est == null && !hasActual) {
+                              return <span style={{ color: "var(--tu-text-subtle)" }}>—</span>;
+                            }
+                            const over = est != null && actualMin > est;
+                            return (
+                              <>
+                                <span style={{ color: over ? "var(--tu-danger, #C70036)" : undefined, fontWeight: over ? 600 : undefined }}>
+                                  {hasActual ? formatHM(actualMin) : "0m"}
+                                </span>
+                                {est != null && (
+                                  <span style={{ color: "var(--tu-text-subtle)" }}> / {formatHM(est)}</span>
+                                )}
+                                {running && (
+                                  <span title="Timer running" aria-label="Timer running" style={{ marginLeft: 5, color: "#16a34a" }}>●</span>
+                                )}
+                              </>
+                            );
+                          })()}
+                          {wo.status === "IN_PROGRESS" && !isClient && (
+                            <button
+                              onClick={() => toggleTimer(wo)}
+                              disabled={timerBusyId === wo.id}
+                              title={wo.timerStartedAt ? "Pause timer" : "Resume timer"}
+                              style={{
+                                marginLeft: 8,
+                                padding: "2px 8px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                borderRadius: 9999,
+                                border: "none",
+                                cursor: "pointer",
+                                whiteSpace: "nowrap",
+                                background: wo.timerStartedAt ? "#e2e8f0" : "#16a34a",
+                                color: wo.timerStartedAt ? "#334155" : "#fff",
+                                opacity: timerBusyId === wo.id ? 0.5 : 1,
+                              }}
+                            >
+                              {timerBusyId === wo.id ? "…" : wo.timerStartedAt ? "❚❚ Pause" : "▶ Resume"}
+                            </button>
+                          )}
                         </td>
                         <td style={{ color: "var(--tu-text-body)" }}>
                           {wo.assignments.length > 0
