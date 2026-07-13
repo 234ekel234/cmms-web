@@ -20,12 +20,12 @@ const ROLE_CONFIG: Record<Role, { label: string; cls: string }> = {
   CLIENT:          { label: "Client",           cls: "bg-amber-50 text-amber-700"  },
 };
 
-function SkeletonRows({ count }: { count: number }) {
+function SkeletonRows({ count, cols }: { count: number; cols: number }) {
   return (
     <>
       {Array.from({ length: count }).map((_, i) => (
         <tr key={i} aria-hidden="true">
-          {Array.from({ length: 3 }).map((__, j) => (
+          {Array.from({ length: cols }).map((__, j) => (
             <td key={j} style={{ padding: "14px 24px" }}>
               <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
             </td>
@@ -44,6 +44,7 @@ export default function UsersPage() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<Role | "ALL">("ALL");
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "SUPERVISOR" as Role });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -80,31 +81,62 @@ export default function UsersPage() {
     }
   }
 
-  async function createUser() {
+  function openCreate() {
+    setEditingId(null);
+    setForm({ name: "", email: "", password: "", role: "SUPERVISOR" });
+    setFormError("");
+    setShowForm(true);
+  }
+
+  function openEdit(u: User) {
+    setEditingId(u.id);
+    setForm({ name: u.name, email: u.email, password: "", role: u.role });
+    setFormError("");
+    setShowForm(true);
+  }
+
+  async function saveUser() {
     if (!form.name.trim()) { setFormError("Name is required."); return; }
     if (!form.email.trim()) { setFormError("Email is required."); return; }
-    if (!form.password.trim() || form.password.length < 6) {
+    // Password is required when creating; on edit a blank field keeps the
+    // current password, but a non-blank one still has to meet the minimum.
+    if (!editingId && (!form.password.trim() || form.password.length < 6)) {
+      setFormError("Password must be at least 6 characters.");
+      return;
+    }
+    if (editingId && form.password && form.password.length < 6) {
       setFormError("Password must be at least 6 characters.");
       return;
     }
     setFormError("");
     setSaving(true);
     try {
-      // GMs provision through the privileged endpoint (any role); everyone
-      // else uses public self-registration (Supervisor / Client only).
-      const endpoint = isGM ? "/users" : "/auth/register";
-      await api.post(endpoint, {
-        name: form.name.trim(),
-        email: form.email.trim().toLowerCase(),
-        password: form.password,
-        role: form.role,
-      });
+      if (editingId) {
+        const payload: { name: string; email: string; role: Role; password?: string } = {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          role: form.role,
+        };
+        if (form.password) payload.password = form.password;
+        await api.patch(`/users/${editingId}`, payload);
+      } else {
+        // GMs provision through the privileged endpoint (any role); everyone
+        // else uses public self-registration (Supervisor / Client only).
+        const endpoint = isGM ? "/users" : "/auth/register";
+        await api.post(endpoint, {
+          name: form.name.trim(),
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+          role: form.role,
+        });
+      }
       setShowForm(false);
+      setEditingId(null);
       setForm({ name: "", email: "", password: "", role: "SUPERVISOR" });
       fetchUsers();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setFormError(e?.response?.data?.error ?? "Failed to create user.");
+      setFormError(e?.response?.data?.error ?? `Failed to ${editingId ? "update" : "create"} user.`);
     } finally {
       setSaving(false);
     }
@@ -140,7 +172,7 @@ export default function UsersPage() {
         </div>
         {isManager && (
           <button
-            onClick={() => { setShowForm(true); setFormError(""); }}
+            onClick={openCreate}
             className="tu-btn-primary"
             type="button"
           >
@@ -157,7 +189,7 @@ export default function UsersPage() {
       {showForm && (
         <div className="tu-card" style={{ marginBottom: 24 }}>
           <div className="tu-card-header">
-            <h2 className="tu-card-title">New User</h2>
+            <h2 className="tu-card-title">{editingId ? "Edit User" : "New User"}</h2>
           </div>
           <div style={{ padding: "0 24px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             <div>
@@ -181,13 +213,13 @@ export default function UsersPage() {
               />
             </div>
             <div>
-              <label className="tu-label">Password *</label>
+              <label className="tu-label">{editingId ? "New Password" : "Password *"}</label>
               <input
                 className="tu-input"
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))}
-                placeholder="Min 6 characters"
+                placeholder={editingId ? "Leave blank to keep current" : "Min 6 characters"}
               />
             </div>
             <div>
@@ -197,13 +229,16 @@ export default function UsersPage() {
                 style={{ width: "100%" }}
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
+                disabled={editingId === me?.id}
               >
                 {ROLE_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
               <p style={{ fontSize: 11, color: "var(--tu-text-subtle)", marginTop: 4 }}>
-                {isGM
+                {editingId === me?.id
+                  ? "You can't change your own role."
+                  : isGM
                   ? "Managers and General Managers have full administrative access."
                   : "Manager-level accounts are provisioned by an admin."}
               </p>
@@ -223,12 +258,14 @@ export default function UsersPage() {
               </button>
               <button
                 type="button"
-                onClick={createUser}
+                onClick={saveUser}
                 disabled={saving}
                 className="tu-btn-primary"
                 style={{ opacity: saving ? 0.5 : 1 }}
               >
-                {saving ? "Creating…" : "Create User"}
+                {saving
+                  ? (editingId ? "Saving…" : "Creating…")
+                  : (editingId ? "Save Changes" : "Create User")}
               </button>
             </div>
           </div>
@@ -274,15 +311,16 @@ export default function UsersPage() {
                 <th scope="col">Name</th>
                 <th scope="col">Email</th>
                 <th scope="col">Role</th>
+                {isGM && <th scope="col">Actions</th>}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <SkeletonRows count={4} />
+                <SkeletonRows count={4} cols={isGM ? 4 : 3} />
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={3}
+                    colSpan={isGM ? 4 : 3}
                     style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}
                   >
                     {users.length === 0
@@ -313,6 +351,17 @@ export default function UsersPage() {
                           {cfg.label}
                         </span>
                       </td>
+                      {isGM && (
+                        <td>
+                          <button
+                            type="button"
+                            onClick={() => openEdit(u)}
+                            className="text-xs font-semibold text-[#2166AC] hover:underline cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
