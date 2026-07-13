@@ -152,23 +152,52 @@ function IconX(p: React.SVGProps<SVGSVGElement>) {
 
 type Account = { id: string; name: string };
 
-const NAV_ITEMS: {
+type NavItem = {
   href: string;
   label: string;
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   badge?: boolean;
-}[] = [
-  { href: "/",               label: "Dashboard",     Icon: IconGrid      },
-  { href: "/work-orders",    label: "Work Orders",   Icon: IconClipboard },
-  { href: "/accounts",       label: "Accounts",      Icon: IconBuilding  },
-  { href: "/assets",         label: "Assets",        Icon: IconBox       },
-  { href: "/employees",      label: "Employees",     Icon: IconUserPlus  },
-  { href: "/pm-checklists",  label: "PM Checklists", Icon: IconChecklist },
-  { href: "/trainings",      label: "Trainings",     Icon: IconGradCap   },
-  { href: "/reports",        label: "Reports",       Icon: IconClipboard },
-  { href: "/notifications",  label: "Notifications", Icon: IconBell, badge: true },
-  { href: "/users",          label: "Users",         Icon: IconUsers     },
-  { href: "/settings",       label: "Settings",      Icon: IconGear      },
+};
+
+// Grouped into labeled sections (mirrors the account tab groups) so the global
+// nav reads as distinct clusters instead of one long list. The first section
+// has no heading — those are the primary entry points.
+const NAV_SECTIONS: { heading?: string; items: NavItem[] }[] = [
+  {
+    items: [
+      { href: "/",         label: "Dashboard", Icon: IconGrid     },
+      { href: "/accounts", label: "Accounts",  Icon: IconBuilding },
+    ],
+  },
+  {
+    heading: "Maintenance",
+    items: [
+      { href: "/work-orders",   label: "Work Orders",   Icon: IconClipboard },
+      { href: "/assets",        label: "Assets",        Icon: IconBox       },
+      { href: "/pm-checklists",  label: "PM Checklists", Icon: IconChecklist },
+    ],
+  },
+  {
+    heading: "Workforce",
+    items: [
+      { href: "/employees", label: "Employees", Icon: IconUserPlus },
+      { href: "/trainings", label: "Trainings", Icon: IconGradCap  },
+    ],
+  },
+  {
+    heading: "Insights",
+    items: [
+      { href: "/reports",       label: "Reports",       Icon: IconClipboard },
+      { href: "/notifications", label: "Notifications", Icon: IconBell, badge: true },
+    ],
+  },
+  {
+    heading: "Admin",
+    items: [
+      { href: "/users",    label: "Users",    Icon: IconUsers },
+      { href: "/settings", label: "Settings", Icon: IconGear  },
+    ],
+  },
 ];
 
 // ── Sidebar nav content (shared between desktop and mobile) ─
@@ -206,6 +235,55 @@ function NavContent({
 
   const initial = user?.name?.[0]?.toUpperCase() ?? "?";
 
+  function renderNavItem(item: NavItem) {
+    const active = isActive(item.href);
+    const count = item.badge ? unreadCount : 0;
+    return (
+      <li key={item.href}>
+        <Link
+          href={item.href}
+          onClick={onNavigate}
+          className={`tu-nav-item${active ? " tu-active" : ""}`}
+          aria-current={active ? "page" : undefined}
+        >
+          <span className="tu-nav-icon" style={{ position: "relative" }}>
+            <item.Icon />
+            {count > 0 && (
+              <span
+                aria-label={`${count} unread`}
+                style={{
+                  position: "absolute",
+                  top: -4,
+                  right: -5,
+                  minWidth: 14,
+                  height: 14,
+                  padding: "0 3px",
+                  background: "#ef4444",
+                  color: "#fff",
+                  borderRadius: 9999,
+                  fontSize: 9,
+                  fontWeight: 700,
+                  lineHeight: "14px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {count > 99 ? "99+" : count}
+              </span>
+            )}
+          </span>
+          <span style={{ flex: 1 }}>{item.label}</span>
+          {count > 0 && (
+            <span style={{ fontSize: 11, fontWeight: 700, color: "#ef4444", marginLeft: 4 }}>
+              {count}
+            </span>
+          )}
+        </Link>
+      </li>
+    );
+  }
+
   return (
     <>
       {/* User identity header */}
@@ -229,58 +307,20 @@ function NavContent({
         <span style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
       </button>
 
-      {/* Primary navigation */}
+      {/* Primary navigation — grouped into labeled sections */}
       <nav className="tu-nav" aria-label="Main navigation">
-        <ul role="list">
-          {NAV_ITEMS.filter((item) => canAccessRoute(user?.role as Role, item.href)).map((item) => {
-            const active = isActive(item.href);
-            const count = item.badge ? unreadCount : 0;
-            return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  onClick={onNavigate}
-                  className={`tu-nav-item${active ? " tu-active" : ""}`}
-                  aria-current={active ? "page" : undefined}
-                >
-                  <span className="tu-nav-icon" style={{ position: "relative" }}>
-                    <item.Icon />
-                    {count > 0 && (
-                      <span
-                        aria-label={`${count} unread`}
-                        style={{
-                          position: "absolute",
-                          top: -4,
-                          right: -5,
-                          minWidth: 14,
-                          height: 14,
-                          padding: "0 3px",
-                          background: "#ef4444",
-                          color: "#fff",
-                          borderRadius: 9999,
-                          fontSize: 9,
-                          fontWeight: 700,
-                          lineHeight: "14px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {count > 99 ? "99+" : count}
-                      </span>
-                    )}
-                  </span>
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  {count > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "#ef4444", marginLeft: 4 }}>
-                      {count}
-                    </span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+        {NAV_SECTIONS.map((section, si) => {
+          const items = section.items.filter((item) => canAccessRoute(user?.role as Role, item.href));
+          if (items.length === 0) return null;
+          return (
+            <div key={section.heading ?? `nav-top-${si}`} className={section.heading ? "tu-section" : undefined}>
+              {section.heading && <p className="tu-section-heading">{section.heading}</p>}
+              <ul role="list">
+                {items.map(renderNavItem)}
+              </ul>
+            </div>
+          );
+        })}
       </nav>
 
       {/* Accounts quick access */}
