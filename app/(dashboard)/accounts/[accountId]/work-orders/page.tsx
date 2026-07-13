@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import api from "@/lib/api";
+import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
@@ -614,7 +614,7 @@ export default function WorkOrdersPage() {
                     const liveSeconds =
                       order.actualSeconds +
                       (running && order.timerStartedAt
-                        ? Math.floor((nowTick - new Date(order.timerStartedAt).getTime()) / 1000)
+                        ? Math.floor((nowTick + getServerClockOffset() - new Date(order.timerStartedAt).getTime()) / 1000)
                         : 0);
                     const est = order.estimatedMinutes;
                     const hasData = est != null || order.actualSeconds > 0 || running;

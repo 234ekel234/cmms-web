@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import api from "@/lib/api";
+import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
@@ -459,7 +459,7 @@ export default function WorkOrdersPage() {
                             const running = wo.timerStartedAt != null;
                             const actualMin =
                               wo.actualSeconds / 60 +
-                              (running ? (Date.now() - new Date(wo.timerStartedAt!).getTime()) / 60000 : 0);
+                              (running ? (Date.now() + getServerClockOffset() - new Date(wo.timerStartedAt!).getTime()) / 60000 : 0);
                             const hasActual = wo.actualSeconds > 0 || running;
                             if (est == null && !hasActual) {
                               return <span style={{ color: "var(--tu-text-subtle)" }}>—</span>;

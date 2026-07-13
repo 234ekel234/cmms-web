@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline from "@/components/StatusPipeline";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -568,7 +568,7 @@ export default function WorkOrderDetailPage() {
         {/* Time tracking (man-hours) */}
         {["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(order.status) && (() => {
           const liveSeconds = order.actualSeconds + (timerRunning && order.timerStartedAt
-            ? Math.floor((nowTick - new Date(order.timerStartedAt).getTime()) / 1000)
+            ? Math.floor((nowTick + getServerClockOffset() - new Date(order.timerStartedAt).getTime()) / 1000)
             : 0);
           const actualMinutes = liveSeconds / 60;
           const estMin = order.estimatedMinutes;
