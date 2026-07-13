@@ -248,7 +248,9 @@ export default function WorkOrderDetailPage() {
         category: editForm.category.trim() || null,
         estimatedMinutes: estMin ? Number(estMin) : null,
       });
-      setOrder(res.data);
+      // PATCH responses omit comments (and other relations); merge so we don't
+      // drop them and crash the comments section.
+      setOrder((prev) => prev ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments } : res.data);
       setEditing(false);
     } catch {
       // silent
@@ -264,7 +266,9 @@ export default function WorkOrderDetailPage() {
       const body: { status: WorkOrderStatus; remarks?: string } = { status };
       if (status === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
       const res = await api.patch(`/work-orders/${order.id}`, body);
-      setOrder(res.data);
+      // PATCH responses omit comments (and other relations); merge so we don't
+      // drop them and crash the comments section.
+      setOrder((prev) => prev ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments } : res.data);
       setShowCompleteForm(false);
       setRemarks("");
     } catch {
