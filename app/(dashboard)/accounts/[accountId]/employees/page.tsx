@@ -42,6 +42,10 @@ export default function EmployeesPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [assigning, setAssigning] = useState(false);
   const [unassigning, setUnassigning] = useState<string | null>(null);
+  // Filters for the assigned-employee list (separate from the assign modal's search).
+  const [listSearch, setListSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "REGULAR" | "PROBATIONARY">("ALL");
+  const [availFilter, setAvailFilter] = useState<"ALL" | "AVAILABLE" | "OCCUPIED">("ALL");
 
   useEffect(() => { fetchEmployees(); }, [accountId]);
 
@@ -100,6 +104,22 @@ export default function EmployeesPage() {
     }
   }
 
+  const filtersActive = listSearch.trim() !== "" || statusFilter !== "ALL" || availFilter !== "ALL";
+  function clearFilters() {
+    setListSearch("");
+    setStatusFilter("ALL");
+    setAvailFilter("ALL");
+  }
+
+  const visible = employees.filter((e) => {
+    const q = listSearch.trim().toLowerCase();
+    const matchSearch = !q || e.name.toLowerCase().includes(q) || (e.position ?? "").toLowerCase().includes(q);
+    const matchStatus = statusFilter === "ALL" || e.status === statusFilter;
+    const matchAvail =
+      availFilter === "ALL" || (availFilter === "OCCUPIED" ? e.occupied : !e.occupied);
+    return matchSearch && matchStatus && matchAvail;
+  });
+
   async function unassign(emp: Employee) {
     setUnassigning(emp.id);
     try {
@@ -130,6 +150,54 @@ export default function EmployeesPage() {
         </div>
       )}
 
+      {/* Filter bar — only when there are assigned employees to filter */}
+      {!loading && employees.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <input
+            className="w-56 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+            placeholder="Search name or position…"
+            value={listSearch}
+            onChange={(e) => setListSearch(e.target.value)}
+          />
+          <div className="inline-flex gap-1" role="group" aria-label="Filter by status">
+            {(["ALL", "REGULAR", "PROBATIONARY"] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                  statusFilter === s ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                {s === "ALL" ? "All" : s === "REGULAR" ? "Regular" : "Probationary"}
+              </button>
+            ))}
+          </div>
+          <div className="inline-flex gap-1" role="group" aria-label="Filter by availability">
+            {(["ALL", "AVAILABLE", "OCCUPIED"] as const).map((a) => (
+              <button
+                key={a}
+                type="button"
+                onClick={() => setAvailFilter(a)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+                  availFilter === a ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                }`}
+              >
+                {a === "ALL" ? "Any" : a === "AVAILABLE" ? "Available" : "Occupied"}
+              </button>
+            ))}
+          </div>
+          <span className="ml-auto text-xs text-gray-400">
+            {filtersActive ? `${visible.length} of ${employees.length}` : `${employees.length} employee${employees.length === 1 ? "" : "s"}`}
+          </span>
+          {filtersActive && (
+            <button type="button" onClick={clearFilters} className="text-xs font-semibold text-[#2166AC] hover:underline cursor-pointer">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
@@ -138,9 +206,13 @@ export default function EmployeesPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400 text-sm">
           No employees assigned. Click &quot;+ Assign&quot; to add employees.
         </div>
+      ) : visible.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400 text-sm">
+          No employees match these filters.
+        </div>
       ) : (
         <div className="space-y-3">
-          {employees.map((emp) => (
+          {visible.map((emp) => (
             <Link key={emp.id} href={`/accounts/${accountId}/employees/${emp.id}`} className="block bg-white rounded-xl border border-gray-100 shadow-sm p-4 hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
