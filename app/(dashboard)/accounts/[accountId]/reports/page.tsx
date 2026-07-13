@@ -36,6 +36,7 @@ type ReportData = {
     assigned: number;
     completedLogs: number;
     byFrequency: { frequency: string; assigned: number; completed: number }[];
+    trend?: { unit: string; points: { label: string; completed: number }[] };
   };
   checklistResponses: {
     id: string;
@@ -130,6 +131,43 @@ function freqLabel(frequency: string) {
   return frequency.replace("_", "-").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+type ChecklistResponse = ReportData["checklistResponses"][number];
+
+// Roll the per-checklist responses up by asset for a per-asset PM summary.
+function aggregateByAsset(responses: ChecklistResponse[]) {
+  const m = new Map<string, { asset: string; checklists: number; completions: number; late: number }>();
+  for (const c of responses) {
+    const key = c.assetName ?? "— No asset —";
+    const a = m.get(key) ?? { asset: key, checklists: 0, completions: 0, late: 0 };
+    a.checklists += 1;
+    a.completions += c.completions;
+    a.late += c.lateCount;
+    m.set(key, a);
+  }
+  return [...m.values()].sort((a, b) => b.completions - a.completions || a.asset.localeCompare(b.asset));
+}
+
+// Vertical mini bar chart of completions per period bucket.
+function TrendChart({ points }: { points: { label: string; completed: number }[] }) {
+  const max = Math.max(1, ...points.map((p) => p.completed));
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+      <div className="flex items-end gap-1 h-28">
+        {points.map((p, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1 min-w-0" title={`${p.label}: ${p.completed}`}>
+            <span className="text-[10px] font-semibold text-gray-500 leading-none">{p.completed || ""}</span>
+            <div
+              className="w-full rounded-t bg-[#2166AC]"
+              style={{ height: `${(p.completed / max) * 100}%`, minHeight: p.completed > 0 ? 4 : 0 }}
+            />
+            <span className="text-[9px] text-gray-400 truncate w-full text-center">{p.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ReportsPage() {
   const params = useParams();
   const accountId = params.accountId as string;
@@ -172,11 +210,68 @@ export default function ReportsPage() {
     setActiveRange({ from: customFrom, to: customTo });
   }
 
+  function exportChecklistCSV() {
+    if (!data) return;
+    const responses = data.checklistResponses ?? [];
+    const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows: string[] = [];
+    const line = (cells: (string | number)[]) => rows.push(cells.map(esc).join(","));
+
+    const totalLate = responses.reduce((s, c) => s + c.lateCount, 0);
+    const totalDrafts = responses.reduce((s, c) => s + c.inProgress, 0);
+    const completions = data.checklists.completedLogs;
+    const onTime = completions > 0 ? Math.round(((completions - totalLate) / completions) * 100) : "";
+
+    line(["PM Checklist Report"]);
+    line(["Period", data.period.from, "to", data.period.to]);
+    line([]);
+    line(["Assigned", data.checklists.assigned]);
+    line(["Completions", completions]);
+    line(["On-time %", onTime]);
+    line(["Late", totalLate]);
+    line(["In progress", totalDrafts]);
+    line([]);
+    line(["By Asset"]);
+    line(["Asset", "Checklists", "Completions", "Late"]);
+    for (const a of aggregateByAsset(responses)) line([a.asset, a.checklists, a.completions, a.late]);
+    line([]);
+    line(["Response Breakdown"]);
+    line(["Checklist", "Asset", "Section", "Item", "Answer", "Count"]);
+    for (const c of responses) {
+      for (const sec of c.sections) {
+        for (const item of sec.items) {
+          for (const opt of sec.answerOptions) {
+            line([c.checklistName, c.assetName ?? "", sec.title, item.label, opt, item.answers[opt] ?? 0]);
+          }
+        }
+      }
+    }
+
+    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `pm-report-${data.period.from}-to-${data.period.to}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-gray-900">Reports</h2>
-        <span className="text-xs text-gray-400">{activeRange.from} – {activeRange.to}</span>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">{activeRange.from} – {activeRange.to}</span>
+          {data && (
+            <button
+              type="button"
+              onClick={exportChecklistCSV}
+              className="text-xs font-semibold text-[#2166AC] border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+            >
+              Export PM CSV
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Period picker */}
@@ -307,6 +402,8 @@ export default function ReportsPage() {
             const completions = data.checklists.completedLogs;
             const onTimeRate = completions > 0 ? Math.round(((completions - totalLate) / completions) * 100) : null;
             const withData = responses.filter((c) => c.completions > 0);
+            const byAsset = aggregateByAsset(responses).filter((a) => a.completions > 0);
+            const trend = data.checklists.trend;
             return (
               <div>
                 <h3 className="text-sm font-bold text-gray-700 mb-3">PM Checklists</h3>
@@ -317,6 +414,38 @@ export default function ReportsPage() {
                   <StatCard label="Late" value={totalLate} color={totalLate > 0 ? "text-red-600" : undefined} />
                   <StatCard label="In progress" value={totalDrafts} />
                 </div>
+
+                {trend && trend.points.some((p) => p.completed > 0) && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Completions over time</p>
+                    <TrendChart points={trend.points} />
+                  </div>
+                )}
+
+                {byAsset.length > 0 && (
+                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-gray-50 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          <th className="px-4 py-3 text-left">Asset</th>
+                          <th className="px-4 py-3 text-center">Checklists</th>
+                          <th className="px-4 py-3 text-center">Completions</th>
+                          <th className="px-4 py-3 text-center">Late</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {byAsset.map((a) => (
+                          <tr key={a.asset} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 font-medium text-gray-800">{a.asset}</td>
+                            <td className="px-4 py-3 text-center text-gray-600">{a.checklists}</td>
+                            <td className="px-4 py-3 text-center text-[#2166AC] font-semibold">{a.completions}</td>
+                            <td className={`px-4 py-3 text-center font-semibold ${a.late > 0 ? "text-red-600" : "text-gray-400"}`}>{a.late}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
                 {data.checklists.byFrequency.length > 0 && (
                   <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden mb-4">
