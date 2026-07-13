@@ -26,6 +26,7 @@ const PREF_LABELS: Record<string, { label: string; description: string }> = {
   WORK_ORDER_REJECTED:    { label: "Order Rejected",    description: "When a work order is rejected" },
   WORK_ORDER_STARTED:     { label: "Work Started",      description: "When a work order moves to in-progress" },
   WORK_ORDER_COMPLETED:   { label: "Work Completed",    description: "When a work order is marked complete" },
+  CHECKLIST_INCOMPLETE:   { label: "Checklist Incomplete", description: "When a PM checklist is past due without completion" },
 };
 
 type Pref = { action: string; enabled: boolean };

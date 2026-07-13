@@ -4,8 +4,8 @@ import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-// Landing for an account: staff get the Overview, clients (who can't see the
-// Overview) keep going straight to their Work Orders.
+// Landing for an account: managers get Members, supervisors (who can't open
+// Members) get the Overview, and clients keep going straight to Work Orders.
 export default function AccountRootPage() {
   const router = useRouter();
   const params = useParams();
@@ -14,7 +14,9 @@ export default function AccountRootPage() {
 
   useEffect(() => {
     if (!user) return;
-    const dest = user.role === "CLIENT" ? "work-orders" : "overview";
+    let dest = "overview";
+    if (user.role === "CLIENT") dest = "work-orders";
+    else if (user.role === "GENERAL_MANAGER" || user.role === "MANAGER") dest = "members";
     router.replace(`/accounts/${accountId}/${dest}`);
   }, [user, accountId, router]);
 

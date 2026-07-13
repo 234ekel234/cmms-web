@@ -14,6 +14,7 @@ type Account = {
 };
 
 const TABS = [
+  { label: "Members", path: "members" },
   { label: "Overview", path: "overview" },
   { label: "Client Portal", path: "portal" },
   { label: "Work Orders", path: "work-orders" },
@@ -25,7 +26,6 @@ const TABS = [
   { label: "Activity", path: "activity" },
   { label: "Attendance", path: "attendance" },
   { label: "Training", path: "training" },
-  { label: "Members", path: "members" },
 ];
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
