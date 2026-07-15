@@ -11,6 +11,7 @@ type Employee = {
   position: string | null;
   categories: string[];
   isReliever: boolean;
+  accounts: { id: string; name: string }[];
   createdAt: string;
 };
 
@@ -33,7 +34,7 @@ function SkeletonRows({ count }: { count: number }) {
     <>
       {Array.from({ length: count }).map((_, i) => (
         <tr key={i} aria-hidden="true">
-          {Array.from({ length: 5 }).map((__, j) => (
+          {Array.from({ length: 6 }).map((__, j) => (
             <td key={j} style={{ padding: "14px 24px" }}>
               <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
             </td>
@@ -50,6 +51,7 @@ export default function EmployeesPage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<EmployeeType | "ALL">("ALL");
+  const [companyFilter, setCompanyFilter] = useState<string>("ALL"); // "ALL" | accountId | "UNASSIGNED"
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<"name" | "recent" | "type">("name");
   const [showForm, setShowForm] = useState(false);
@@ -155,12 +157,19 @@ export default function EmployeesPage() {
     );
   }
 
+  // Companies (accounts) that actually have employees assigned, so the filter
+  // only offers accounts you'll find someone under.
+  const allCompanies = Array.from(
+    new Map(employees.flatMap((e) => e.accounts).map((a) => [a.id, a])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name));
+
   const filtersActive =
-    search.trim() !== "" || typeFilter !== "ALL" || categoryFilter.length > 0;
+    search.trim() !== "" || typeFilter !== "ALL" || companyFilter !== "ALL" || categoryFilter.length > 0;
 
   function clearFilters() {
     setSearch("");
     setTypeFilter("ALL");
+    setCompanyFilter("ALL");
     setCategoryFilter([]);
   }
 
@@ -172,11 +181,16 @@ export default function EmployeesPage() {
         e.position?.toLowerCase().includes(search.toLowerCase()) ||
         (e.categories ?? []).some((c) => c.toLowerCase().includes(search.toLowerCase()));
       const matchType = typeFilter === "ALL" || empType(e) === typeFilter;
+      const matchCompany =
+        companyFilter === "ALL" ||
+        (companyFilter === "UNASSIGNED"
+          ? e.accounts.length === 0
+          : e.accounts.some((a) => a.id === companyFilter));
       // Match any selected skill (OR) — "show me electricians or plumbers".
       const matchCategory =
         categoryFilter.length === 0 ||
         (e.categories ?? []).some((c) => categoryFilter.includes(c));
-      return matchSearch && matchType && matchCategory;
+      return matchSearch && matchType && matchCompany && matchCategory;
     })
     .sort((a, b) => {
       if (sortKey === "recent") {
@@ -340,6 +354,21 @@ export default function EmployeesPage() {
             </button>
           ))}
         </div>
+        {allCompanies.length > 0 && (
+          <select
+            className="tu-select"
+            style={{ minWidth: 180 }}
+            value={companyFilter}
+            onChange={(e) => setCompanyFilter(e.target.value)}
+            aria-label="Filter by company"
+          >
+            <option value="ALL">All companies</option>
+            {allCompanies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+            <option value="UNASSIGNED">Unassigned</option>
+          </select>
+        )}
         <select
           className="tu-select"
           style={{ minWidth: 160, marginLeft: "auto" }}
@@ -416,6 +445,7 @@ export default function EmployeesPage() {
                 <th scope="col">Position</th>
                 <th scope="col">Type</th>
                 <th scope="col">Skills</th>
+                <th scope="col">Assigned to</th>
                 <th scope="col" style={{ width: 100 }}></th>
               </tr>
             </thead>
@@ -425,7 +455,7 @@ export default function EmployeesPage() {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}
                   >
                     {employees.length === 0 ? "No employees yet. Click \"+ New Employee\" to add one." : "No employees match your search."}
@@ -459,6 +489,24 @@ export default function EmployeesPage() {
                           </div>
                         ) : (
                           <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
+                        )}
+                      </td>
+                      <td>
+                        {emp.accounts.length === 0 ? (
+                          <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 9999, background: "var(--tu-bg-secondary)", color: "var(--tu-text-subtle)", fontWeight: 600 }}>
+                            Unassigned
+                          </span>
+                        ) : (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                            {emp.accounts.map((a) => (
+                              <span
+                                key={a.id}
+                                style={{ fontSize: 11, padding: "1px 8px", borderRadius: 9999, background: "var(--tu-bg-brand-soft)", color: "var(--tu-text-brand)", fontWeight: 600 }}
+                              >
+                                {a.name}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </td>
                       <td>
