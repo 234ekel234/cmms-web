@@ -10,11 +10,13 @@ type EmployeePerf = {
   id: string;
   name: string;
   position: string | null;
+  isReliever: boolean;
   workOrders: { assigned: number; completed: number; inProgress: number };
   training: { total: number; completed: number; rate: number | null };
 };
 
 type ReportData = {
+  accountName: string;
   period: { from: string; to: string };
   workOrders: {
     total: number;
@@ -222,7 +224,8 @@ export default function ReportsPage() {
     const completions = data.checklists.completedLogs;
     const onTime = completions > 0 ? Math.round(((completions - totalLate) / completions) * 100) : "";
 
-    line(["PM Checklist Report"]);
+    line(["Account Report"]);
+    line(["Account", data.accountName]);
     line(["Period", data.period.from, "to", data.period.to]);
     line([]);
     line(["Assigned", data.checklists.assigned]);
@@ -247,11 +250,37 @@ export default function ReportsPage() {
       }
     }
 
+    line([]);
+    line(["Employee Performance"]);
+    line([
+      "Employee", "Position", "Type", "Company",
+      "WOs Assigned", "WOs Completed", "WOs In Progress",
+      "Attendance %", "Present", "Absent",
+      "Training Completed", "Training Total",
+    ]);
+    for (const emp of data.employees) {
+      const att = data.attendance.byEmployee.find((a) => a.id === emp.id);
+      line([
+        emp.name,
+        emp.position ?? "",
+        emp.isReliever ? "Reliever" : "Regular",
+        data.accountName,
+        emp.workOrders.assigned,
+        emp.workOrders.completed,
+        emp.workOrders.inProgress,
+        att?.rate ?? "",
+        att?.present ?? 0,
+        att?.absent ?? 0,
+        emp.training.completed,
+        emp.training.total,
+      ]);
+    }
+
     const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `pm-report-${data.period.from}-to-${data.period.to}.csv`;
+    a.download = `account-report-${data.period.from}-to-${data.period.to}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   }

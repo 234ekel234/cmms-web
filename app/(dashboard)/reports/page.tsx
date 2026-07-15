@@ -29,6 +29,17 @@ type DashboardData = {
   accounts: AccountSummary[];
 };
 
+type EmployeeReport = {
+  id: string;
+  name: string;
+  position: string | null;
+  isReliever: boolean;
+  companies: string[];
+  workOrders: { assigned: number; completed: number; inProgress: number };
+  attendance: { present: number; absent: number; total: number; rate: number | null };
+  training: { total: number; completed: number; rate: number | null };
+};
+
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Today",
   week:  "This Week",
@@ -55,21 +66,55 @@ function PctBar({ value, danger = false }: { value: number | null; danger?: bool
   );
 }
 
-function exportCSV(accounts: AccountSummary[], period: Period) {
-  const header = ["Account", "Open WOs", "Overdue WOs", "Poor Assets", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"].join(",");
-  const rows = accounts.map((a) => [
-    `"${a.name}"`,
-    a.openWorkOrders,
-    a.overdueWorkOrders,
-    a.poorHealthAssets,
-    a.checklistsDone,
-    a.checklistsTotal,
-    a.attendancePresent,
-    a.attendanceTotal,
-    pct(a.attendancePresent, a.attendanceTotal) ?? "",
-  ].join(","));
-  const csv = [header, ...rows].join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], period: Period) {
+  const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const lines: string[] = [];
+  const line = (cells: (string | number)[]) => lines.push(cells.map(esc).join(","));
+
+  // ── Per-account summary ──
+  line(["Account Summary"]);
+  line(["Account", "Open WOs", "Overdue WOs", "Poor Assets", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"]);
+  for (const a of accounts) {
+    line([
+      a.name,
+      a.openWorkOrders,
+      a.overdueWorkOrders,
+      a.poorHealthAssets,
+      a.checklistsDone,
+      a.checklistsTotal,
+      a.attendancePresent,
+      a.attendanceTotal,
+      pct(a.attendancePresent, a.attendanceTotal) ?? "",
+    ]);
+  }
+
+  // ── Per-employee performance (across all accounts) ──
+  line([]);
+  line(["Employee Performance"]);
+  line([
+    "Employee", "Position", "Type", "Companies",
+    "WOs Assigned", "WOs Completed", "WOs In Progress",
+    "Attendance %", "Present", "Absent",
+    "Training Completed", "Training Total",
+  ]);
+  for (const e of employees) {
+    line([
+      e.name,
+      e.position ?? "",
+      e.isReliever ? "Reliever" : "Regular",
+      e.companies.join("; "),
+      e.workOrders.assigned,
+      e.workOrders.completed,
+      e.workOrders.inProgress,
+      e.attendance.rate ?? "",
+      e.attendance.present,
+      e.attendance.absent,
+      e.training.completed,
+      e.training.total,
+    ]);
+  }
+
+  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -80,6 +125,7 @@ function exportCSV(accounts: AccountSummary[], period: Period) {
 
 export default function ReportsPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [employees, setEmployees] = useState<EmployeeReport[]>([]);
   const [period, setPeriod] = useState<Period>("month");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -90,8 +136,14 @@ export default function ReportsPage() {
     setLoading(true);
     setError(false);
     try {
-      const res = await api.get("/dashboard", { params: { period } });
-      setData(res.data);
+      // Employee performance rides alongside the dashboard so the CSV export can
+      // include a per-employee section; a failure there shouldn't blank the page.
+      const [dash, emp] = await Promise.all([
+        api.get("/dashboard", { params: { period } }),
+        api.get("/reports/employees", { params: { period } }).catch(() => null),
+      ]);
+      setData(dash.data);
+      setEmployees(emp?.data?.employees ?? []);
     } catch {
       setError(true);
     } finally {
@@ -116,7 +168,7 @@ export default function ReportsPage() {
           {data && (
             <button
               type="button"
-              onClick={() => exportCSV(data.accounts, period)}
+              onClick={() => exportCSV(data.accounts, employees, period)}
               className="tu-btn-secondary"
             >
               ↓ Export CSV
