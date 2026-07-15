@@ -9,7 +9,6 @@ type Employee = {
   id: string;
   name: string;
   position: string | null;
-  status: "PROBATIONARY" | "REGULAR";
   isReliever: boolean;
   openWorkOrders: number;
   occupied: boolean;
@@ -20,7 +19,6 @@ type GlobalEmployee = {
   id: string;
   name: string;
   position: string | null;
-  status: "PROBATIONARY" | "REGULAR";
   isReliever: boolean;
 };
 
@@ -47,7 +45,7 @@ export default function EmployeesPage() {
   const [unassigning, setUnassigning] = useState<string | null>(null);
   // Filters for the assigned-employee list (separate from the assign modal's search).
   const [listSearch, setListSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"ALL" | "REGULAR" | "PROBATIONARY">("ALL");
+  const [typeFilter, setTypeFilter] = useState<"ALL" | "REGULAR" | "RELIEVER">("ALL");
   const [availFilter, setAvailFilter] = useState<"ALL" | "AVAILABLE" | "OCCUPIED">("ALL");
 
   useEffect(() => { fetchEmployees(); }, [accountId]);
@@ -110,20 +108,20 @@ export default function EmployeesPage() {
     }
   }
 
-  const filtersActive = listSearch.trim() !== "" || statusFilter !== "ALL" || availFilter !== "ALL";
+  const filtersActive = listSearch.trim() !== "" || typeFilter !== "ALL" || availFilter !== "ALL";
   function clearFilters() {
     setListSearch("");
-    setStatusFilter("ALL");
+    setTypeFilter("ALL");
     setAvailFilter("ALL");
   }
 
   const visible = employees.filter((e) => {
     const q = listSearch.trim().toLowerCase();
     const matchSearch = !q || e.name.toLowerCase().includes(q) || (e.position ?? "").toLowerCase().includes(q);
-    const matchStatus = statusFilter === "ALL" || e.status === statusFilter;
+    const matchType = typeFilter === "ALL" || (typeFilter === "RELIEVER" ? e.isReliever : !e.isReliever);
     const matchAvail =
       availFilter === "ALL" || (availFilter === "OCCUPIED" ? e.occupied : !e.occupied);
-    return matchSearch && matchStatus && matchAvail;
+    return matchSearch && matchType && matchAvail;
   });
 
   async function unassign(emp: Employee) {
@@ -165,17 +163,17 @@ export default function EmployeesPage() {
             value={listSearch}
             onChange={(e) => setListSearch(e.target.value)}
           />
-          <div className="inline-flex gap-1" role="group" aria-label="Filter by status">
-            {(["ALL", "REGULAR", "PROBATIONARY"] as const).map((s) => (
+          <div className="inline-flex gap-1" role="group" aria-label="Filter by type">
+            {(["ALL", "REGULAR", "RELIEVER"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
-                onClick={() => setStatusFilter(s)}
+                onClick={() => setTypeFilter(s)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                  statusFilter === s ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  typeFilter === s ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
                 }`}
               >
-                {s === "ALL" ? "All" : s === "REGULAR" ? "Regular" : "Probationary"}
+                {s === "ALL" ? "All" : s === "REGULAR" ? "Regular" : "Reliever"}
               </button>
             ))}
           </div>
@@ -225,14 +223,9 @@ export default function EmployeesPage() {
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-semibold text-gray-800">{emp.name}</p>
                     {emp.position && <p className="text-sm text-gray-500">{emp.position}</p>}
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${emp.status === "REGULAR" ? "bg-green-50 text-green-700" : "bg-yellow-50 text-yellow-700"}`}>
-                      {emp.status === "REGULAR" ? "Regular" : "Probationary"}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${emp.isReliever ? "bg-indigo-50 text-indigo-700" : "bg-green-50 text-green-700"}`}>
+                      {emp.isReliever ? "Reliever" : "Regular"}
                     </span>
-                    {emp.isReliever && (
-                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
-                        Reliever
-                      </span>
-                    )}
                     {emp.occupied && (
                       <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-orange-50 text-orange-700">
                         Occupied

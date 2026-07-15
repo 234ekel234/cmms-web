@@ -3,21 +3,24 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 
-type EmployeeStatus = "PROBATIONARY" | "REGULAR";
+type EmployeeType = "REGULAR" | "RELIEVER";
 
 type Employee = {
   id: string;
   name: string;
   position: string | null;
-  status: EmployeeStatus;
   categories: string[];
   isReliever: boolean;
   createdAt: string;
 };
 
-const STATUS_CONFIG: Record<EmployeeStatus, { label: string; cls: string }> = {
-  REGULAR:      { label: "Regular",      cls: "bg-green-50 text-green-700" },
-  PROBATIONARY: { label: "Probationary", cls: "bg-amber-50 text-amber-700" },
+// An employee's classification is derived from isReliever: relievers can cover
+// multiple accounts, regulars belong to a single account.
+const empType = (e: { isReliever: boolean }): EmployeeType => (e.isReliever ? "RELIEVER" : "REGULAR");
+
+const TYPE_CONFIG: Record<EmployeeType, { label: string; cls: string }> = {
+  REGULAR:  { label: "Regular",  cls: "bg-green-50 text-green-700" },
+  RELIEVER: { label: "Reliever", cls: "bg-indigo-50 text-indigo-700" },
 };
 
 const COMMON_CATEGORIES = [
@@ -46,15 +49,14 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<EmployeeStatus | "ALL">("ALL");
+  const [typeFilter, setTypeFilter] = useState<EmployeeType | "ALL">("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
-  const [sortKey, setSortKey] = useState<"name" | "recent" | "status">("name");
+  const [sortKey, setSortKey] = useState<"name" | "recent" | "type">("name");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: "",
     position: "",
-    status: "REGULAR" as EmployeeStatus,
     categories: [] as string[],
     catInput: "",
     isReliever: false,
@@ -80,14 +82,14 @@ export default function EmployeesPage() {
 
   function openCreate() {
     setEditId(null);
-    setForm({ name: "", position: "", status: "REGULAR", categories: [], catInput: "", isReliever: false });
+    setForm({ name: "", position: "", categories: [], catInput: "", isReliever: false });
     setFormError("");
     setShowForm(true);
   }
 
   function openEdit(emp: Employee) {
     setEditId(emp.id);
-    setForm({ name: emp.name, position: emp.position ?? "", status: emp.status, categories: emp.categories ?? [], catInput: "", isReliever: emp.isReliever });
+    setForm({ name: emp.name, position: emp.position ?? "", categories: emp.categories ?? [], catInput: "", isReliever: emp.isReliever });
     setFormError("");
     setShowForm(true);
   }
@@ -110,7 +112,6 @@ export default function EmployeesPage() {
       const payload = {
         name: form.name.trim(),
         position: form.position.trim() || null,
-        status: form.status,
         categories: form.categories,
         isReliever: form.isReliever,
       };
@@ -155,11 +156,11 @@ export default function EmployeesPage() {
   }
 
   const filtersActive =
-    search.trim() !== "" || statusFilter !== "ALL" || categoryFilter.length > 0;
+    search.trim() !== "" || typeFilter !== "ALL" || categoryFilter.length > 0;
 
   function clearFilters() {
     setSearch("");
-    setStatusFilter("ALL");
+    setTypeFilter("ALL");
     setCategoryFilter([]);
   }
 
@@ -170,26 +171,26 @@ export default function EmployeesPage() {
         e.name.toLowerCase().includes(search.toLowerCase()) ||
         e.position?.toLowerCase().includes(search.toLowerCase()) ||
         (e.categories ?? []).some((c) => c.toLowerCase().includes(search.toLowerCase()));
-      const matchStatus = statusFilter === "ALL" || e.status === statusFilter;
+      const matchType = typeFilter === "ALL" || empType(e) === typeFilter;
       // Match any selected skill (OR) — "show me electricians or plumbers".
       const matchCategory =
         categoryFilter.length === 0 ||
         (e.categories ?? []).some((c) => categoryFilter.includes(c));
-      return matchSearch && matchStatus && matchCategory;
+      return matchSearch && matchType && matchCategory;
     })
     .sort((a, b) => {
       if (sortKey === "recent") {
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       }
-      if (sortKey === "status") {
-        if (a.status !== b.status) return a.status === "REGULAR" ? -1 : 1;
+      if (sortKey === "type") {
+        if (a.isReliever !== b.isReliever) return a.isReliever ? 1 : -1;
         return a.name.localeCompare(b.name);
       }
       return a.name.localeCompare(b.name);
     });
 
-  const regularCount = employees.filter((e) => e.status === "REGULAR").length;
-  const probCount = employees.filter((e) => e.status === "PROBATIONARY").length;
+  const regularCount = employees.filter((e) => !e.isReliever).length;
+  const relieverCount = employees.filter((e) => e.isReliever).length;
 
   return (
     <div className="tu-page">
@@ -198,7 +199,7 @@ export default function EmployeesPage() {
         <div>
           <h1 className="tu-page-title">Employee Registry</h1>
           <p className="tu-page-sub">
-            {loading ? "Loading…" : `${employees.length} employees · ${regularCount} regular · ${probCount} probationary`}
+            {loading ? "Loading…" : `${employees.length} employees · ${regularCount} regular · ${relieverCount} reliever`}
           </p>
         </div>
         <button
@@ -239,17 +240,6 @@ export default function EmployeesPage() {
                 onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
                 placeholder="e.g. Electrician, Supervisor"
               />
-            </div>
-            <div>
-              <label className="tu-label">Status</label>
-              <select
-                className="tu-select"
-                value={form.status}
-                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value as EmployeeStatus }))}
-              >
-                <option value="REGULAR">Regular</option>
-                <option value="PROBATIONARY">Probationary</option>
-              </select>
             </div>
             <div>
               <label className="tu-label">Type</label>
@@ -338,15 +328,15 @@ export default function EmployeesPage() {
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search name, position, skill…"
         />
-        <div className="tu-filter-group" role="group" aria-label="Filter by status">
-          {(["ALL", "REGULAR", "PROBATIONARY"] as const).map((s) => (
+        <div className="tu-filter-group" role="group" aria-label="Filter by type">
+          {(["ALL", "REGULAR", "RELIEVER"] as const).map((s) => (
             <button
               key={s}
               type="button"
-              onClick={() => setStatusFilter(s)}
-              className={`tu-period-pill${statusFilter === s ? " tu-active-pill" : ""}`}
+              onClick={() => setTypeFilter(s)}
+              className={`tu-period-pill${typeFilter === s ? " tu-active-pill" : ""}`}
             >
-              {s === "ALL" ? "All" : STATUS_CONFIG[s].label}
+              {s === "ALL" ? "All" : TYPE_CONFIG[s].label}
             </button>
           ))}
         </div>
@@ -359,7 +349,7 @@ export default function EmployeesPage() {
         >
           <option value="name">Sort: Name (A–Z)</option>
           <option value="recent">Sort: Newest first</option>
-          <option value="status">Sort: Status</option>
+          <option value="type">Sort: Type</option>
         </select>
       </div>
 
@@ -424,7 +414,7 @@ export default function EmployeesPage() {
               <tr>
                 <th scope="col">Name</th>
                 <th scope="col">Position</th>
-                <th scope="col">Status</th>
+                <th scope="col">Type</th>
                 <th scope="col">Skills</th>
                 <th scope="col" style={{ width: 100 }}></th>
               </tr>
@@ -443,7 +433,7 @@ export default function EmployeesPage() {
                 </tr>
               ) : (
                 filtered.map((emp) => {
-                  const st = STATUS_CONFIG[emp.status];
+                  const ty = TYPE_CONFIG[empType(emp)];
                   return (
                     <tr key={emp.id}>
                       <td className="tu-strong">{emp.name}</td>
@@ -451,14 +441,9 @@ export default function EmployeesPage() {
                         {emp.position ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                       </td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${st.cls}`}>
-                          {st.label}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ty.cls}`}>
+                          {ty.label}
                         </span>
-                        {emp.isReliever && (
-                          <span className="ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-indigo-50 text-indigo-700">
-                            Reliever
-                          </span>
-                        )}
                       </td>
                       <td>
                         {(emp.categories ?? []).length > 0 ? (

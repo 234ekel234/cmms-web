@@ -7,14 +7,13 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import Breadcrumbs from "@/components/Breadcrumbs";
 
-type EmployeeStatus = "REGULAR" | "PROBATIONARY";
 type EmployeeCategory = "ELECTRICAL" | "MECHANICAL" | "PLUMBING" | "CIVIL" | "GENERAL";
 
 type Employee = {
   id: string;
   name: string;
   position: string | null;
-  status: EmployeeStatus;
+  isReliever: boolean;
   categories: EmployeeCategory[];
   openWorkOrders?: number;
   attendance?: { present: number; absent: number; total: number; rate: number | null } | null;
@@ -37,11 +36,6 @@ const CATEGORIES: { value: EmployeeCategory; label: string }[] = [
   { value: "CIVIL",      label: "Civil" },
   { value: "GENERAL",    label: "General / Other" },
 ];
-
-const STATUS_LABEL: Record<EmployeeStatus, string> = {
-  REGULAR:      "Regular",
-  PROBATIONARY: "Probationary",
-};
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -66,7 +60,7 @@ export default function EmployeeDetailPage() {
   // Edit form state
   const [name, setName] = useState("");
   const [position, setPosition] = useState("");
-  const [status, setStatus] = useState<EmployeeStatus>("REGULAR");
+  const [isReliever, setIsReliever] = useState(false);
   const [categories, setCategories] = useState<EmployeeCategory[]>([]);
 
   useEffect(() => { fetchData(); }, [employeeId]);
@@ -83,7 +77,7 @@ export default function EmployeeDetailPage() {
       setEmployee(found);
       setName(found.name);
       setPosition(found.position ?? "");
-      setStatus(found.status);
+      setIsReliever(found.isReliever);
       setCategories(found.categories ?? []);
       setTrainings(trainRes.data);
     } catch {
@@ -106,7 +100,7 @@ export default function EmployeeDetailPage() {
       const res = await api.put(`/employees/${employeeId}`, {
         name: name.trim(),
         position: position.trim() || null,
-        status,
+        isReliever,
         categories,
       });
       setEmployee((prev) => prev ? { ...prev, ...res.data } : res.data);
@@ -123,7 +117,7 @@ export default function EmployeeDetailPage() {
     if (!employee) return;
     setName(employee.name);
     setPosition(employee.position ?? "");
-    setStatus(employee.status);
+    setIsReliever(employee.isReliever);
     setCategories(employee.categories ?? []);
     setEditing(false);
     setError(null);
@@ -202,23 +196,23 @@ export default function EmployeeDetailPage() {
         {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2 mb-4">{error}</p>}
 
         <div className="grid grid-cols-2 gap-4">
-          {/* Status */}
+          {/* Type */}
           <div>
-            <p className="text-xs font-bold text-gray-400 mb-1.5">Status</p>
+            <p className="text-xs font-bold text-gray-400 mb-1.5">Type</p>
             {editing ? (
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as EmployeeStatus)}
+                value={isReliever ? "RELIEVER" : "REGULAR"}
+                onChange={(e) => setIsReliever(e.target.value === "RELIEVER")}
                 className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30"
               >
-                <option value="REGULAR">Regular</option>
-                <option value="PROBATIONARY">Probationary</option>
+                <option value="REGULAR">Regular — one account</option>
+                <option value="RELIEVER">Reliever — multiple accounts</option>
               </select>
             ) : (
               <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                employee.status === "REGULAR" ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                employee.isReliever ? "bg-indigo-50 text-indigo-700" : "bg-green-50 text-green-700"
               }`}>
-                {STATUS_LABEL[employee.status]}
+                {employee.isReliever ? "Reliever" : "Regular"}
               </span>
             )}
           </div>
