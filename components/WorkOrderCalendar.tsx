@@ -87,7 +87,7 @@ export default function WorkOrderCalendar<T extends CalendarOrder>({ orders, hre
       ) : (
         <>
           {/* Weekday header */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderTop: "1px solid var(--tu-border)", borderLeft: "1px solid var(--tu-border)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderTop: "1px solid var(--tu-border)", borderLeft: "1px solid var(--tu-border)" }}>
             {WEEKDAYS.map((d) => (
               <div key={d} style={{ padding: "8px 10px", fontSize: 11, fontWeight: 700, color: "var(--tu-text-subtle)", textTransform: "uppercase", letterSpacing: 0.4, borderRight: "1px solid var(--tu-border)", borderBottom: "1px solid var(--tu-border)", background: "var(--tu-bg-secondary)" }}>
                 {d}
@@ -96,7 +96,7 @@ export default function WorkOrderCalendar<T extends CalendarOrder>({ orders, hre
           </div>
 
           {/* Day grid */}
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", borderLeft: "1px solid var(--tu-border)" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(0, 1fr))", borderLeft: "1px solid var(--tu-border)" }}>
             {cells.map((d) => {
               const key = dateKey(d);
               const inMonth = d.getMonth() === cursor.getMonth();
