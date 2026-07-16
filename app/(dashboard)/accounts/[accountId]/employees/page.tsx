@@ -20,6 +20,7 @@ type GlobalEmployee = {
   name: string;
   position: string | null;
   isReliever: boolean;
+  accounts: { id: string; name: string }[];
 };
 
 function attColor(rate: number | null) {
@@ -82,7 +83,12 @@ export default function EmployeesPage() {
   const assignedIds = new Set(employees.map((e) => e.id));
   const available = registry.filter(
     (e) =>
+      // Not already on this account…
       !assignedIds.has(e.id) &&
+      // …and assignable: relievers can join any number of accounts, but a
+      // regular employee already tied to another account can't be double-
+      // assigned (the API rejects it), so don't offer them.
+      (e.isReliever || !e.accounts.some((a) => a.id !== accountId)) &&
       (!search.trim() ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
         e.position?.toLowerCase().includes(search.toLowerCase()))
