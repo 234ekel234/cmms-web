@@ -91,6 +91,7 @@ const EMPTY_FORM = {
   estHours: "",
   estMinutes: "",
   isSpecialProject: false,
+  isBreakdown: false,
 };
 
 function formatDate(iso: string) {
@@ -250,6 +251,7 @@ export default function WorkOrdersPage() {
         dueDate: form.dueDate || null,
         estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : null,
         isSpecialProject: form.isSpecialProject,
+        isBreakdown: form.isBreakdown,
       });
       setOrders((prev) => [res.data, ...prev]);
       setShowForm(false);
@@ -526,6 +528,23 @@ export default function WorkOrdersPage() {
                 <label htmlFor="isSpecial" style={{ fontSize: 14, color: "var(--tu-text-body)" }}>Special Project</label>
               </div>
             )}
+            {/* Drives the failure count behind MTBF on the Reports tab, so it
+                has to mean "something broke" rather than "this was urgent". */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isBreakdown"
+                checked={form.isBreakdown}
+                onChange={(e) => setForm((f) => ({ ...f, isBreakdown: e.target.checked }))}
+                className="rounded"
+              />
+              <label htmlFor="isBreakdown" style={{ fontSize: 14, color: "var(--tu-text-body)" }}>
+                Breakdown
+                <span style={{ display: "block", fontSize: 12, color: "var(--tu-text-subtle)" }}>
+                  Unplanned work because something failed. Counts toward reliability.
+                </span>
+              </label>
+            </div>
           </div>
           {formError && <p className="tu-danger-text" style={{ fontSize: 12.5, marginTop: 12 }}>{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">

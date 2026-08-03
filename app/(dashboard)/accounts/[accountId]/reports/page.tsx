@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type Period = "this_week" | "this_month" | "this_quarter" | "this_year" | "custom";
 
@@ -187,6 +188,36 @@ function TrendChart({ points }: { points: { label: string; completed: number }[]
   );
 }
 
+type AssetReliability = {
+  assetId: string;
+  name: string;
+  category: string;
+  status: string;
+  health: string;
+  downtimeHours: number;
+  uptimeHours: number;
+  availability: number | null;
+  failures: number;
+  mttrHours: number | null;
+  mtbfHours: number | null;
+  repairsCompleted: number;
+  isDownNow: boolean;
+};
+
+type ReliabilityData = {
+  summary: {
+    assetsTracked: number;
+    assetsDownNow: number;
+    totalDowntimeHours: number;
+    failures: number;
+    availability: number | null;
+    mttrHours: number | null;
+    mtbfHours: number | null;
+  };
+  assets: AssetReliability[];
+  coverage: { unclassifiedWorkOrders: number; assetsWithDowntimeData: number };
+};
+
 export default function ReportsPage() {
   const params = useParams();
   const accountId = params.accountId as string;
@@ -197,6 +228,7 @@ export default function ReportsPage() {
   const [customError, setCustomError] = useState("");
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reliability, setReliability] = useState<ReliabilityData | null>(null);
 
   useEffect(() => {
     loadReport(activeRange.from, activeRange.to);
@@ -205,8 +237,16 @@ export default function ReportsPage() {
   async function loadReport(from: string, to: string) {
     setLoading(true);
     try {
-      const res = await api.get(`/accounts/${accountId}/reports?from=${from}&to=${to}`);
-      setData(res.data);
+      // Reliability is a separate endpoint so a failure there cannot blank the
+      // rest of the report.
+      const [res, rel] = await Promise.allSettled([
+        api.get(`/accounts/${accountId}/reports?from=${from}&to=${to}`),
+        api.get(`/accounts/${accountId}/reports/reliability?from=${from}&to=${to}`),
+      ]);
+      if (rel.status === "fulfilled") setReliability(rel.value.data);
+      else setReliability(null);
+      if (res.status === "rejected") throw res.reason;
+      setData(res.value.data);
     } catch {
       // silent
     } finally {
@@ -611,6 +651,105 @@ export default function ReportsPage() {
               </div>
             );
           })()}
+
+          {/* Reliability — downtime, availability, MTTR, MTBF */}
+          {reliability && (
+            <div>
+              <h3 className="text-sm font-bold text-[var(--tu-text-body)] mb-3">Reliability</h3>
+
+              <div className="flex gap-3 mb-4 flex-wrap">
+                <StatCard
+                  label="Availability"
+                  value={reliability.summary.availability != null ? `${(reliability.summary.availability * 100).toFixed(1)}%` : "—"}
+                  color="text-[var(--tu-on-success)]"
+                />
+                <StatCard label="Downtime" value={`${reliability.summary.totalDowntimeHours}h`} />
+                <StatCard
+                  label="Failures"
+                  value={reliability.summary.failures}
+                  color={reliability.summary.failures > 0 ? "text-[var(--tu-on-danger)]" : undefined}
+                />
+                <StatCard label="Mean Time To Repair" value={reliability.summary.mttrHours != null ? `${reliability.summary.mttrHours}h` : "—"} />
+                <StatCard label="Mean Time Between Failures" value={reliability.summary.mtbfHours != null ? `${reliability.summary.mtbfHours}h` : "—"} />
+                <StatCard
+                  label="Down now"
+                  value={reliability.summary.assetsDownNow}
+                  color={reliability.summary.assetsDownNow > 0 ? "text-[var(--tu-on-danger)]" : undefined}
+                />
+              </div>
+
+              {/* MTBF is only as honest as the breakdown flag. Saying so beats
+                  letting an unflagged account read as flawless. */}
+              {reliability.coverage.unclassifiedWorkOrders > 0 && (
+                <p className="text-xs text-[var(--tu-text-subtle)] mb-3">
+                  {reliability.coverage.unclassifiedWorkOrders} work order
+                  {reliability.coverage.unclassifiedWorkOrders === 1 ? " is" : "s are"} not marked as a
+                  breakdown, so failure counts and mean time between failures cover only what has
+                  been classified.
+                </p>
+              )}
+
+              {reliability.assets.length === 0 ? (
+                <EmptyState
+                  compact
+                  icon="asset"
+                  title="No assets to measure"
+                  hint="Reliability is calculated per asset. Add assets to this account to see downtime and failure rates."
+                />
+              ) : (
+                <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden mb-4">
+                  <div style={{ overflowX: "auto" }}>
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-[var(--tu-bg-secondary)] text-xs text-[var(--tu-text-subtle)] font-semibold uppercase tracking-wide">
+                          <th className="px-4 py-3 text-left">Asset</th>
+                          <th className="px-4 py-3 text-center">Availability</th>
+                          <th className="px-4 py-3 text-center">Downtime</th>
+                          <th className="px-4 py-3 text-center">Failures</th>
+                          <th className="px-4 py-3 text-center">Mean Time<br />To Repair</th>
+                          <th className="px-4 py-3 text-center">Mean Time<br />Between Failures</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[var(--tu-border)]">
+                        {reliability.assets.map((a) => (
+                          <tr key={a.assetId}>
+                            <td className="px-4 py-3">
+                              <span className="font-medium text-[var(--tu-text-heading)]">{a.name}</span>
+                              {a.isDownNow && (
+                                <span className="tu-badge tu-badge-danger" style={{ marginLeft: 8 }}>Down</span>
+                              )}
+                              <span className="block text-xs text-[var(--tu-text-subtle)]">{a.category}</span>
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.availability != null ? (
+                                <span className={a.availability < 0.9 ? "tu-figure text-[var(--tu-on-danger)]" : "tu-figure"}>
+                                  {(a.availability * 100).toFixed(1)}%
+                                </span>
+                              ) : (
+                                <span className="tu-figure-zero">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.downtimeHours > 0 ? <span className="tu-figure">{a.downtimeHours}h</span> : <span className="tu-figure-zero">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.failures > 0 ? <span className="tu-figure">{a.failures}</span> : <span className="tu-figure-zero">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.mttrHours != null ? <span className="tu-figure">{a.mttrHours}h</span> : <span className="tu-figure-zero">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.mtbfHours != null ? <span className="tu-figure">{a.mtbfHours}h</span> : <span className="tu-figure-zero">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Employee Performance */}
           <div>
