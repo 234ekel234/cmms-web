@@ -26,6 +26,7 @@ type WorkOrder = {
   remarks: string | null;
   completedAt: string | null;
   isSpecialProject: boolean;
+  isBreakdown: boolean;
   estimatedMinutes: number | null;
   actualSeconds: number;
   timerStartedAt: string | null;
@@ -151,6 +152,7 @@ export default function WorkOrderDetailPage() {
   // Edit mode for non-status fields
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "" });
+  const [savingBreakdown, setSavingBreakdown] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   // Parts used. A line can either point at a catalogue part (which draws its
@@ -303,6 +305,32 @@ export default function WorkOrderDetailPage() {
       // silent
     } finally {
       setSavingEdit(false);
+    }
+  }
+
+  /**
+   * Reclassifies the order as a breakdown (or not) after the fact.
+   *
+   * Deliberately separate from the edit form, which is closed once an order is
+   * terminal. Diagnosis usually lands *after* the work is done — a request comes
+   * in as "no aircon in unit 5" and only turns out to be a compressor failure
+   * once someone opens it up. Mean time to repair is measured over completed
+   * orders, so if a finished job could not be flagged, it would never count.
+   */
+  async function setBreakdown(next: boolean) {
+    if (!order) return;
+    setSavingBreakdown(true);
+    try {
+      const res = await api.patch(`/work-orders/${order.id}`, { isBreakdown: next });
+      // PATCH responses omit comments (and other relations); merge so we don't
+      // drop them and crash the comments/parts sections.
+      setOrder((prev) => prev
+        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        : res.data);
+    } catch {
+      // silent
+    } finally {
+      setSavingBreakdown(false);
     }
   }
 
@@ -507,11 +535,38 @@ export default function WorkOrderDetailPage() {
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-[var(--tu-text-heading)]">{order.title}</h1>
-            {order.isSpecialProject && (
-              <span className="inline-block mt-1 text-xs font-semibold text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-full px-2 py-0.5">
-                ★ Special Project
-              </span>
-            )}
+            <div className="flex items-center gap-2 flex-wrap mt-1">
+              {order.isSpecialProject && (
+                <span className="text-xs font-semibold text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-full px-2 py-0.5">
+                  ★ Special Project
+                </span>
+              )}
+              {order.isBreakdown && (
+                <span className="text-xs font-semibold text-[var(--tu-on-danger)] bg-[var(--tu-soft-danger)] rounded-full px-2 py-0.5">
+                  Breakdown
+                </span>
+              )}
+              {/* Available at any status, including completed — see setBreakdown. */}
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setBreakdown(!order.isBreakdown)}
+                  disabled={savingBreakdown}
+                  className="text-xs text-[var(--tu-text-subtle)] underline decoration-dotted underline-offset-2 hover:text-[var(--tu-text-heading)] disabled:opacity-50 cursor-pointer bg-transparent border-none p-0"
+                  title={
+                    order.isBreakdown
+                      ? "Stop counting this as an equipment failure in the reliability report"
+                      : "Count this as an equipment failure in the reliability report"
+                  }
+                >
+                  {savingBreakdown
+                    ? "Saving…"
+                    : order.isBreakdown
+                      ? "Not a breakdown"
+                      : "Mark as breakdown"}
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {canManage && !isTerminal && (
