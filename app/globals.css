@@ -2426,3 +2426,39 @@ figure:hover .tu-attachment-remove,
 @media (hover: none) {
   .tu-attachment-remove { opacity: 1; }
 }
+
+/* ── Progress thread ──────────────────────────────────────
+   A work order's running history: notes and the photos that belong with them.
+   The rail down the left ties entries into one sequence rather than a stack of
+   unrelated cards. */
+.tu-thread { display: flex; flex-direction: column; gap: 0; margin: 0; padding: 0; list-style: none; }
+.tu-thread-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0 14px;
+  position: relative;
+}
+/* The connecting rail, stopping at the last entry so the thread has an end. */
+.tu-thread-item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 38px;
+  bottom: 0;
+  width: 1px;
+  background: var(--tu-border);
+}
+.tu-thread-avatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tu-bg-brand-soft);
+  color: var(--tu-text-brand);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}

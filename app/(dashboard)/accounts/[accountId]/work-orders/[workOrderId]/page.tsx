@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import StatusPipeline from "@/components/StatusPipeline";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
-import Attachments from "@/components/Attachments";
+import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -33,7 +33,13 @@ type WorkOrder = {
   timerStartedAt: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
-  comments: { id: string; body: string; authorName: string; createdAt: string }[];
+  comments: {
+    id: string;
+    body: string;
+    authorName: string;
+    createdAt: string;
+    attachments?: ProgressAttachment[];
+  }[];
   assignments: { id: string; employeeId: string; employee: { id: string; name: string; position: string | null } }[];
   // Omitted by the API for CLIENT users — parts carry cost, which clients don't see yet.
   parts?: WorkOrderPart[];
@@ -117,16 +123,6 @@ function formatQty(qty: number) {
   return Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100);
 }
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
-}
-
 type AccountEmployee = { id: string; name: string; position: string | null };
 
 export default function WorkOrderDetailPage() {
@@ -142,6 +138,11 @@ export default function WorkOrderDetailPage() {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
+  // Files chosen but not yet posted. An update is one entry — note and photos
+  // together — so they are held here until Post rather than uploaded on pick.
+  const [staged, setStaged] = useState<File[]>([]);
+  const [progressError, setProgressError] = useState("");
+  const progressFileRef = useRef<HTMLInputElement>(null);
 
   // Assignment picker
   const [accountEmployees, setAccountEmployees] = useState<AccountEmployee[]>([]);
@@ -465,17 +466,46 @@ export default function WorkOrderDetailPage() {
   }
 
   async function addComment() {
-    if (!commentText.trim() || submittingComment || !order) return;
+    const text = commentText.trim();
+    // Either alone is a valid update: a set of photos needs no caption, and a
+    // note needs no photos.
+    if ((!text && staged.length === 0) || submittingComment || !order) return;
     setSubmittingComment(true);
+    setProgressError("");
     try {
-      const res = await api.post(`/work-orders/${order.id}/comments`, { body: commentText.trim() });
+      // Multipart only when there is something to upload, so text-only posts
+      // stay a plain JSON request.
+      let res;
+      if (staged.length > 0) {
+        const form = new FormData();
+        if (text) form.append("body", text);
+        for (const f of staged) form.append("files", f);
+        res = await api.post(`/work-orders/${order.id}/comments`, form);
+      } else {
+        res = await api.post(`/work-orders/${order.id}/comments`, { body: text });
+      }
       setOrder((prev) => prev ? { ...prev, comments: [...prev.comments, res.data] } : prev);
       setCommentText("");
-    } catch {
-      // silent
+      setStaged([]);
+      if (progressFileRef.current) progressFileRef.current.value = "";
+    } catch (err: unknown) {
+      const r = (err as { response?: { data?: { error?: string } } })?.response;
+      setProgressError(r?.data?.error ?? "Could not post that update.");
     } finally {
       setSubmittingComment(false);
     }
+  }
+
+  function stageFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = Array.from(e.target.files ?? []);
+    setProgressError("");
+    const tooBig = picked.find((f) => f.size > 15 * 1024 * 1024);
+    if (tooBig) {
+      // Surfaced instantly here; the API enforces the limit regardless.
+      setProgressError(`"${tooBig.name}" is over the 15 MB limit.`);
+      return;
+    }
+    setStaged((prev) => [...prev, ...picked].slice(0, 8));
   }
 
   if (loading) {
@@ -1162,53 +1192,20 @@ export default function WorkOrderDetailPage() {
         </div>
       )}
 
-      {/* Attachments — job photos, before/after, paperwork */}
-      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
-        <Attachments
-          parent="work-orders"
-          parentId={order.id}
-          canUpload
-          canDelete={canManage}
-        />
-      </div>
-
-      {/* Comments */}
-      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-[var(--tu-text-body)] mb-4">
-          Comments {order.comments.length > 0 && `(${order.comments.length})`}
-        </h2>
-        {order.comments.length === 0 ? (
-          <EmptyState compact icon="activity" title="No comments yet" hint="Use comments to record findings and hand work over." />
-        ) : (
-          <div className="space-y-3 mb-4">
-            {order.comments.map((c) => (
-              <div key={c.id} className="bg-[var(--tu-bg-secondary)] rounded-lg p-3">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-[var(--tu-text-body)]">{c.authorName}</span>
-                  <span className="text-xs text-[var(--tu-text-subtle)]">{timeAgo(c.createdAt)}</span>
-                </div>
-                <p className="text-sm text-[var(--tu-text-body)]">{c.body}</p>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="flex gap-2">
-          <input
-            className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
-            value={commentText}
-            onChange={(e) => setCommentText(e.target.value)}
-            placeholder="Add a comment..."
-            onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && addComment()}
-          />
-          <button
-            onClick={addComment}
-            disabled={!commentText.trim() || submittingComment}
-            className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
-          >
-            {submittingComment ? "..." : "Send"}
-          </button>
-        </div>
-      </div>
+      {/* Progress — the running record of what happened and when: notes,
+          photos, and the paperwork that goes with them. */}
+      <ProgressThread
+        entries={order.comments}
+        text={commentText}
+        onTextChange={setCommentText}
+        staged={staged}
+        onStageFiles={stageFiles}
+        onUnstage={(i) => setStaged((prev) => prev.filter((_, n) => n !== i))}
+        fileInputRef={progressFileRef}
+        onPost={addComment}
+        posting={submittingComment}
+        error={progressError}
+      />
     </div>
   );
 }
