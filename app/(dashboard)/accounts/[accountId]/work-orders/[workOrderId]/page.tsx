@@ -7,6 +7,7 @@ import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline from "@/components/StatusPipeline";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import EmptyState from "@/components/EmptyState";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -32,22 +33,45 @@ type WorkOrder = {
   asset: { id: string; name: string } | null;
   comments: { id: string; body: string; authorName: string; createdAt: string }[];
   assignments: { id: string; employeeId: string; employee: { id: string; name: string; position: string | null } }[];
+  // Omitted by the API for CLIENT users — parts carry cost, which clients don't see yet.
+  parts?: WorkOrderPart[];
+};
+
+type WorkOrderPart = {
+  id: string;
+  description: string;
+  quantity: number;
+  unitCost: number | null;
+  supplier: string | null;
+  // Set when the line was picked from the account's spare-parts catalogue, in
+  // which case saving it also draws that part's stock down.
+  partId: string | null;
+  part?: { id: string; name: string; unit: string | null; quantityOnHand: number } | null;
+};
+
+type CatalogPart = {
+  id: string;
+  name: string;
+  partNumber: string | null;
+  unit: string | null;
+  unitCost: number | null;
+  quantityOnHand: number;
 };
 
 const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
-  REQUESTED:   { label: "Requested",   cls: "bg-purple-50 text-purple-700" },
-  PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
-  IN_PROGRESS: { label: "In Progress", cls: "bg-amber-50 text-amber-700" },
-  ON_HOLD:     { label: "On Hold",     cls: "bg-slate-100 text-slate-700" },
-  COMPLETED:   { label: "Completed",   cls: "bg-green-50 text-green-700" },
-  REJECTED:    { label: "Rejected",    cls: "bg-red-50 text-red-700" },
+  REQUESTED:   { label: "Requested",   cls: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" },
+  PENDING:     { label: "Accepted",    cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
+  IN_PROGRESS: { label: "In Progress", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
+  ON_HOLD:     { label: "On Hold",     cls: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]" },
+  COMPLETED:   { label: "Completed",   cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  REJECTED:    { label: "Rejected",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }> = {
-  LOW:      { label: "Low",      cls: "bg-green-50 text-green-700" },
-  MEDIUM:   { label: "Medium",   cls: "bg-blue-50 text-blue-700" },
-  HIGH:     { label: "High",     cls: "bg-amber-50 text-amber-700" },
-  CRITICAL: { label: "Critical", cls: "bg-red-50 text-red-700" },
+  LOW:      { label: "Low",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  MEDIUM:   { label: "Medium",   cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
+  HIGH:     { label: "High",     cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
+  CRITICAL: { label: "Critical", cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 const VALID_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
@@ -79,6 +103,16 @@ function formatTimer(totalSeconds: number) {
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
   return `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+}
+
+function formatPeso(amount: number) {
+  return `₱${amount.toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+// Quantities are stored as floats so fractional units (2.5 L of oil) work, but
+// whole numbers should read as "3", not "3.00".
+function formatQty(qty: number) {
+  return Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100);
 }
 
 function timeAgo(iso: string) {
@@ -118,6 +152,17 @@ export default function WorkOrderDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({ priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "" });
   const [savingEdit, setSavingEdit] = useState(false);
+
+  // Parts used. A line can either point at a catalogue part (which draws its
+  // stock down when saved) or be plain free text for anything not stocked.
+  const emptyPartForm = { partId: "", description: "", quantity: "1", unitCost: "", supplier: "" };
+  const [showPartForm, setShowPartForm] = useState(false);
+  const [partForm, setPartForm] = useState(emptyPartForm);
+  const [editingPartId, setEditingPartId] = useState<string | null>(null);
+  const [savingPart, setSavingPart] = useState(false);
+  const [partError, setPartError] = useState<string | null>(null);
+  const [removingPartId, setRemovingPartId] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<CatalogPart[]>([]);
 
   // Man-hour time tracking
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -249,8 +294,10 @@ export default function WorkOrderDetailPage() {
         estimatedMinutes: estMin ? Number(estMin) : null,
       });
       // PATCH responses omit comments (and other relations); merge so we don't
-      // drop them and crash the comments section.
-      setOrder((prev) => prev ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments } : res.data);
+      // drop them and crash the comments/parts sections.
+      setOrder((prev) => prev
+        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        : res.data);
       setEditing(false);
     } catch {
       // silent
@@ -267,14 +314,124 @@ export default function WorkOrderDetailPage() {
       if (status === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
       const res = await api.patch(`/work-orders/${order.id}`, body);
       // PATCH responses omit comments (and other relations); merge so we don't
-      // drop them and crash the comments section.
-      setOrder((prev) => prev ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments } : res.data);
+      // drop them and crash the comments/parts sections.
+      setOrder((prev) => prev
+        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        : res.data);
       setShowCompleteForm(false);
       setRemarks("");
     } catch {
       // silent
     } finally {
       setUpdatingStatus(false);
+    }
+  }
+
+  // Loaded lazily the first time the part form opens — most visits to a work
+  // order never touch parts, so there's no reason to fetch the catalogue upfront.
+  async function loadCatalog() {
+    if (catalog.length > 0) return;
+    try {
+      const res = await api.get(`/accounts/${accountId}/parts`);
+      setCatalog(res.data);
+    } catch {
+      // Silent: the form still works as free text without the catalogue.
+    }
+  }
+
+  // Picking a catalogue part fills in the name and cost, but both stay editable
+  // — the price paid on the day can differ from the catalogue's.
+  function selectCatalogPart(partId: string) {
+    const picked = catalog.find((c) => c.id === partId);
+    setPartForm((f) => ({
+      ...f,
+      partId,
+      description: picked ? picked.name : f.description,
+      unitCost: picked?.unitCost != null ? String(picked.unitCost) : f.unitCost,
+    }));
+  }
+
+  function openPartForm(part?: WorkOrderPart) {
+    setPartError(null);
+    loadCatalog();
+    if (part) {
+      setEditingPartId(part.id);
+      setPartForm({
+        partId: part.partId ?? "",
+        description: part.description,
+        quantity: String(part.quantity),
+        unitCost: part.unitCost != null ? String(part.unitCost) : "",
+        supplier: part.supplier ?? "",
+      });
+    } else {
+      setEditingPartId(null);
+      setPartForm(emptyPartForm);
+    }
+    setShowPartForm(true);
+  }
+
+  function closePartForm() {
+    setShowPartForm(false);
+    setEditingPartId(null);
+    setPartForm(emptyPartForm);
+    setPartError(null);
+  }
+
+  async function savePart() {
+    if (!order || savingPart) return;
+    const description = partForm.description.trim();
+    if (!description) { setPartError("Part description is required"); return; }
+    const quantity = Number(partForm.quantity);
+    if (!Number.isFinite(quantity) || quantity <= 0) { setPartError("Quantity must be greater than 0"); return; }
+    const costRaw = partForm.unitCost.trim();
+    const unitCost = costRaw === "" ? null : Number(costRaw);
+    if (unitCost != null && (!Number.isFinite(unitCost) || unitCost < 0)) {
+      setPartError("Unit cost must be 0 or more"); return;
+    }
+
+    setSavingPart(true);
+    setPartError(null);
+    const body = {
+      description,
+      quantity,
+      unitCost,
+      supplier: partForm.supplier.trim() || null,
+      partId: partForm.partId || null,
+    };
+    try {
+      if (editingPartId) {
+        const res = await api.patch(`/work-orders/${order.id}/parts/${editingPartId}`, body);
+        setOrder((prev) => prev
+          ? { ...prev, parts: (prev.parts ?? []).map((p) => (p.id === editingPartId ? res.data : p)) }
+          : prev);
+      } else {
+        const res = await api.post(`/work-orders/${order.id}/parts`, body);
+        setOrder((prev) => prev ? { ...prev, parts: [...(prev.parts ?? []), res.data] } : prev);
+      }
+      // The catalogue's on-hand figures are now stale — refetch so the picker
+      // shows what is actually left.
+      setCatalog([]);
+      loadCatalog();
+      closePartForm();
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setPartError(e?.response?.data?.error ?? "Could not save the part. Please try again.");
+    } finally {
+      setSavingPart(false);
+    }
+  }
+
+  async function removePart(partId: string) {
+    if (!order) return;
+    setRemovingPartId(partId);
+    try {
+      await api.delete(`/work-orders/${order.id}/parts/${partId}`);
+      setOrder((prev) => prev ? { ...prev, parts: (prev.parts ?? []).filter((p) => p.id !== partId) } : prev);
+      if (editingPartId === partId) closePartForm();
+    } catch {
+      // silent
+    } finally {
+      setRemovingPartId(null);
     }
   }
 
@@ -295,8 +452,8 @@ export default function WorkOrderDetailPage() {
   if (loading) {
     return (
       <div className="p-8 max-w-4xl mx-auto">
-        <div className="h-8 w-48 bg-gray-100 rounded animate-pulse mb-4" />
-        <div className="h-64 bg-white rounded-xl border border-gray-100 animate-pulse" />
+        <div className="h-8 w-48 bg-[var(--tu-bg-secondary-strong)] rounded animate-pulse mb-4" />
+        <div className="h-64 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
       </div>
     );
   }
@@ -304,7 +461,7 @@ export default function WorkOrderDetailPage() {
   if (error || !order) {
     return (
       <div className="p-8">
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
+        <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load work order.{" "}
           <button onClick={fetchOrder} className="underline cursor-pointer">Try again</button>
         </div>
@@ -321,6 +478,21 @@ export default function WorkOrderDetailPage() {
   // Special project gate: only managers can approve/reject special projects
   const canActOnStatus = !isClient && canManage && (!order.isSpecialProject || isManager);
 
+  // Parts used. Lines with no unit cost are counted but left out of the total,
+  // and flagged so the figure isn't mistaken for a complete cost.
+  const parts = order.parts ?? [];
+  const partsTotal = parts.reduce((sum, p) => sum + (p.unitCost ?? 0) * p.quantity, 0);
+  const partsMissingCost = parts.filter((p) => p.unitCost == null).length;
+
+  const selectedCatalogPart = partForm.partId ? catalog.find((c) => c.id === partForm.partId) ?? null : null;
+  // Warn when the job would take more than the count knows about. Only the
+  // extra beyond what this line already consumed counts when editing.
+  const alreadyIssued = editingPartId
+    ? parts.find((p) => p.id === editingPartId && p.partId === partForm.partId)?.quantity ?? 0
+    : 0;
+  const shortStock =
+    !!selectedCatalogPart && (Number(partForm.quantity) || 0) - alreadyIssued > selectedCatalogPart.quantityOnHand;
+
   return (
     <div className="p-8 max-w-4xl mx-auto">
       <Breadcrumbs
@@ -331,12 +503,12 @@ export default function WorkOrderDetailPage() {
       />
 
       {/* Main card */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
+      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold text-gray-900">{order.title}</h1>
+            <h1 className="text-xl font-bold text-[var(--tu-text-heading)]">{order.title}</h1>
             {order.isSpecialProject && (
-              <span className="inline-block mt-1 text-xs font-semibold text-amber-700 bg-amber-50 rounded-full px-2 py-0.5">
+              <span className="inline-block mt-1 text-xs font-semibold text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-full px-2 py-0.5">
                 ★ Special Project
               </span>
             )}
@@ -345,7 +517,7 @@ export default function WorkOrderDetailPage() {
             {canManage && !isTerminal && (
               <button
                 onClick={openEdit}
-                className="text-xs text-gray-500 border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 cursor-pointer"
+                className="text-xs text-[var(--tu-text-subtle)] border border-[var(--tu-border)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
               >
                 Edit
               </button>
@@ -358,16 +530,16 @@ export default function WorkOrderDetailPage() {
 
         {/* Lifecycle pipeline */}
         {order.status === "REJECTED" ? (
-          <div className="bg-red-50 rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-red-800">
+          <div className="bg-[var(--tu-soft-danger)] rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-[var(--tu-on-danger)]">
             This work order was rejected.
           </div>
         ) : (
           <>
             {order.status === "ON_HOLD" && (
-              <div className="flex items-center justify-center gap-2 bg-slate-100 border border-slate-200 rounded-lg p-2.5 my-2.5 text-[13px] font-semibold text-slate-700">
+              <div className="flex items-center justify-center gap-2 bg-[var(--tu-soft-neutral)] border border-[var(--tu-bd-neutral)] rounded-lg p-2.5 my-2.5 text-[13px] font-semibold text-[var(--tu-on-neutral)]">
                 <span className="flex gap-[3px]" aria-hidden="true">
-                  <span className="w-[3px] h-3.5 rounded-sm bg-slate-500" />
-                  <span className="w-[3px] h-3.5 rounded-sm bg-slate-500" />
+                  <span className="w-[3px] h-3.5 rounded-sm bg-[var(--tu-status-on-hold)]" />
+                  <span className="w-[3px] h-3.5 rounded-sm bg-[var(--tu-status-on-hold)]" />
                 </span>
                 On hold — work is paused. Resume it to continue.
               </div>
@@ -378,12 +550,12 @@ export default function WorkOrderDetailPage() {
 
         {/* Inline edit form */}
         {editing && (
-          <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200">
+          <div className="bg-[var(--tu-bg-secondary)] rounded-xl p-4 mb-4 border border-[var(--tu-border)]">
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Priority</label>
+                <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Priority</label>
                 <select
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={editForm.priority}
                   onChange={(e) => setEditForm((f) => ({ ...f, priority: e.target.value as WorkOrderPriority }))}
                 >
@@ -393,29 +565,29 @@ export default function WorkOrderDetailPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+                <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Category</label>
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={editForm.category}
                   onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value }))}
                   placeholder="e.g. Electrical, HVAC"
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Due Date</label>
+                <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Due Date</label>
                 <input
                   type="date"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={editForm.dueDate}
                   onChange={(e) => setEditForm((f) => ({ ...f, dueDate: e.target.value }))}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 mb-1">Est. Minutes</label>
+                <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Est. Minutes</label>
                 <input
                   type="number"
                   min="0"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={editForm.estimatedMinutes}
                   onChange={(e) => setEditForm((f) => ({ ...f, estimatedMinutes: e.target.value }))}
                   placeholder="e.g. 120"
@@ -425,14 +597,14 @@ export default function WorkOrderDetailPage() {
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setEditing(false)}
-                className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-100 cursor-pointer"
+                className="px-3 py-1.5 text-xs text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary-strong)] cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={saveEdit}
                 disabled={savingEdit}
-                className="px-3 py-1.5 text-xs text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+                className="px-3 py-1.5 text-xs text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
                 {savingEdit ? "Saving…" : "Save Changes"}
               </button>
@@ -445,16 +617,16 @@ export default function WorkOrderDetailPage() {
           <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${priorityCfg.cls}`}>
             {priorityCfg.label}
           </span>
-          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${order.type === "INTERNAL" ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"}`}>
+          <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${order.type === "INTERNAL" ? "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>
             {order.type === "INTERNAL" ? "Internal" : "External"}
           </span>
           {order.category && (
-            <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">
+            <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]">
               {order.category}
             </span>
           )}
           {order.dueDate && (
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isOverdue ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${isOverdue ? "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" : "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]"}`}>
               {isOverdue ? "Overdue · " : "Due "}{new Date(order.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
             </span>
           )}
@@ -462,16 +634,16 @@ export default function WorkOrderDetailPage() {
 
         {/* Description */}
         {order.description && (
-          <p className="text-sm text-gray-600 mb-4 leading-relaxed">{order.description}</p>
+          <p className="text-sm text-[var(--tu-text-body)] mb-4 leading-relaxed">{order.description}</p>
         )}
 
         {/* Asset */}
         {order.asset && (
           <p className="text-sm mb-4">
-            <span className="text-gray-500">Asset: </span>
+            <span className="text-[var(--tu-text-subtle)]">Asset: </span>
             <Link
               href={`/accounts/${accountId}/assets/${order.asset.id}`}
-              className="text-[#2166AC] hover:underline"
+              className="text-[var(--tu-text-brand)] hover:underline"
             >
               {order.asset.name}
             </Link>
@@ -481,11 +653,11 @@ export default function WorkOrderDetailPage() {
         {/* Assignees */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Assigned To</p>
+            <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Assigned To</p>
             {canManage && !isTerminal && (
               <button
                 onClick={openAssignPicker}
-                className="text-xs text-[#2166AC] hover:underline cursor-pointer"
+                className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
               >
                 + Add
               </button>
@@ -494,16 +666,16 @@ export default function WorkOrderDetailPage() {
           {order.assignments.length > 0 ? (
             <div className="flex flex-wrap gap-2">
               {order.assignments.map((a) => (
-                <span key={a.id} className="inline-flex items-center gap-1.5 text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-1 font-medium">
-                  <Link href={`/accounts/${accountId}/employees/${a.employee.id}`} className="hover:text-[#2166AC] hover:underline">
+                <span key={a.id} className="inline-flex items-center gap-1.5 text-xs bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)] rounded-full px-2.5 py-1 font-medium">
+                  <Link href={`/accounts/${accountId}/employees/${a.employee.id}`} className="hover:text-[var(--tu-text-brand)] hover:underline">
                     {a.employee.name}
                   </Link>
-                  {a.employee.position && <span className="text-gray-400">· {a.employee.position}</span>}
+                  {a.employee.position && <span className="text-[var(--tu-text-subtle)]">· {a.employee.position}</span>}
                   {canManage && !isTerminal && (
                     <button
                       onClick={() => removeAssignment(a.employeeId)}
                       disabled={removingId === a.employeeId}
-                      className="text-gray-400 hover:text-red-500 cursor-pointer leading-none"
+                      className="text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] cursor-pointer leading-none"
                       aria-label={`Remove ${a.employee.name}`}
                     >
                       {removingId === a.employeeId ? "…" : "×"}
@@ -513,15 +685,15 @@ export default function WorkOrderDetailPage() {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-400">No employees assigned</p>
+            <EmptyState compact icon="employee" title="No employees assigned" hint="Assign a technician so this work order shows on their queue." />
           )}
 
           {/* Assign picker */}
           {showAssignPicker && (
-            <div className="mt-3 border border-gray-200 rounded-xl overflow-hidden shadow-sm">
-              <div className="p-3 border-b border-gray-100">
+            <div className="mt-3 border border-[var(--tu-border)] rounded-xl overflow-hidden shadow-sm">
+              <div className="p-3 border-b border-[var(--tu-border)]">
                 <input
-                  className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   placeholder="Search employees…"
                   value={empSearch}
                   onChange={(e) => setEmpSearch(e.target.value)}
@@ -540,23 +712,23 @@ export default function WorkOrderDetailPage() {
                       key={e.id}
                       onClick={() => assignEmployee(e.id)}
                       disabled={assigningId === e.id}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-gray-50 flex items-center justify-between cursor-pointer transition-colors"
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-[var(--tu-bg-secondary)] flex items-center justify-between cursor-pointer transition-colors"
                     >
                       <div>
-                        <span className="font-medium text-gray-800">{e.name}</span>
-                        {e.position && <span className="text-gray-400 text-xs ml-2">{e.position}</span>}
+                        <span className="font-medium text-[var(--tu-text-heading)]">{e.name}</span>
+                        {e.position && <span className="text-[var(--tu-text-subtle)] text-xs ml-2">{e.position}</span>}
                       </div>
-                      {assigningId === e.id && <span className="text-xs text-gray-400">…</span>}
+                      {assigningId === e.id && <span className="text-xs text-[var(--tu-text-subtle)]">…</span>}
                     </button>
                   ))}
                 {accountEmployees.filter((e) => !order.assignments.some((a) => a.employeeId === e.id)).length === 0 && (
-                  <p className="text-xs text-gray-400 text-center py-4">All employees assigned.</p>
+                  <p className="text-xs text-[var(--tu-text-subtle)] text-center py-4">All employees assigned.</p>
                 )}
               </div>
-              <div className="p-2 border-t border-gray-100">
+              <div className="p-2 border-t border-[var(--tu-border)]">
                 <button
                   onClick={() => setShowAssignPicker(false)}
-                  className="w-full text-xs text-gray-500 py-1.5 hover:bg-gray-50 rounded-lg cursor-pointer"
+                  className="w-full text-xs text-[var(--tu-text-subtle)] py-1.5 hover:bg-[var(--tu-bg-secondary)] rounded-lg cursor-pointer"
                 >
                   Done
                 </button>
@@ -576,30 +748,30 @@ export default function WorkOrderDetailPage() {
           const overBudget = estMin != null && actualMinutes > estMin;
           const isDone = order.status === "COMPLETED";
           return (
-            <div className="border border-gray-100 rounded-xl p-4 mb-4">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Time Tracking · Man-Hours</p>
+            <div className="border border-[var(--tu-border)] rounded-xl p-4 mb-4">
+              <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Time Tracking · Man-Hours</p>
 
               {/* Expected */}
               <div className="flex items-center justify-between gap-3 mb-3">
-                <span className="text-sm text-gray-500">Expected</span>
+                <span className="text-sm text-[var(--tu-text-subtle)]">Expected</span>
                 {editingEst ? (
                   <div className="flex items-center gap-1.5">
                     <input type="number" min={0} value={estHrs} onChange={(e) => setEstHrs(e.target.value)} placeholder="0"
-                      className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2166AC]" />
-                    <span className="text-xs text-gray-400">h</span>
+                      className="w-14 border border-[var(--tu-border)] rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]" />
+                    <span className="text-xs text-[var(--tu-text-subtle)]">h</span>
                     <input type="number" min={0} max={59} value={estMins} onChange={(e) => setEstMins(e.target.value)} placeholder="0"
-                      className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[#2166AC]" />
-                    <span className="text-xs text-gray-400">m</span>
-                    <button onClick={saveEstimate} className="ml-1 text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-2.5 py-1 hover:bg-[#1a5490] cursor-pointer">Save</button>
-                    <button onClick={() => setEditingEst(false)} className="text-xs text-gray-500 px-1 cursor-pointer">Cancel</button>
+                      className="w-14 border border-[var(--tu-border)] rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]" />
+                    <span className="text-xs text-[var(--tu-text-subtle)]">m</span>
+                    <button onClick={saveEstimate} className="ml-1 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-2.5 py-1 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer">Save</button>
+                    <button onClick={() => setEditingEst(false)} className="text-xs text-[var(--tu-text-subtle)] px-1 cursor-pointer">Cancel</button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-gray-800">{estMin != null ? formatHM(estMin) : "Not set"}</span>
+                    <span className="text-sm font-semibold text-[var(--tu-text-heading)]">{estMin != null ? formatHM(estMin) : "Not set"}</span>
                     {canManage && (
                       <button
                         onClick={() => { setEstHrs(estMin != null ? String(Math.floor(estMin / 60)) : ""); setEstMins(estMin != null ? String(estMin % 60) : ""); setEditingEst(true); }}
-                        className="text-xs text-[#2166AC] hover:underline cursor-pointer"
+                        className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
                       >
                         {estMin != null ? "Edit" : "Set"}
                       </button>
@@ -609,13 +781,13 @@ export default function WorkOrderDetailPage() {
               </div>
 
               {/* Live timer / actual */}
-              <div className="bg-gray-50 rounded-lg p-3 flex items-center justify-between">
+              <div className="bg-[var(--tu-bg-secondary)] rounded-lg p-3 flex items-center justify-between">
                 <div>
-                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{isDone ? "Actual" : "Elapsed"}</p>
-                  <p className={`text-2xl font-bold tabular-nums ${overBudget ? "text-red-600" : "text-gray-900"}`}>{formatTimer(liveSeconds)}</p>
+                  <p className="text-[11px] font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">{isDone ? "Actual" : "Elapsed"}</p>
+                  <p className={`text-2xl font-bold tabular-nums ${overBudget ? "text-[var(--tu-on-danger)]" : "text-[var(--tu-text-heading)]"}`}>{formatTimer(liveSeconds)}</p>
                 </div>
                 {!isDone && (
-                  <span className={`text-xs font-semibold ${timerRunning ? "text-green-600" : "text-slate-500"}`}>
+                  <span className={`text-xs font-semibold ${timerRunning ? "text-[var(--tu-on-success)]" : "text-[var(--tu-on-neutral)]"}`}>
                     {timerRunning ? "● Running" : "❚❚ Paused"}
                   </span>
                 )}
@@ -624,10 +796,10 @@ export default function WorkOrderDetailPage() {
               {/* Budget progress */}
               {pct != null && (
                 <div className="mt-3">
-                  <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-1.5 rounded-full ${overBudget ? "bg-red-500" : "bg-[#2166AC]"}`} style={{ width: `${pct}%` }} />
+                  <div className="h-1.5 bg-[var(--tu-bg-secondary-strong)] rounded-full overflow-hidden">
+                    <div className={`h-1.5 rounded-full ${overBudget ? "bg-[var(--tu-priority-critical)]" : "bg-[var(--tu-text-brand)]"}`} style={{ width: `${pct}%` }} />
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
+                  <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
                     {formatHM(actualMinutes)} of {formatHM(estMin!)} {overBudget ? "· over budget" : ""}
                   </p>
                 </div>
@@ -639,7 +811,7 @@ export default function WorkOrderDetailPage() {
                   onClick={toggleTimer}
                   disabled={timerBusy}
                   className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
-                    order.timerStartedAt ? "bg-slate-100 text-slate-700 hover:bg-slate-200" : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
+                    order.timerStartedAt ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]" : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
                   }`}
                 >
                   {timerBusy ? "…" : order.timerStartedAt ? "❚❚ Pause Timer" : "▶ Resume Timer"}
@@ -651,25 +823,25 @@ export default function WorkOrderDetailPage() {
 
         {/* Completed info */}
         {order.status === "COMPLETED" && (
-          <div className="bg-green-50 rounded-lg p-3 mb-4">
+          <div className="bg-[var(--tu-soft-success)] rounded-lg p-3 mb-4">
             {order.remarks && (
-              <p className="text-sm text-gray-700 italic mb-1">&quot;{order.remarks}&quot;</p>
+              <p className="text-sm text-[var(--tu-text-body)] italic mb-1">&quot;{order.remarks}&quot;</p>
             )}
             {order.completedAt && (
-              <p className="text-xs text-gray-400">Completed {formatDate(order.completedAt)}</p>
+              <p className="text-xs text-[var(--tu-text-subtle)]">Completed {formatDate(order.completedAt)}</p>
             )}
           </div>
         )}
 
-        <p className="text-xs text-gray-400">Created {formatDate(order.createdAt)}</p>
+        <p className="text-xs text-[var(--tu-text-subtle)]">Created {formatDate(order.createdAt)}</p>
 
         {/* Status actions */}
         {canActOnStatus && nextStatuses.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
+          <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
             {showCompleteForm && order.status === "IN_PROGRESS" ? (
               <div>
                 <textarea
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC] resize-none mb-3"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-none mb-3"
                   rows={3}
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
@@ -678,14 +850,14 @@ export default function WorkOrderDetailPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowCompleteForm(false)}
-                    className="px-3 py-1.5 text-xs text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                    className="px-3 py-1.5 text-xs text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={() => updateStatus("COMPLETED")}
                     disabled={updatingStatus}
-                    className="px-3 py-1.5 text-xs text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1.5 text-xs text-white bg-[var(--tu-status-completed)] rounded-lg hover:bg-[var(--tu-status-completed)] disabled:opacity-50 cursor-pointer"
                   >
                     {updatingStatus ? "Saving..." : "Confirm Complete"}
                   </button>
@@ -703,12 +875,12 @@ export default function WorkOrderDetailPage() {
                     disabled={updatingStatus}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
                       ns === "REJECTED"
-                        ? "bg-red-50 text-red-600 hover:bg-red-100"
+                        ? "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)] hover:bg-[var(--tu-soft-danger)]"
                         : ns === "COMPLETED"
-                        ? "bg-green-50 text-green-700 hover:bg-green-100"
+                        ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] hover:bg-[var(--tu-soft-success)]"
                         : ns === "ON_HOLD"
-                        ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                        : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
+                        ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]"
+                        : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
                     }`}
                   >
                     {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
@@ -726,37 +898,237 @@ export default function WorkOrderDetailPage() {
         )}
 
         {order.isSpecialProject && order.status === "REQUESTED" && !isManager && !isClient && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+          <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
+            <p className="text-xs text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-lg px-3 py-2">
               Awaiting manager approval for this special project.
             </p>
           </div>
         )}
       </div>
 
+      {/* Parts used — staff only; clients don't see parts cost yet */}
+      {canManage && (
+        <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--tu-text-body)]">
+                Parts Used {parts.length > 0 && `(${parts.length})`}
+              </h2>
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
+                Recorded for job costing. Lines picked from stock also draw down the spare-parts count.
+              </p>
+            </div>
+            {!showPartForm && (
+              <button
+                onClick={() => openPartForm()}
+                className="px-3 py-1.5 text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-soft-brand)] cursor-pointer"
+              >
+                + Add Part
+              </button>
+            )}
+          </div>
+
+          {parts.length === 0 && !showPartForm ? (
+            <EmptyState compact icon="part" title="No parts recorded" hint="Log the spare parts consumed so stock levels stay accurate." />
+          ) : parts.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-[var(--tu-text-subtle)] border-b border-[var(--tu-border)]">
+                    <th className="pb-2 font-medium">Part</th>
+                    <th className="pb-2 font-medium text-right">Qty</th>
+                    <th className="pb-2 font-medium text-right">Unit Cost</th>
+                    <th className="pb-2 font-medium text-right">Total</th>
+                    <th className="pb-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {parts.map((p) => (
+                    <tr key={p.id} className="border-b border-[var(--tu-border)] last:border-0">
+                      <td className="py-2 pr-2 text-[var(--tu-text-body)]">
+                        {p.description}
+                        {p.partId ? (
+                          <Link
+                            href={`/accounts/${accountId}/parts/${p.partId}`}
+                            className="block text-xs text-[var(--tu-text-brand)] hover:underline"
+                          >
+                            From stock{p.part ? ` · ${formatQty(p.part.quantityOnHand)}${p.part.unit ? ` ${p.part.unit}` : ""} left` : ""}
+                          </Link>
+                        ) : (
+                          p.supplier && <span className="block text-xs text-[var(--tu-text-subtle)]">{p.supplier}</span>
+                        )}
+                      </td>
+                      <td className="py-2 px-2 text-right text-[var(--tu-text-body)] whitespace-nowrap">{formatQty(p.quantity)}</td>
+                      <td className="py-2 px-2 text-right text-[var(--tu-text-body)] whitespace-nowrap">
+                        {p.unitCost != null ? formatPeso(p.unitCost) : <span className="text-[var(--tu-text-disabled)]">—</span>}
+                      </td>
+                      <td className="py-2 px-2 text-right font-medium text-[var(--tu-text-body)] whitespace-nowrap">
+                        {p.unitCost != null ? formatPeso(p.unitCost * p.quantity) : <span className="text-[var(--tu-text-disabled)]">—</span>}
+                      </td>
+                      <td className="py-2 pl-2 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => openPartForm(p)}
+                          className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-brand)] cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => removePart(p.id)}
+                          disabled={removingPartId === p.id}
+                          className="ml-3 text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] disabled:opacity-50 cursor-pointer"
+                        >
+                          {removingPartId === p.id ? "..." : "Remove"}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={3} className="pt-3 text-right text-xs font-semibold text-[var(--tu-text-subtle)] pr-2">
+                      Total parts cost
+                    </td>
+                    <td className="pt-3 text-right text-sm font-semibold text-[var(--tu-text-heading)] whitespace-nowrap">
+                      {formatPeso(partsTotal)}
+                    </td>
+                    <td />
+                  </tr>
+                  {partsMissingCost > 0 && (
+                    <tr>
+                      <td colSpan={5} className="pt-1 text-right text-xs text-[var(--tu-on-warning)]">
+                        {partsMissingCost} {partsMissingCost === 1 ? "line has" : "lines have"} no unit cost — not included in the total.
+                      </td>
+                    </tr>
+                  )}
+                </tfoot>
+              </table>
+            </div>
+          )}
+
+          {showPartForm && (
+            <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {catalog.length > 0 && (
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-[var(--tu-text-subtle)] mb-1">From spare parts stock (optional)</label>
+                    <select
+                      className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] bg-[var(--tu-bg-surface)]"
+                      value={partForm.partId}
+                      onChange={(e) => selectCatalogPart(e.target.value)}
+                    >
+                      <option value="">Not from stock — free text</option>
+                      {catalog.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}{c.partNumber ? ` (${c.partNumber})` : ""} — {formatQty(c.quantityOnHand)}{c.unit ? ` ${c.unit}` : ""} on hand
+                        </option>
+                      ))}
+                    </select>
+                    {selectedCatalogPart && (
+                      <p className="text-xs text-[var(--tu-text-subtle)] mt-1">
+                        Saving this deducts{" "}
+                        <strong>{formatQty(Number(partForm.quantity) || 0)}{selectedCatalogPart.unit ? ` ${selectedCatalogPart.unit}` : ""}</strong>{" "}
+                        from stock
+                        {editingPartId ? " (adjusted for what this line already used)" : ""}.
+                        {" "}
+                        <Link href={`/accounts/${accountId}/parts/${selectedCatalogPart.id}`} className="text-[var(--tu-text-brand)] hover:underline">
+                          View part
+                        </Link>
+                      </p>
+                    )}
+                    {shortStock && (
+                      <p className="text-xs text-[var(--tu-on-warning)] mt-1">
+                        Only {formatQty(selectedCatalogPart!.quantityOnHand)} on hand. You can still record it — the count will go negative and flag for correction.
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-[var(--tu-text-subtle)] mb-1">Part / material</label>
+                  <input
+                    autoFocus
+                    className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                    value={partForm.description}
+                    onChange={(e) => setPartForm({ ...partForm, description: e.target.value })}
+                    placeholder="e.g. 1/2 HP capacitor"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--tu-text-subtle)] mb-1">Quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                    value={partForm.quantity}
+                    onChange={(e) => setPartForm({ ...partForm, quantity: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-[var(--tu-text-subtle)] mb-1">Unit cost (₱, optional)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                    value={partForm.unitCost}
+                    onChange={(e) => setPartForm({ ...partForm, unitCost: e.target.value })}
+                    placeholder="Leave blank if unknown"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-medium text-[var(--tu-text-subtle)] mb-1">Supplier / source (optional)</label>
+                  <input
+                    className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                    value={partForm.supplier}
+                    onChange={(e) => setPartForm({ ...partForm, supplier: e.target.value })}
+                    placeholder="e.g. Client-supplied, ACE Hardware"
+                  />
+                </div>
+              </div>
+              {partError && <p className="text-xs text-[var(--tu-on-danger)] mt-2">{partError}</p>}
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={closePartForm}
+                  className="px-3 py-1.5 text-xs text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={savePart}
+                  disabled={savingPart}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                >
+                  {savingPart ? "Saving..." : editingPartId ? "Save Changes" : "Add Part"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Comments */}
-      <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">
+      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
+        <h2 className="text-sm font-semibold text-[var(--tu-text-body)] mb-4">
           Comments {order.comments.length > 0 && `(${order.comments.length})`}
         </h2>
         {order.comments.length === 0 ? (
-          <p className="text-sm text-gray-400">No comments yet.</p>
+          <EmptyState compact icon="activity" title="No comments yet" hint="Use comments to record findings and hand work over." />
         ) : (
           <div className="space-y-3 mb-4">
             {order.comments.map((c) => (
-              <div key={c.id} className="bg-gray-50 rounded-lg p-3">
+              <div key={c.id} className="bg-[var(--tu-bg-secondary)] rounded-lg p-3">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-gray-700">{c.authorName}</span>
-                  <span className="text-xs text-gray-400">{timeAgo(c.createdAt)}</span>
+                  <span className="text-xs font-semibold text-[var(--tu-text-body)]">{c.authorName}</span>
+                  <span className="text-xs text-[var(--tu-text-subtle)]">{timeAgo(c.createdAt)}</span>
                 </div>
-                <p className="text-sm text-gray-700">{c.body}</p>
+                <p className="text-sm text-[var(--tu-text-body)]">{c.body}</p>
               </div>
             ))}
           </div>
         )}
         <div className="flex gap-2">
           <input
-            className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+            className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
             value={commentText}
             onChange={(e) => setCommentText(e.target.value)}
             placeholder="Add a comment..."
@@ -765,7 +1137,7 @@ export default function WorkOrderDetailPage() {
           <button
             onClick={addComment}
             disabled={!commentText.trim() || submittingComment}
-            className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
           >
             {submittingComment ? "..." : "Send"}
           </button>

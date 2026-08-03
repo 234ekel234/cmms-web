@@ -29,36 +29,30 @@ export default function StatusPipeline({
   const progress = PROGRESS[status];
   const onHold = status === "ON_HOLD";
   return (
-    <div className="flex items-start my-4" role="img" aria-label={ariaLabel ?? `Progress: step ${progress} of ${steps.length}`}>
+    <div className="tu-pipeline" role="img" aria-label={ariaLabel ?? `Progress: step ${progress} of ${steps.length}`}>
       {steps.map((step, i) => {
         const stepNum = i + 1;
         const done = progress >= stepNum;
         const active = progress === stepNum;
         const paused = active && onHold; // sitting on this step, but work is paused
         return (
-          <div key={step} className="flex-1 flex flex-col items-center relative">
+          <div key={step} className="tu-pipe-step">
             {i < steps.length - 1 && (
-              <span className={`absolute top-[11px] left-1/2 w-full h-0.5 ${progress > stepNum ? "bg-[#2166AC]" : "bg-gray-200"}`} />
+              <span className={`tu-pipe-line${progress > stepNum ? " tu-filled" : ""}`} />
             )}
             <span
-              className={`relative z-10 flex items-center justify-center w-[22px] h-[22px] rounded-full text-[11px] font-bold ${
-                paused
-                  ? "bg-white border-[3px] border-slate-400"
-                  : active
-                  ? "bg-white border-[3px] border-[#2166AC]"
-                  : done
-                  ? "bg-[#2166AC] border-2 border-[#2166AC] text-white"
-                  : "bg-gray-200 border-2 border-gray-200 text-transparent"
+              className={`tu-pipe-node${
+                paused ? " tu-paused" : active ? " tu-current" : done ? " tu-done" : ""
               }`}
             >
               {paused ? (
-                <span className="flex gap-[2px]" aria-hidden="true">
-                  <span className="w-[3px] h-[9px] rounded-sm bg-slate-500" />
-                  <span className="w-[3px] h-[9px] rounded-sm bg-slate-500" />
+                <span className="tu-pipe-pause" aria-hidden="true">
+                  <span />
+                  <span />
                 </span>
-              ) : active ? <span className="w-2 h-2 rounded-full bg-[#2166AC]" /> : done ? "✓" : ""}
+              ) : active ? <span className="tu-pipe-inner" /> : done ? "✓" : ""}
             </span>
-            <span className={`mt-1.5 text-[9px] font-semibold text-center ${paused ? "text-slate-600" : done ? "text-[#2166AC]" : "text-gray-400"}`}>
+            <span className={`tu-pipe-label${paused ? " tu-paused" : done ? " tu-done" : ""}`}>
               {paused ? "On Hold" : step}
             </span>
           </div>

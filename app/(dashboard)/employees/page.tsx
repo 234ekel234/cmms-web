@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { EmptyRow } from "@/components/EmptyState";
 
 type EmployeeType = "REGULAR" | "RELIEVER";
 
@@ -20,8 +21,8 @@ type Employee = {
 const empType = (e: { isReliever: boolean }): EmployeeType => (e.isReliever ? "RELIEVER" : "REGULAR");
 
 const TYPE_CONFIG: Record<EmployeeType, { label: string; cls: string }> = {
-  REGULAR:  { label: "Regular",  cls: "bg-green-50 text-green-700" },
-  RELIEVER: { label: "Reliever", cls: "bg-indigo-50 text-indigo-700" },
+  REGULAR:  { label: "Regular",  cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  RELIEVER: { label: "Reliever", cls: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" },
 };
 
 const COMMON_CATEGORIES = [
@@ -452,15 +453,20 @@ export default function EmployeesPage() {
             <tbody>
               {loading ? (
                 <SkeletonRows count={5} />
+              ) : employees.length === 0 ? (
+                <EmptyRow
+                  colSpan={6}
+                  icon="employee"
+                  title="No employees yet"
+                  hint="The registry holds every technician you can assign to an account. Add the first one to get started."
+                />
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={6}
-                    style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}
-                  >
-                    {employees.length === 0 ? "No employees yet. Click \"+ New Employee\" to add one." : "No employees match your search."}
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={6}
+                  icon="search"
+                  title="No matching employees"
+                  hint="Nothing matches the current search and filters."
+                />
               ) : (
                 filtered.map((emp) => {
                   const ty = TYPE_CONFIG[empType(emp)];

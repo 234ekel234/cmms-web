@@ -1,17 +1,10 @@
 import { AuthProvider } from "@/context/AuthContext";
-import Sidebar from "@/components/Sidebar";
-import CommandPalette from "@/components/CommandPalette";
+import AppShell from "@/components/AppShell";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <div className="flex min-h-screen" style={{ background: "var(--tu-bg-secondary)" }}>
-        <Sidebar />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
-        <CommandPalette />
-      </div>
+      <AppShell>{children}</AppShell>
     </AuthProvider>
   );
 }

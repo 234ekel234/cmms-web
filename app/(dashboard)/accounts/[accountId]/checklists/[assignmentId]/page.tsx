@@ -25,12 +25,12 @@ type Assignment = {
 type ItemState = { answer: string; remarks: string; answeredAt?: string };
 
 const FREQ_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-blue-50 text-blue-700" },
+  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
   WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-amber-50 text-amber-700" },
+  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
   SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-green-50 text-green-700" },
+  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -105,10 +105,10 @@ const HISTORY_COUNTS: Record<string, number> = {
 
 type OccStatus = "done" | "partial" | "missed" | "due";
 const OCC_CONFIG: Record<OccStatus, { bg: string; dot: string; text: string; label: string }> = {
-  done:    { bg: "bg-green-50", dot: "bg-green-500", text: "text-green-700", label: "Done" },
-  partial: { bg: "bg-amber-50", dot: "bg-amber-500", text: "text-amber-700", label: "Partial" },
-  missed:  { bg: "bg-red-50",   dot: "bg-red-400",   text: "text-red-600",   label: "Missed" },
-  due:     { bg: "bg-white",    dot: "bg-gray-300",  text: "text-gray-400",  label: "Due" },
+  done:    { bg: "bg-[var(--tu-soft-success)]", dot: "bg-[var(--tu-status-completed)]", text: "text-[var(--tu-on-success)]", label: "Done" },
+  partial: { bg: "bg-[var(--tu-soft-warning)]", dot: "bg-[var(--tu-priority-high)]", text: "text-[var(--tu-on-warning)]", label: "Partial" },
+  missed:  { bg: "bg-[var(--tu-soft-danger)]",   dot: "bg-[var(--tu-priority-critical)]",   text: "text-[var(--tu-on-danger)]",   label: "Missed" },
+  due:     { bg: "bg-[var(--tu-bg-surface)]",    dot: "bg-[var(--tu-text-disabled)]",  text: "text-[var(--tu-text-subtle)]",  label: "Due" },
 };
 
 export default function ChecklistFormPage() {
@@ -265,17 +265,17 @@ export default function ChecklistFormPage() {
   if (loading) {
     return (
       <div className="p-8 flex items-center justify-center min-h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[#2166AC] border-t-transparent" />
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--tu-text-brand)] border-t-transparent" />
       </div>
     );
   }
 
   if (!assignment) {
-    return <div className="p-8 text-sm text-red-600">{error ?? "Checklist not found."}</div>;
+    return <div className="p-8 text-sm text-[var(--tu-on-danger)]">{error ?? "Checklist not found."}</div>;
   }
 
   const { checklist } = assignment;
-  const freq = FREQ_CONFIG[checklist.frequency] ?? { label: checklist.frequency, cls: "bg-gray-100 text-gray-600" };
+  const freq = FREQ_CONFIG[checklist.frequency] ?? { label: checklist.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
   const atCurrent = isAtCurrentPeriod();
   const { total, completeCount, incompleteTitles } = sectionStats();
   const progressPct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
@@ -303,19 +303,19 @@ export default function ChecklistFormPage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
+      <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
         <Link
           href={`/accounts/${accountId}/checklists`}
-          className="text-[#2166AC] text-sm font-semibold hover:underline shrink-0"
+          className="text-[var(--tu-text-brand)] text-sm font-semibold hover:underline shrink-0"
         >
           ← Checklists
         </Link>
         <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-bold text-gray-900 truncate">{checklist.name}</h2>
+          <h2 className="text-sm font-bold text-[var(--tu-text-heading)] truncate">{checklist.name}</h2>
           {assignment.asset && (
             <Link
               href={`/accounts/${accountId}/assets/${assignment.asset.id}`}
-              className="text-xs text-[#2166AC] hover:underline"
+              className="text-xs text-[var(--tu-text-brand)] hover:underline"
             >
               › {assignment.asset.name}
             </Link>
@@ -327,7 +327,7 @@ export default function ChecklistFormPage() {
         {!isEditing && periodLog && !periodLog.isDraft && (
           <button
             onClick={() => setIsEditing(true)}
-            className="text-sm text-[#2166AC] font-semibold hover:underline shrink-0 cursor-pointer"
+            className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0 cursor-pointer"
           >
             Edit
           </button>
@@ -335,46 +335,46 @@ export default function ChecklistFormPage() {
       </div>
 
       {/* Period navigation */}
-      <div className="bg-gray-50 border-b border-gray-200 px-6 py-3 flex items-center gap-4">
+      <div className="bg-[var(--tu-bg-secondary)] border-b border-[var(--tu-border)] px-6 py-3 flex items-center gap-4">
         <button
           onClick={() => navigate(-1)}
-          className="text-2xl text-[#2166AC] hover:text-blue-800 font-bold w-8 h-8 flex items-center justify-center cursor-pointer"
+          className="text-2xl text-[var(--tu-text-brand)] hover:text-[var(--tu-on-brand)] font-bold w-8 h-8 flex items-center justify-center cursor-pointer"
         >
           ‹
         </button>
         <div className="flex-1 text-center">
-          <p className="text-sm font-bold text-gray-900">{formatPeriod(selectedDate, checklist.frequency)}</p>
+          <p className="text-sm font-bold text-[var(--tu-text-heading)]">{formatPeriod(selectedDate, checklist.frequency)}</p>
           <div className="flex items-center justify-center gap-2 mt-1">
             {periodLog ? (
               <>
-                <span className={`text-xs font-semibold ${periodLog.isDraft ? "text-amber-600" : "text-green-700"}`}>
+                <span className={`text-xs font-semibold ${periodLog.isDraft ? "text-[var(--tu-on-warning)]" : "text-[var(--tu-on-success)]"}`}>
                   {periodLog.isDraft ? "Partial" : `Done · ${fmtTime(periodLog.completedAt)}`}
                 </span>
                 {periodLog.isLate && (
-                  <span className="bg-amber-50 text-amber-700 text-xs font-bold px-2 py-0.5 rounded-full">Late</span>
+                  <span className="bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] text-xs font-bold px-2 py-0.5 rounded-full">Late</span>
                 )}
               </>
             ) : (
-              <span className="text-xs text-gray-400">No entry</span>
+              <span className="text-xs text-[var(--tu-text-subtle)]">No entry</span>
             )}
           </div>
         </div>
         <button
           onClick={() => navigate(1)}
           disabled={atCurrent}
-          className="text-2xl text-[#2166AC] hover:text-blue-800 font-bold w-8 h-8 flex items-center justify-center disabled:text-gray-300 disabled:cursor-not-allowed cursor-pointer"
+          className="text-2xl text-[var(--tu-text-brand)] hover:text-[var(--tu-on-brand)] font-bold w-8 h-8 flex items-center justify-center disabled:text-[var(--tu-text-disabled)] disabled:cursor-not-allowed cursor-pointer"
         >
           ›
         </button>
       </div>
 
       {/* History strip — recent occurrences at a glance, click to open one */}
-      <div className="bg-white border-b border-gray-200 px-6 py-3">
+      <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-3">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wide">
+          <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide">
             History · last {historyCount} {freq.label.toLowerCase()}
           </p>
-          <p className="text-xs text-gray-400">{doneCount}/{historyCount} completed</p>
+          <p className="text-xs text-[var(--tu-text-subtle)]">{doneCount}/{historyCount} completed</p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {history.map(({ time, date, status }) => {
@@ -387,11 +387,11 @@ export default function ChecklistFormPage() {
                 onClick={() => { setSelectedDate(date); setError(null); setSaveMsg(""); }}
                 aria-current={selected ? "true" : undefined}
                 className={`shrink-0 w-[68px] rounded-lg px-2 py-2 text-center transition-colors cursor-pointer ${cfg.bg} ${
-                  selected ? "border-2 border-[#2166AC]" : "border border-gray-200 hover:border-gray-400"
+                  selected ? "border-2 border-[var(--tu-text-brand)]" : "border border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 <span className={`block w-2 h-2 rounded-full mx-auto mb-1 ${cfg.dot}`} aria-hidden="true" />
-                <span className="block text-[11px] font-semibold text-gray-700 whitespace-nowrap">
+                <span className="block text-[11px] font-semibold text-[var(--tu-text-body)] whitespace-nowrap">
                   {shortPeriodLabel(date, checklist.frequency)}
                 </span>
                 <span className={`block text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</span>
@@ -402,8 +402,8 @@ export default function ChecklistFormPage() {
       </div>
 
       {isEditing && isPastPeriod() && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5">
-          <p className="text-xs text-amber-800 font-semibold">
+        <div className="bg-[var(--tu-soft-warning)] border-b border-[var(--tu-bd-warning)] px-6 py-2.5">
+          <p className="text-xs text-[var(--tu-on-warning)] font-semibold">
             This period has already passed — submission will be marked as late.
           </p>
         </div>
@@ -419,23 +419,23 @@ export default function ChecklistFormPage() {
           const filled = sectionFilled(sec);
 
           return (
-            <div key={sec.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div key={sec.id} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">
               {/* Section header */}
-              <div className="bg-gray-700 px-4 py-2.5 flex items-center justify-between">
+              <div className="bg-[var(--tu-text-heading)] px-4 py-2.5 flex items-center justify-between">
                 <span className="text-sm font-bold text-white">{sec.title}</span>
                 {completedAt ? (
-                  <span className="text-xs font-semibold text-green-300">
+                  <span className="text-xs font-semibold text-[var(--tu-on-success)]">
                     {locked && "🔒 "}✓ {fmtDateTime(completedAt)}
                   </span>
                 ) : touched ? (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${filled ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"}`}>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${filled ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>
                     {filled ? "Complete" : "Incomplete"}
                   </span>
                 ) : null}
               </div>
 
               {/* Column headers */}
-              <div className="flex items-center border-b border-gray-100 bg-gray-50 px-4 py-2 text-xs font-bold text-gray-500">
+              <div className="flex items-center border-b border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] px-4 py-2 text-xs font-bold text-[var(--tu-text-subtle)]">
                 <div className="flex-1 pr-4">Item</div>
                 {sec.answerOptions.map((opt) => (
                   <div key={opt} className="w-20 text-center">{opt}</div>
@@ -449,12 +449,12 @@ export default function ChecklistFormPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center px-4 py-3 border-b border-gray-50 last:border-0 ${ii % 2 === 1 ? "bg-gray-50/50" : ""}`}
+                    className={`flex items-center px-4 py-3 border-b border-[var(--tu-border)] last:border-0 ${ii % 2 === 1 ? "bg-[var(--tu-bg-secondary)]/50" : ""}`}
                   >
                     <div className="flex-1 pr-4">
-                      <p className="text-sm text-gray-800">{ii + 1}. {item.label}</p>
+                      <p className="text-sm text-[var(--tu-text-heading)]">{ii + 1}. {item.label}</p>
                       {!editable && state.answeredAt && (
-                        <p className="text-xs text-gray-400 mt-0.5">Answered {fmtTime(state.answeredAt)}</p>
+                        <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Answered {fmtTime(state.answeredAt)}</p>
                       )}
                     </div>
                     {sec.answerOptions.map((opt) => (
@@ -464,12 +464,12 @@ export default function ChecklistFormPage() {
                           disabled={!editable}
                           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                             state.answer === opt
-                              ? "border-[#2166AC]"
-                              : "border-gray-300"
-                          } ${editable ? "cursor-pointer hover:border-[#2166AC]" : "cursor-default"}`}
+                              ? "border-[var(--tu-text-brand)]"
+                              : "border-[var(--tu-border-strong)]"
+                          } ${editable ? "cursor-pointer hover:border-[var(--tu-text-brand)]" : "cursor-default"}`}
                         >
                           {state.answer === opt && (
-                            <div className="w-2.5 h-2.5 rounded-full bg-[#2166AC]" />
+                            <div className="w-2.5 h-2.5 rounded-full bg-[var(--tu-text-brand)]" />
                           )}
                         </button>
                       </div>
@@ -481,10 +481,10 @@ export default function ChecklistFormPage() {
                           value={state.remarks}
                           onChange={(e) => setRemarks(item.id, e.target.value)}
                           placeholder="—"
-                          className="w-full text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30 bg-white"
+                          className="w-full text-sm border border-[var(--tu-border)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 bg-[var(--tu-bg-surface)]"
                         />
                       ) : (
-                        <span className="text-sm text-gray-500 italic">{state.remarks || "—"}</span>
+                        <span className="text-sm text-[var(--tu-text-subtle)] italic">{state.remarks || "—"}</span>
                       )}
                     </div>
                   </div>
@@ -497,44 +497,44 @@ export default function ChecklistFormPage() {
 
       {/* Footer — sticky submit bar */}
       {isEditing && (
-        <div className="fixed bottom-0 left-60 right-0 bg-white border-t border-gray-200 px-6 py-4 shadow-lg">
+        <div className="fixed bottom-0 left-60 right-0 bg-[var(--tu-bg-surface)] border-t border-[var(--tu-border)] px-6 py-4 shadow-lg">
           <div className="max-w-4xl mx-auto space-y-3">
             {/* Progress */}
             <div className="flex items-center gap-3">
-              <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-[var(--tu-bg-secondary-strong)] rounded-full overflow-hidden">
                 <div
-                  className="h-2 bg-[#2166AC] rounded-full transition-all"
+                  className="h-2 bg-[var(--tu-text-brand)] rounded-full transition-all"
                   style={{ width: `${progressPct}%` }}
                 />
               </div>
-              <span className="text-xs text-gray-500 font-semibold whitespace-nowrap">
+              <span className="text-xs text-[var(--tu-text-subtle)] font-semibold whitespace-nowrap">
                 {completeCount}/{total} sections complete
               </span>
             </div>
 
             {incompleteTitles.length > 0 && (
-              <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2">
+              <p className="text-xs text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-lg px-3 py-2">
                 Incomplete (won&apos;t be saved): {incompleteTitles.join(", ")}
               </p>
             )}
             {saveMsg && (
-              <p className="text-xs text-green-700 bg-green-50 rounded-lg px-3 py-2 font-semibold">{saveMsg}</p>
+              <p className="text-xs text-[var(--tu-on-success)] bg-[var(--tu-soft-success)] rounded-lg px-3 py-2 font-semibold">{saveMsg}</p>
             )}
             {error && (
-              <p className="text-xs text-red-700 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-xs text-[var(--tu-on-danger)] bg-[var(--tu-soft-danger)] rounded-lg px-3 py-2">{error}</p>
             )}
 
             <div className="flex gap-3">
               <Link
                 href={`/accounts/${accountId}/checklists`}
-                className="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                className="px-5 py-2.5 border border-[var(--tu-border)] text-[var(--tu-text-body)] rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors"
               >
                 Cancel
               </Link>
               <button
                 onClick={handleSubmit}
                 disabled={submitting || completeCount === 0}
-                className="flex-1 bg-[#2166AC] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1a5490] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex-1 bg-[var(--tu-text-brand)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 {submitting ? "Saving…" : completeCount < total ? "Save Partial" : "Submit Checklist"}
               </button>

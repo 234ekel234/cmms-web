@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
+import EmptyState from "@/components/EmptyState";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -32,20 +33,23 @@ type WorkOrder = {
 
 type AccountEmployee = { id: string; name: string; position: string | null };
 
+// Pills reuse the theme-aware .tu-badge-* variants so they track dark mode.
+// Labels stay local: this workspace calls PENDING "Accepted" to match the
+// pipeline wording, which differs from the global label in lib/statuses.ts.
 const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
-  REQUESTED:   { label: "Requested",   cls: "bg-purple-50 text-purple-700" },
-  PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
-  IN_PROGRESS: { label: "In Progress", cls: "bg-amber-50 text-amber-700" },
-  ON_HOLD:     { label: "On Hold",     cls: "bg-slate-100 text-slate-700" },
-  COMPLETED:   { label: "Completed",   cls: "bg-green-50 text-green-700" },
-  REJECTED:    { label: "Rejected",    cls: "bg-red-50 text-red-700" },
+  REQUESTED:   { label: "Requested",   cls: "tu-badge tu-badge-brand" },
+  PENDING:     { label: "Accepted",    cls: "tu-badge tu-badge-brand" },
+  IN_PROGRESS: { label: "In Progress", cls: "tu-badge tu-badge-warning" },
+  ON_HOLD:     { label: "On Hold",     cls: "tu-badge tu-badge-neutral" },
+  COMPLETED:   { label: "Completed",   cls: "tu-badge tu-badge-success" },
+  REJECTED:    { label: "Rejected",    cls: "tu-badge tu-badge-danger" },
 };
 
 const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }> = {
-  LOW:      { label: "Low",      cls: "bg-green-50 text-green-700" },
-  MEDIUM:   { label: "Medium",   cls: "bg-blue-50 text-blue-700" },
-  HIGH:     { label: "High",     cls: "bg-amber-50 text-amber-700" },
-  CRITICAL: { label: "Critical", cls: "bg-red-50 text-red-700" },
+  LOW:      { label: "Low",      cls: "tu-badge tu-badge-neutral" },
+  MEDIUM:   { label: "Medium",   cls: "tu-badge tu-badge-brand" },
+  HIGH:     { label: "High",     cls: "tu-badge tu-badge-warning" },
+  CRITICAL: { label: "Critical", cls: "tu-badge tu-badge-danger" },
 };
 
 const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "REJECTED"];
@@ -330,34 +334,29 @@ export default function WorkOrdersPage() {
   const specialCount = orders.filter((o) => o.isSpecialProject).length;
 
   return (
-    <div className="p-8">
+    <div className="tu-page">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="tu-page-header" style={{ marginBottom: 20 }}>
         <div>
-          <h2 className="text-lg font-bold text-gray-900">{mode === "calendar" ? "Calendar" : view === "special" ? "Special Projects" : "Work Orders"}</h2>
+          <h2 className="tu-page-title">{mode === "calendar" ? "Calendar" : view === "special" ? "Special Projects" : "Work Orders"}</h2>
           {mode === "list" && !loading && overdueCount > 0 && (
-            <p className="text-xs text-red-500 mt-0.5">{overdueCount} overdue</p>
+            <p className="tu-page-sub tu-danger-text">{overdueCount} overdue</p>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* List / Calendar toggle */}
-          <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+          <div className="tu-segmented">
             {(["list", "calendar"] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
-                className={`px-3 py-2 text-sm font-semibold capitalize cursor-pointer transition-colors ${
-                  mode === m ? "bg-[#2166AC] text-white" : "bg-white text-gray-600 hover:text-[#2166AC]"
-                }`}
+                className={mode === m ? "tu-active" : undefined}
               >
                 {m}
               </button>
             ))}
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
-          >
+          <button onClick={() => setShowForm(true)} className="tu-btn-primary">
             + New
           </button>
         </div>
@@ -365,7 +364,7 @@ export default function WorkOrdersPage() {
 
       {/* View toggle */}
       {mode === "list" && (
-      <div className="flex gap-2 mb-4">
+      <div className="tu-toolbar">
         {([
           { key: "work" as const, label: "Work Orders", count: workCount },
           { key: "special" as const, label: "Special Projects", count: specialCount },
@@ -373,11 +372,7 @@ export default function WorkOrdersPage() {
           <button
             key={t.key}
             onClick={() => { setView(t.key); setStatusFilter("ALL"); }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer border ${
-              view === t.key
-                ? "bg-[#2166AC] text-white border-[#2166AC]"
-                : "bg-white text-gray-600 border-gray-200 hover:border-[#2166AC] hover:text-[#2166AC]"
-            }`}
+            className={`tu-view-pill${view === t.key ? " tu-active" : ""}`}
           >
             {t.label}{t.count > 0 ? ` (${t.count})` : ""}
           </button>
@@ -387,7 +382,7 @@ export default function WorkOrdersPage() {
 
       {/* Status filters */}
       {mode === "list" && !loading && (
-        <div className="flex gap-2 mb-6 flex-wrap">
+        <div className="tu-toolbar">
           {([
             { key: "ALL" as const, label: `All (${inView.length})` },
             ...(overdueCount > 0
@@ -401,21 +396,18 @@ export default function WorkOrdersPage() {
             <button
               key={f.key}
               onClick={() => setStatusFilter(f.key as WorkOrderStatus | "ALL" | "OVERDUE")}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                statusFilter === f.key
-                  ? "bg-[#2166AC] text-white border-[#2166AC]"
-                  : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
-              }`}
+              className={`tu-filter-pill${statusFilter === f.key ? " tu-active" : ""}`}
             >
               {f.label}
             </button>
           ))}
-          <label className="ml-auto inline-flex items-center gap-1.5 text-xs font-medium text-gray-500">
+          <label className="tu-toolbar-spacer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 500, color: "var(--tu-text-subtle)" }}>
             Sort
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              className="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-semibold text-gray-700 cursor-pointer"
+              className="tu-select"
+              style={{ minWidth: 150, padding: "6px 30px 6px 10px", fontSize: 12.5 }}
               aria-label="Sort work orders"
             >
               {SORT_OPTIONS.map((s) => (
@@ -428,22 +420,22 @@ export default function WorkOrdersPage() {
 
       {/* Create form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">New Work Order</h3>
+        <div className="tu-card" style={{ padding: 20, marginBottom: 24 }}>
+          <h3 className="tu-card-title" style={{ marginBottom: 16 }}>New Work Order</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Title *</label>
+              <label className="tu-label">Title *</label>
               <input
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="tu-input"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="Work order title"
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+              <label className="tu-label">Description</label>
               <textarea
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC] resize-none"
+                className="tu-textarea"
                 rows={3}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -451,9 +443,9 @@ export default function WorkOrdersPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Priority</label>
+              <label className="tu-label">Priority</label>
               <select
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="tu-select" style={{ width: "100%" }}
                 value={form.priority}
                 onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as WorkOrderPriority }))}
               >
@@ -464,9 +456,9 @@ export default function WorkOrdersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+              <label className="tu-label">Category</label>
               <select
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="tu-select" style={{ width: "100%" }}
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
@@ -477,18 +469,18 @@ export default function WorkOrdersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Due Date</label>
+              <label className="tu-label">Due Date</label>
               <input
                 type="date"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="tu-input"
                 value={form.dueDate}
                 onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Asset</label>
+              <label className="tu-label">Asset</label>
               <select
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="tu-select" style={{ width: "100%" }}
                 value={form.assetId}
                 onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
               >
@@ -499,13 +491,13 @@ export default function WorkOrdersPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-gray-500 mb-1">Expected Time</label>
+              <label className="tu-label">Expected Time</label>
               <div className="flex gap-2">
                 <input
                   type="number"
                   min={0}
                   aria-label="Expected hours"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="tu-input"
                   value={form.estHours}
                   onChange={(e) => setForm((f) => ({ ...f, estHours: e.target.value }))}
                   placeholder="Hours"
@@ -515,7 +507,7 @@ export default function WorkOrdersPage() {
                   min={0}
                   max={59}
                   aria-label="Expected minutes"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="tu-input"
                   value={form.estMinutes}
                   onChange={(e) => setForm((f) => ({ ...f, estMinutes: e.target.value }))}
                   placeholder="Minutes"
@@ -531,23 +523,19 @@ export default function WorkOrdersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, isSpecialProject: e.target.checked }))}
                   className="rounded"
                 />
-                <label htmlFor="isSpecial" className="text-sm text-gray-700">Special Project</label>
+                <label htmlFor="isSpecial" style={{ fontSize: 14, color: "var(--tu-text-body)" }}>Special Project</label>
               </div>
             )}
           </div>
-          {formError && <p className="text-red-500 text-xs mt-3">{formError}</p>}
+          {formError && <p className="tu-danger-text" style={{ fontSize: 12.5, marginTop: 12 }}>{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button
               onClick={() => { setShowForm(false); setFormError(""); setForm({ ...EMPTY_FORM }); }}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              className="tu-btn-secondary"
             >
               Cancel
             </button>
-            <button
-              onClick={createWorkOrder}
-              disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
-            >
+            <button onClick={createWorkOrder} disabled={saving} className="tu-btn-primary">
               {saving ? "Creating..." : "Create"}
             </button>
           </div>
@@ -555,13 +543,13 @@ export default function WorkOrdersPage() {
       )}
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">
+        <div className="tu-error-banner">
           Failed to load work orders.
         </div>
       )}
 
       {mode === "calendar" ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+        <div className="tu-card" style={{ padding: 20 }}>
           <WorkOrderCalendar
             orders={orders}
             loading={loading}
@@ -570,11 +558,23 @@ export default function WorkOrdersPage() {
         </div>
       ) : loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="tu-skeleton" style={{ height: 80, borderRadius: "var(--tu-radius-lg)" }} />)}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center text-gray-400 text-sm">
-          {inView.length === 0 ? "No work orders yet." : "No work orders match this filter."}
+        <div className="tu-card">
+          {inView.length === 0 ? (
+            <EmptyState
+              icon="workOrder"
+              title="No work orders yet"
+              hint="Create the first work order for this account with the + New button."
+            />
+          ) : (
+            <EmptyState
+              icon="search"
+              title="No matching work orders"
+              hint="Try a different status filter to widen the results."
+            />
+          )}
         </div>
       ) : (
         <div className="space-y-3">
@@ -586,34 +586,37 @@ export default function WorkOrdersPage() {
             const nextStatuses = TRANSITIONS[order.status];
 
             return (
-              <div key={order.id} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 ${isRejected ? "opacity-90" : ""}`}>
+              <div key={order.id} className="tu-wo-card" style={isRejected ? { opacity: 0.9 } : undefined}>
                 {/* Top row: title + status pill */}
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <Link
                     href={`/accounts/${accountId}/work-orders/${order.id}`}
-                    className={`flex-1 text-base font-bold leading-snug hover:text-[#2166AC] transition-colors ${isRejected ? "text-gray-500" : "text-gray-900"}`}
+                    className="tu-wo-title flex-1"
+                    style={isRejected ? { color: "var(--tu-text-subtle)" } : undefined}
                   >
                     {order.title}
                   </Link>
-                  <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${statusCfg.cls}`}>{statusCfg.label}</span>
+                  <span className={`shrink-0 ${statusCfg.cls}`}>{statusCfg.label}</span>
                 </div>
 
                 {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
                   {order.isSpecialProject && (
-                    <span className="rounded px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800">★ Special Project</span>
+                    <span className="tu-badge tu-badge-warning">★ Special Project</span>
                   )}
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${priorityCfg.cls}`}>{priorityCfg.label}</span>
+                  <span className={priorityCfg.cls}>{priorityCfg.label}</span>
                   {order.category && (
-                    <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">{order.category}</span>
+                    <span className="tu-chip">{order.category}</span>
                   )}
                   {order.dueDate && (
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${overdue ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-500"}`}>
+                    <span className={overdue ? "tu-badge tu-badge-danger" : "tu-chip"}>
                       {overdue ? "Overdue · " : "Due "}
                       {formatDate(order.dueDate)}
                     </span>
                   )}
-                  {order.asset && <span className="text-xs font-medium text-[#2166AC]">› {order.asset.name}</span>}
+                  {order.asset && (
+                    <span style={{ fontSize: 12, fontWeight: 500, color: "var(--tu-text-brand)" }}>› {order.asset.name}</span>
+                  )}
                   {(() => {
                     const running = order.status === "IN_PROGRESS" && order.timerStartedAt != null;
                     const liveSeconds =
@@ -627,23 +630,21 @@ export default function WorkOrdersPage() {
                     const over = est != null && liveSeconds / 60 > est;
                     return (
                       <span
-                        className={`inline-flex items-center gap-1 rounded-full text-xs font-semibold ${
-                          running ? "px-2.5 py-1 bg-green-50 text-green-700" : `px-2 py-0.5 ${over ? "bg-red-50 text-red-600" : "bg-gray-100 text-gray-600"}`
-                        }`}
+                        className={`tu-timer${running ? " tu-timer-running" : over ? " tu-timer-over" : ""}`}
                         title={running ? "Timer running" : over ? "Over estimated man-hours" : "Logged / estimated man-hours"}
                       >
                         {running ? (
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" aria-hidden="true" />
+                          <span className="tu-timer-dot" aria-hidden="true" />
                         ) : (
                           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                             <circle cx="12" cy="12" r="9" />
                             <path d="M12 7v5l3 2" />
                           </svg>
                         )}
-                        <span className={running ? "text-base font-bold tabular-nums leading-none" : undefined}>
+                        <span className={running ? "tu-timer-clock" : undefined}>
                           {running ? formatTimer(liveSeconds) : liveSeconds > 0 ? formatHM(liveSeconds / 60) : "0m"}
                         </span>
-                        {est != null && <span className="opacity-70">/ {formatHM(est)}</span>}
+                        {est != null && <span className="tu-timer-est">/ {formatHM(est)}</span>}
                       </span>
                     );
                   })()}
@@ -651,11 +652,7 @@ export default function WorkOrdersPage() {
                     <button
                       onClick={() => toggleTimer(order)}
                       disabled={timerBusyId === order.id}
-                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold cursor-pointer transition-colors disabled:opacity-50 ${
-                        order.timerStartedAt
-                          ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                          : "bg-green-600 text-white hover:bg-green-700"
-                      }`}
+                      className={`tu-timer-btn ${order.timerStartedAt ? "tu-timer-btn-pause" : "tu-timer-btn-resume"}`}
                       title={order.timerStartedAt ? "Pause timer" : "Resume timer"}
                     >
                       {timerBusyId === order.id ? "…" : order.timerStartedAt ? "❚❚ Pause" : "▶ Resume"}
@@ -664,12 +661,12 @@ export default function WorkOrdersPage() {
                 </div>
 
                 {order.description && (
-                  <p className="text-[13px] text-gray-600 leading-relaxed mb-3 line-clamp-2">{order.description}</p>
+                  <p className="tu-wo-desc line-clamp-2">{order.description}</p>
                 )}
 
                 {/* Pipeline or rejected banner */}
                 {isRejected ? (
-                  <div className="bg-red-50 rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-red-800">
+                  <div className="tu-inline-notice tu-inline-notice-danger">
                     This work order was rejected.
                   </div>
                 ) : (
@@ -677,16 +674,13 @@ export default function WorkOrdersPage() {
                 )}
 
                 {/* Footer: assignment + created */}
-                <div className="flex items-center justify-between gap-2 text-[11px] text-gray-400">
+                <div className="tu-wo-meta">
                   <span className="flex items-center gap-2 min-w-0">
                     <span className="truncate">
                       {order.assignments.length > 0 ? order.assignments.map((a) => a.employee.name).join(", ") : "Unassigned"}
                     </span>
                     {!isClient && canManage && !isTerminal(order) && (
-                      <button
-                        onClick={() => openAssignModal(order)}
-                        className="shrink-0 text-[11px] font-semibold text-[#2166AC] hover:underline cursor-pointer"
-                      >
+                      <button onClick={() => openAssignModal(order)} className="tu-link shrink-0">
                         {order.assignments.length > 0 ? "Edit" : "+ Assign"}
                       </button>
                     )}
@@ -696,19 +690,19 @@ export default function WorkOrdersPage() {
 
                 {/* Action buttons */}
                 {!isClient && canManage && nextStatuses.length > 0 && (
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+                  <div className="tu-wo-actions">
                     {nextStatuses.map((ns) => (
                       <button
                         key={ns}
                         onClick={() => updateStatus(order.id, ns)}
-                        className={`px-3 py-1 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                        className={`tu-action-btn${
                           ns === "REJECTED"
-                            ? "bg-red-50 text-red-600 hover:bg-red-100"
+                            ? " tu-action-reject"
                             : ns === "COMPLETED"
-                            ? "bg-green-50 text-green-700 hover:bg-green-100"
+                            ? " tu-action-complete"
                             : ns === "ON_HOLD"
-                            ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                            : "bg-[#2166AC] text-white hover:bg-[#1a5490]"
+                            ? " tu-action-hold"
+                            : ""
                         }`}
                       >
                         {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
@@ -731,27 +725,27 @@ export default function WorkOrdersPage() {
       {/* Assign-employees modal */}
       {assigningOrder && (
         <div
-          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4"
+          className="tu-modal-overlay"
           onClick={() => setAssigningOrder(null)}
           role="presentation"
         >
           <div
-            className="bg-white rounded-xl shadow-lg w-full max-w-md max-h-[80vh] flex flex-col"
+            className="tu-modal" style={{ maxWidth: 440 }}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-label="Assign employees"
           >
-            <div className="p-5 border-b border-gray-100">
-              <h3 className="text-sm font-semibold text-gray-800">Assign Employees</h3>
-              <p className="text-xs text-gray-400 mt-0.5 truncate">{assigningOrder.title}</p>
+            <div className="tu-modal-header" style={{ display: "block" }}>
+              <h3 className="tu-modal-title" style={{ fontSize: 14 }}>Assign Employees</h3>
+              <p className="truncate" style={{ fontSize: 12, color: "var(--tu-text-subtle)", margin: "2px 0 0" }}>{assigningOrder.title}</p>
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {employeesLoading ? (
-                <p className="text-sm text-gray-400 text-center py-10">Loading employees…</p>
+                <p className="tu-empty-hint" style={{ textAlign: "center", padding: "40px 0", margin: 0 }}>Loading employees…</p>
               ) : employees.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-10">No employees on this account.</p>
+                <p className="tu-empty-hint" style={{ textAlign: "center", padding: "40px 0", margin: 0 }}>No employees on this account.</p>
               ) : (
                 employees.map((emp) => {
                   const assigned = assigningOrder.assignments.some((a) => a.employeeId === emp.id);
@@ -761,16 +755,14 @@ export default function WorkOrdersPage() {
                       onClick={() => toggleAssignment(assigningOrder, emp)}
                       disabled={togglingId !== null}
                       aria-pressed={assigned}
-                      className="w-full flex items-center justify-between gap-3 px-5 py-3 text-left hover:bg-gray-50 disabled:opacity-60 cursor-pointer transition-colors"
+                      className="tu-pick-row"
                     >
                       <span className="min-w-0">
-                        <span className="block text-sm font-medium text-gray-800 truncate">{emp.name}</span>
-                        {emp.position && <span className="block text-xs text-gray-400">{emp.position}</span>}
+                        <span className="tu-pick-name truncate">{emp.name}</span>
+                        {emp.position && <span className="tu-pick-sub">{emp.position}</span>}
                       </span>
                       <span
-                        className={`shrink-0 w-5 h-5 rounded border flex items-center justify-center text-xs font-bold ${
-                          assigned ? "bg-[#2166AC] border-[#2166AC] text-white" : "border-gray-300 text-transparent"
-                        }`}
+                        className={`tu-pick-check${assigned ? " tu-checked" : ""}`}
                         aria-hidden="true"
                       >
                         {togglingId === emp.id ? "…" : "✓"}
@@ -781,13 +773,10 @@ export default function WorkOrdersPage() {
               )}
             </div>
 
-            {assignError && <p className="text-red-500 text-xs px-5 py-2">{assignError}</p>}
+            {assignError && <p className="tu-danger-text" style={{ fontSize: 12.5, padding: "8px 20px", margin: 0 }}>{assignError}</p>}
 
-            <div className="p-4 border-t border-gray-100 flex justify-end">
-              <button
-                onClick={() => setAssigningOrder(null)}
-                className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] cursor-pointer"
-              >
+            <div className="tu-modal-footer">
+              <button onClick={() => setAssigningOrder(null)} className="tu-btn-primary">
                 Done
               </button>
             </div>

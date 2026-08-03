@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
+import { EmptyRow } from "@/components/EmptyState";
 
 type Account = { id: string; name: string };
 
@@ -321,17 +322,19 @@ export default function AssetsPage() {
                   </tr>
                 ))
               ) : assets.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                    No assets yet.
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={8}
+                  icon="asset"
+                  title="No assets yet"
+                  hint="Assets are the equipment you maintain. Add them from an account's Assets tab."
+                />
               ) : sorted.length === 0 ? (
-                <tr>
-                  <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                    No assets match these filters.
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={8}
+                  icon="search"
+                  title="No matching assets"
+                  hint="Nothing matches the current filters."
+                />
               ) : (
                 sorted.map((asset) => {
                   const health = HEALTH_BADGE[asset.health];
@@ -362,11 +365,9 @@ export default function AssetsPage() {
                         {asset.location ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                       </td>
                       <td className="tu-center">
-                        {asset.openWorkOrders > 0 ? (
-                          <span className="tu-badge tu-badge-brand">{asset.openWorkOrders}</span>
-                        ) : (
-                          <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                        )}
+                        {asset.openWorkOrders > 0
+                          ? <span className="tu-figure">{asset.openWorkOrders}</span>
+                          : <span className="tu-figure-zero">—</span>}
                       </td>
                       <td style={{ color: "var(--tu-text-body)", fontSize: 13 }}>
                         {asset.lastCompletedAt

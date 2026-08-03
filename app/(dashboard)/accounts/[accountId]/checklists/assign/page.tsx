@@ -20,12 +20,12 @@ type Asset = {
 };
 
 const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-blue-50 text-blue-700" },
+  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
   WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-amber-50 text-amber-700" },
+  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
   SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-green-50 text-green-700" },
+  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 export default function AssignChecklistPage() {
@@ -97,13 +97,13 @@ export default function AssignChecklistPage() {
       <div className="flex items-center gap-3 mb-6">
         <Link
           href={`/accounts/${accountId}/checklists`}
-          className="text-gray-400 hover:text-gray-600 transition-colors text-sm"
+          className="text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-body)] transition-colors text-sm"
         >
           ← Back
         </Link>
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Assign Checklist</h2>
-          <p className="text-xs text-gray-400 mt-0.5">
+          <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assign Checklist</h2>
+          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
             Pick a PM template and optionally link it to an asset
           </p>
         </div>
@@ -112,16 +112,16 @@ export default function AssignChecklistPage() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-16 bg-white rounded-xl border border-gray-100 animate-pulse" />
+            <div key={i} className="h-16 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left: checklist picker */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-              <div className="p-4 border-b border-gray-100">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
+            <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm">
+              <div className="p-4 border-b border-[var(--tu-border)]">
+                <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">
                   PM Template
                 </p>
                 <input
@@ -129,7 +129,7 @@ export default function AssignChecklistPage() {
                   placeholder="Search checklists…"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30 mb-2"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 mb-2"
                 />
                 <div className="flex flex-wrap gap-1.5">
                   {frequencies.map((f) => {
@@ -140,10 +140,10 @@ export default function AssignChecklistPage() {
                         onClick={() => setFreqFilter(f)}
                         className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
                           freqFilter === f
-                            ? "bg-[#2166AC] text-white border-[#2166AC]"
+                            ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]"
                             : cfg
                             ? `${cfg.cls} border-transparent`
-                            : "bg-gray-100 text-gray-500 border-transparent"
+                            : "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)] border-transparent"
                         }`}
                       >
                         {cfg ? cfg.label : "All"}
@@ -153,9 +153,9 @@ export default function AssignChecklistPage() {
                 </div>
               </div>
 
-              <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+              <div className="divide-y divide-[var(--tu-border)] max-h-80 overflow-y-auto">
                 {filtered.length === 0 ? (
-                  <p className="text-center text-sm text-gray-400 py-8">No checklists found.</p>
+                  <p className="text-center text-sm text-[var(--tu-text-subtle)] py-8">No checklists found.</p>
                 ) : (
                   filtered.map((c) => {
                     const cfg = FREQUENCY_CONFIG[c.frequency];
@@ -167,15 +167,15 @@ export default function AssignChecklistPage() {
                         onClick={() => setSelectedChecklist(isSelected ? null : c)}
                         className={`w-full text-left px-4 py-3 flex items-center justify-between gap-3 transition-colors cursor-pointer ${
                           isSelected
-                            ? "bg-blue-50/60"
-                            : "hover:bg-gray-50"
+                            ? "bg-[var(--tu-soft-brand)]/60"
+                            : "hover:bg-[var(--tu-bg-secondary)]"
                         }`}
                       >
                         <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-medium ${isSelected ? "text-[#2166AC]" : "text-gray-800"}`}>
+                          <p className={`text-sm font-medium ${isSelected ? "text-[var(--tu-text-brand)]" : "text-[var(--tu-text-heading)]"}`}>
                             {c.name}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
+                          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
                             {c.sections.length} section{c.sections.length !== 1 ? "s" : ""} · {items} item{items !== 1 ? "s" : ""}
                           </p>
                         </div>
@@ -186,7 +186,7 @@ export default function AssignChecklistPage() {
                             </span>
                           )}
                           {isSelected && (
-                            <span className="text-[#2166AC]">
+                            <span className="text-[var(--tu-text-brand)]">
                               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414L8.414 15l-4.121-4.121a1 1 0 011.414-1.414L8.414 12.172l6.879-6.879a1 1 0 011.414 0z" clipRule="evenodd" />
                               </svg>
@@ -204,28 +204,28 @@ export default function AssignChecklistPage() {
           {/* Right: asset + summary */}
           <div className="lg:col-span-2 space-y-4">
             {/* Asset picker */}
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
-                Link to Asset <span className="text-gray-300 font-normal normal-case">(optional)</span>
+            <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4">
+              <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">
+                Link to Asset <span className="text-[var(--tu-text-disabled)] font-normal normal-case">(optional)</span>
               </p>
               <input
                 type="text"
                 placeholder="Search assets…"
                 value={assetSearch}
                 onChange={(e) => setAssetSearch(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30 mb-2"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 mb-2"
               />
-              <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto rounded-lg border border-gray-100">
+              <div className="divide-y divide-[var(--tu-border)] max-h-48 overflow-y-auto rounded-lg border border-[var(--tu-border)]">
                 <button
                   onClick={() => setSelectedAssetId("")}
                   className={`w-full text-left px-3 py-2.5 text-sm transition-colors cursor-pointer ${
-                    !selectedAssetId ? "bg-blue-50/60 text-[#2166AC] font-medium" : "text-gray-500 hover:bg-gray-50"
+                    !selectedAssetId ? "bg-[var(--tu-soft-brand)]/60 text-[var(--tu-text-brand)] font-medium" : "text-[var(--tu-text-subtle)] hover:bg-[var(--tu-bg-secondary)]"
                   }`}
                 >
                   No asset (general PM)
                 </button>
                 {filteredAssets.length === 0 && assetSearch && (
-                  <p className="text-xs text-gray-400 text-center py-4">No assets found.</p>
+                  <p className="text-xs text-[var(--tu-text-subtle)] text-center py-4">No assets found.</p>
                 )}
                 {filteredAssets.map((a) => (
                   <button
@@ -233,12 +233,12 @@ export default function AssignChecklistPage() {
                     onClick={() => setSelectedAssetId(a.id === selectedAssetId ? "" : a.id)}
                     className={`w-full text-left px-3 py-2.5 transition-colors cursor-pointer ${
                       selectedAssetId === a.id
-                        ? "bg-blue-50/60 text-[#2166AC]"
-                        : "hover:bg-gray-50 text-gray-700"
+                        ? "bg-[var(--tu-soft-brand)]/60 text-[var(--tu-text-brand)]"
+                        : "hover:bg-[var(--tu-bg-secondary)] text-[var(--tu-text-body)]"
                     }`}
                   >
                     <p className="text-sm font-medium">{a.name}</p>
-                    <p className="text-xs text-gray-400">{a.category}</p>
+                    <p className="text-xs text-[var(--tu-text-subtle)]">{a.category}</p>
                   </button>
                 ))}
               </div>
@@ -246,56 +246,56 @@ export default function AssignChecklistPage() {
 
             {/* Summary card */}
             <div className={`rounded-xl border shadow-sm p-4 transition-colors ${
-              selectedChecklist ? "bg-white border-[#2166AC]/20" : "bg-gray-50 border-gray-100"
+              selectedChecklist ? "bg-[var(--tu-bg-surface)] border-[var(--tu-text-brand)]/20" : "bg-[var(--tu-bg-secondary)] border-[var(--tu-border)]"
             }`}>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Summary</p>
+              <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Summary</p>
               {selectedChecklist ? (
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Template</span>
-                    <span className="font-semibold text-gray-800 text-right max-w-[60%] truncate">{selectedChecklist.name}</span>
+                    <span className="text-[var(--tu-text-subtle)]">Template</span>
+                    <span className="font-semibold text-[var(--tu-text-heading)] text-right max-w-[60%] truncate">{selectedChecklist.name}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Frequency</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${FREQUENCY_CONFIG[selectedChecklist.frequency]?.cls ?? "bg-gray-100 text-gray-600"}`}>
+                    <span className="text-[var(--tu-text-subtle)]">Frequency</span>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${FREQUENCY_CONFIG[selectedChecklist.frequency]?.cls ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]"}`}>
                       {FREQUENCY_CONFIG[selectedChecklist.frequency]?.label ?? selectedChecklist.frequency}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Sections</span>
-                    <span className="text-gray-800">{selectedChecklist.sections.length}</span>
+                    <span className="text-[var(--tu-text-subtle)]">Sections</span>
+                    <span className="text-[var(--tu-text-heading)]">{selectedChecklist.sections.length}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Items</span>
-                    <span className="text-gray-800">{totalItems}</span>
+                    <span className="text-[var(--tu-text-subtle)]">Items</span>
+                    <span className="text-[var(--tu-text-heading)]">{totalItems}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Asset</span>
-                    <span className="text-gray-800">{selectedAsset ? selectedAsset.name : "General"}</span>
+                    <span className="text-[var(--tu-text-subtle)]">Asset</span>
+                    <span className="text-[var(--tu-text-heading)]">{selectedAsset ? selectedAsset.name : "General"}</span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-gray-400">Select a template to preview.</p>
+                <p className="text-sm text-[var(--tu-text-subtle)]">Select a template to preview.</p>
               )}
             </div>
 
             {/* Error */}
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+              <p className="text-sm text-[var(--tu-on-danger)] bg-[var(--tu-soft-danger)] rounded-lg px-3 py-2">{error}</p>
             )}
 
             {/* Actions */}
             <div className="flex gap-3">
               <Link
                 href={`/accounts/${accountId}/checklists`}
-                className="flex-1 text-center border border-gray-200 text-gray-600 px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors"
+                className="flex-1 text-center border border-[var(--tu-border)] text-[var(--tu-text-body)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors"
               >
                 Cancel
               </Link>
               <button
                 onClick={handleAssign}
                 disabled={!selectedChecklist || submitting}
-                className="flex-1 bg-[#2166AC] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#1a5490] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex-1 bg-[var(--tu-text-brand)] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 {submitting ? "Assigning…" : "Assign"}
               </button>

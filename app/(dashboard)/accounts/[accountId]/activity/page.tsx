@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type AuditLog = {
   id: string;
@@ -13,23 +14,23 @@ type AuditLog = {
 };
 
 const ACTION_DOT: Record<string, string> = {
-  WORK_ORDER_REQUESTED: "bg-purple-400",
-  WORK_ORDER_CREATED:   "bg-blue-400",
-  WORK_ORDER_ACCEPTED:  "bg-green-500",
-  WORK_ORDER_REJECTED:  "bg-red-400",
-  WORK_ORDER_STARTED:   "bg-amber-400",
-  WORK_ORDER_COMPLETED: "bg-green-500",
-  WORK_ORDER_UPDATED:   "bg-blue-400",
-  CHECKLIST_COMPLETED:  "bg-[#2166AC]",
+  WORK_ORDER_REQUESTED: "bg-[var(--tu-status-pending)]",
+  WORK_ORDER_CREATED:   "bg-[var(--tu-priority-medium)]",
+  WORK_ORDER_ACCEPTED:  "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_REJECTED:  "bg-[var(--tu-priority-critical)]",
+  WORK_ORDER_STARTED:   "bg-[var(--tu-priority-high)]",
+  WORK_ORDER_COMPLETED: "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_UPDATED:   "bg-[var(--tu-priority-medium)]",
+  CHECKLIST_COMPLETED:  "bg-[var(--tu-text-brand)]",
   CHECKLIST_ASSIGNED:   "bg-cyan-500",
-  CHECKLIST_REMOVED:    "bg-gray-400",
-  CHECKLIST_INCOMPLETE: "bg-red-400",
-  CHECKLIST_EDITED:     "bg-amber-400",
-  ATTENDANCE_MARKED:    "bg-slate-400",
+  CHECKLIST_REMOVED:    "bg-[var(--tu-text-subtle)]",
+  CHECKLIST_INCOMPLETE: "bg-[var(--tu-priority-critical)]",
+  CHECKLIST_EDITED:     "bg-[var(--tu-priority-high)]",
+  ATTENDANCE_MARKED:    "bg-[var(--tu-status-on-hold)]",
   ASSET_CREATED:        "bg-violet-400",
-  ASSET_STATUS_CHANGED: "bg-orange-400",
+  ASSET_STATUS_CHANGED: "bg-[var(--tu-health-poor)]",
   MEMBER_ADDED:         "bg-violet-400",
-  MEMBER_REMOVED:       "bg-red-400",
+  MEMBER_REMOVED:       "bg-[var(--tu-priority-critical)]",
 };
 
 type FilterKey = "all" | "work_orders" | "checklists" | "attendance" | "assets" | "members";
@@ -122,7 +123,7 @@ export default function ActivityPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h2 className="text-lg font-bold text-gray-900 mb-4">Activity Log</h2>
+      <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-4">Activity Log</h2>
 
       {/* Filter chips */}
       <div className="flex gap-2 flex-wrap mb-6">
@@ -131,7 +132,7 @@ export default function ActivityPage() {
             key={f.key}
             onClick={() => setActiveFilter(f.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
-              activeFilter === f.key ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+              activeFilter === f.key ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >
             {f.label}
@@ -141,31 +142,39 @@ export default function ActivityPage() {
 
       {loading ? (
         <div className="space-y-4">
-          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-14 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-14 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
         </div>
       ) : filteredLogs.length === 0 ? (
-        <div className="text-center text-gray-400 py-12 text-sm">
-          {activeFilter === "all" ? "No activity recorded yet." : `No ${filterDef.label.toLowerCase()} activity yet.`}
+        <div className="tu-card">
+          <EmptyState
+            icon="activity"
+            title={activeFilter === "all" ? "No activity yet" : `No ${filterDef.label.toLowerCase()} activity`}
+            hint={
+              activeFilter === "all"
+                ? "Every change made on this account is recorded here."
+                : "Nothing has been recorded under this filter yet."
+            }
+          />
         </div>
       ) : (
         <div>
           {groups.map((group) => (
             <div key={group.label} className="mb-6">
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3 ml-8">
+              <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3 ml-8">
                 {group.label}
               </p>
               {group.items.map((log, idx) => {
-                const dotCls = ACTION_DOT[log.action] ?? "bg-gray-300";
+                const dotCls = ACTION_DOT[log.action] ?? "bg-[var(--tu-text-disabled)]";
                 const isLast = idx === group.items.length - 1;
                 return (
                   <div key={log.id} className="flex items-start gap-3">
                     <div className="flex flex-col items-center w-5 shrink-0 pt-1">
                       <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${dotCls}`} />
-                      {!isLast && <div className="w-0.5 bg-gray-200 flex-1 mt-1" style={{ minHeight: "20px" }} />}
+                      {!isLast && <div className="w-0.5 bg-[var(--tu-bg-tertiary)] flex-1 mt-1" style={{ minHeight: "20px" }} />}
                     </div>
-                    <div className={`flex-1 pb-3 ml-2 ${!isLast ? "border-b border-gray-50" : ""}`}>
-                      <p className="text-sm text-gray-800 font-medium">{log.description}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                    <div className={`flex-1 pb-3 ml-2 ${!isLast ? "border-b border-[var(--tu-border)]" : ""}`}>
+                      <p className="text-sm text-[var(--tu-text-heading)] font-medium">{log.description}</p>
+                      <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
                         {log.performedByName ?? "System"} · {formatTimestamp(log.createdAt)}
                       </p>
                     </div>
@@ -179,7 +188,7 @@ export default function ActivityPage() {
             <button
               onClick={loadMore}
               disabled={loadingMore}
-              className="w-full py-3 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 cursor-pointer disabled:opacity-50 mt-4"
+              className="w-full py-3 text-sm text-[var(--tu-text-subtle)] border border-[var(--tu-border)] rounded-xl hover:bg-[var(--tu-bg-secondary)] cursor-pointer disabled:opacity-50 mt-4"
             >
               {loadingMore ? "Loading..." : "Load more"}
             </button>

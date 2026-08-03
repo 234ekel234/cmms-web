@@ -18,13 +18,16 @@ type Props<T extends CalendarOrder> = {
   loading?: boolean;
 };
 
+// Tonal tokens rather than fixed hexes, so day chips stay readable in dark mode.
+// Each status gets a distinct tone — Requested/Accepted/In Progress previously
+// all resolved to the same blue, making the chips impossible to tell apart.
 const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string; label: string }> = {
-  REQUESTED:   { bg: "#eef6ff", fg: "#2166AC", label: "Requested"   },
-  PENDING:     { bg: "#fef3c7", fg: "#92400e", label: "Pending"     },
-  IN_PROGRESS: { bg: "#dbeafe", fg: "#1d4ed8", label: "In Progress" },
-  ON_HOLD:     { bg: "#f1f5f9", fg: "#475569", label: "On Hold"     },
-  COMPLETED:   { bg: "#dcfce7", fg: "#166534", label: "Completed"   },
-  REJECTED:    { bg: "#fee2e2", fg: "#991b1b", label: "Rejected"    },
+  REQUESTED:   { bg: "var(--tu-soft-warning)", fg: "var(--tu-on-warning)", label: "Requested"   },
+  PENDING:     { bg: "var(--tu-soft-info)",    fg: "var(--tu-on-info)",    label: "Accepted"    },
+  IN_PROGRESS: { bg: "var(--tu-soft-brand)",   fg: "var(--tu-on-brand)",   label: "In Progress" },
+  ON_HOLD:     { bg: "var(--tu-soft-neutral)", fg: "var(--tu-on-neutral)", label: "On Hold"     },
+  COMPLETED:   { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)", label: "Completed"   },
+  REJECTED:    { bg: "var(--tu-soft-danger)",  fg: "var(--tu-on-danger)",  label: "Rejected"    },
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];

@@ -38,15 +38,6 @@ function IconChecklist(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function IconBell(p: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
-      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-      <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-    </svg>
-  );
-}
-
 function IconGear(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
@@ -108,31 +99,11 @@ function IconBox(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-function IconLogOut(p: React.SVGProps<SVGSVGElement>) {
+function IconBolt(p: React.SVGProps<SVGSVGElement>) {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-      <polyline points="16 17 21 12 16 7"/>
-      <line x1="21" y1="12" x2="9" y2="12"/>
-    </svg>
-  );
-}
-
-function IconSearch(p: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
-      <circle cx="11" cy="11" r="8"/>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-    </svg>
-  );
-}
-
-function IconMenu(p: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" {...p}>
-      <line x1="3" y1="6" x2="21" y2="6"/>
-      <line x1="3" y1="12" x2="21" y2="12"/>
-      <line x1="3" y1="18" x2="21" y2="18"/>
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9L17 7M7 17l-2.1 2.1"/>
     </svg>
   );
 }
@@ -156,7 +127,6 @@ type NavItem = {
   href: string;
   label: string;
   Icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
-  badge?: boolean;
 };
 
 // Grouped into labeled sections (mirrors the account tab groups) so the global
@@ -174,6 +144,7 @@ const NAV_SECTIONS: { heading?: string; items: NavItem[] }[] = [
     items: [
       { href: "/work-orders",   label: "Work Orders",   Icon: IconClipboard },
       { href: "/assets",        label: "Assets",        Icon: IconBox       },
+      { href: "/parts",         label: "Spare Parts",   Icon: IconBolt      },
       { href: "/pm-checklists",  label: "PM Checklists", Icon: IconChecklist },
     ],
   },
@@ -187,8 +158,7 @@ const NAV_SECTIONS: { heading?: string; items: NavItem[] }[] = [
   {
     heading: "Insights",
     items: [
-      { href: "/reports",       label: "Reports",       Icon: IconClipboard },
-      { href: "/notifications", label: "Notifications", Icon: IconBell, badge: true },
+      { href: "/reports", label: "Reports", Icon: IconClipboard },
     ],
   },
   {
@@ -204,21 +174,15 @@ const NAV_SECTIONS: { heading?: string; items: NavItem[] }[] = [
 
 function NavContent({
   user,
-  logout,
   onNavigate,
 }: {
   user: { name: string; email: string; role?: string } | null;
-  logout: () => void;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
   const [accounts, setAccounts] = useState<Account[]>([]);
 
   useEffect(() => {
-    api.get("/notifications").then((r) => {
-      setUnreadCount(r.data.filter((n: { isRead: boolean }) => !n.isRead).length);
-    }).catch(() => {});
     api.get("/accounts").then((r) => setAccounts(r.data)).catch(() => {});
   }, []);
 
@@ -233,11 +197,8 @@ function NavContent({
   const accountSubPath = accountTabMatch ? accountTabMatch[1] : "work-orders";
   const activeAccountId = pathname.match(/^\/accounts\/([^/]+)/)?.[1];
 
-  const initial = user?.name?.[0]?.toUpperCase() ?? "?";
-
   function renderNavItem(item: NavItem) {
     const active = isActive(item.href);
-    const count = item.badge ? unreadCount : 0;
     return (
       <li key={item.href}>
         <Link
@@ -246,39 +207,8 @@ function NavContent({
           className={`tu-nav-item${active ? " tu-active" : ""}`}
           aria-current={active ? "page" : undefined}
         >
-          <span className="tu-nav-icon" style={{ position: "relative" }}>
-            <item.Icon />
-            {count > 0 && (
-              <span
-                aria-label={`${count} unread`}
-                style={{
-                  position: "absolute",
-                  top: -4,
-                  right: -5,
-                  minWidth: 14,
-                  height: 14,
-                  padding: "0 3px",
-                  background: "#ef4444",
-                  color: "#fff",
-                  borderRadius: 9999,
-                  fontSize: 9,
-                  fontWeight: 700,
-                  lineHeight: "14px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {count > 99 ? "99+" : count}
-              </span>
-            )}
-          </span>
+          <span className="tu-nav-icon"><item.Icon /></span>
           <span style={{ flex: 1 }}>{item.label}</span>
-          {count > 0 && (
-            <span style={{ fontSize: 11, fontWeight: 700, color: "#ef4444", marginLeft: 4 }}>
-              {count}
-            </span>
-          )}
         </Link>
       </li>
     );
@@ -286,26 +216,7 @@ function NavContent({
 
   return (
     <>
-      {/* User identity header */}
-      <div className="tu-user-header">
-        <div className="tu-avatar" aria-hidden="true">{initial}</div>
-        <div className="tu-user-info">
-          <span className="tu-user-name">{user?.name}</span>
-          <span className="tu-user-email">{user?.email}</span>
-        </div>
-      </div>
-
-      {/* Global search trigger (opens the ⌘K command palette) */}
-      <button
-        type="button"
-        onClick={() => { onNavigate?.(); window.dispatchEvent(new CustomEvent("open-command-palette")); }}
-        className="tu-nav-item"
-        style={{ width: "100%", justifyContent: "flex-start", color: "#6b7280" }}
-      >
-        <span className="tu-nav-icon"><IconSearch /></span>
-        <span style={{ flex: 1, textAlign: "left" }}>Search…</span>
-        <span style={{ fontSize: 10, fontWeight: 600, color: "#9ca3af", border: "1px solid #e5e7eb", borderRadius: 4, padding: "1px 5px" }}>⌘K</span>
-      </button>
+      {/* Identity, search, and notifications now live in the Topbar. */}
 
       {/* Primary navigation — grouped into labeled sections */}
       <nav className="tu-nav" aria-label="Main navigation">
@@ -340,7 +251,7 @@ function NavContent({
                   >
                     <span
                       className="tu-project-dot"
-                      style={{ backgroundColor: active ? "#2166AC" : "#94a3b8" }}
+                      style={{ backgroundColor: active ? "var(--tu-nav-active-text)" : "var(--tu-nav-text-dim)" }}
                       aria-hidden="true"
                     />
                     <span className="tu-project-name">{acc.name}</span>
@@ -352,29 +263,26 @@ function NavContent({
         </div>
       )}
 
-      {/* Spacer pushes utility group to bottom */}
-      <div style={{ flex: 1 }} />
-
-      {/* Bottom utility group */}
-      <div className="tu-utility-group">
-        <ul role="list">
-          <li>
-            <button className="tu-utility-item" type="button" onClick={() => { onNavigate?.(); logout(); }}>
-              <IconLogOut />
-              Sign out
-            </button>
-          </li>
-        </ul>
-      </div>
+      {/* Trailing space so the last section never hugs the viewport edge. */}
+      <div style={{ flex: 1, minHeight: 16 }} />
     </>
   );
 }
 
 // ── Main component ────────────────────────────────────────
 
-export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const [drawerOpen, setDrawerOpen] = useState(false);
+/**
+ * Navigation surface. The mobile drawer's open state is owned by AppShell so
+ * the Topbar's hamburger can drive it; this component only renders.
+ */
+export default function Sidebar({
+  drawerOpen,
+  onCloseDrawer,
+}: {
+  drawerOpen: boolean;
+  onCloseDrawer: () => void;
+}) {
+  const { user } = useAuth();
   const closeRef = useRef<HTMLButtonElement>(null);
 
   // Move focus to close button when drawer opens (WCAG 2.1 §3.2.2)
@@ -386,34 +294,16 @@ export default function Sidebar() {
   useEffect(() => {
     if (!drawerOpen) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setDrawerOpen(false);
+      if (e.key === "Escape") onCloseDrawer();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [drawerOpen]);
+  }, [drawerOpen, onCloseDrawer]);
 
   return (
     <>
-      {/* Mobile hamburger — hidden on lg+ */}
-      <button
-        className="tu-mobile-toggle"
-        onClick={() => setDrawerOpen(true)}
-        aria-label="Open navigation"
-        aria-expanded={drawerOpen}
-        aria-controls="mobile-drawer"
-        type="button"
-      >
-        <IconMenu />
-      </button>
-
       {/* Mobile overlay */}
-      {drawerOpen && (
-        <div
-          className="tu-overlay"
-          onClick={() => setDrawerOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      {drawerOpen && <div className="tu-overlay" onClick={onCloseDrawer} aria-hidden="true" />}
 
       {/* Mobile drawer */}
       <aside
@@ -424,11 +314,11 @@ export default function Sidebar() {
       >
         <div className="tu-drawer-header">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/fmi_logo.png" alt="FMI" style={{ height: 28, width: "auto", objectFit: "contain" }} />
+          <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 26, width: "auto", objectFit: "contain" }} />
           <button
             ref={closeRef}
             className="tu-drawer-close"
-            onClick={() => setDrawerOpen(false)}
+            onClick={onCloseDrawer}
             aria-label="Close navigation"
             type="button"
           >
@@ -436,7 +326,7 @@ export default function Sidebar() {
           </button>
         </div>
         <div className="tu-inner">
-          <NavContent user={user} logout={logout} onNavigate={() => setDrawerOpen(false)} />
+          <NavContent user={user} onNavigate={onCloseDrawer} />
         </div>
       </aside>
 
@@ -444,14 +334,12 @@ export default function Sidebar() {
       <aside className="tu-sidebar" aria-label="Navigation">
         <div className="tu-logo-strip">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/fmi_logo.png" alt="FMI" style={{ height: 28, width: "auto", objectFit: "contain" }} />
-          <span className="tu-logo-label">Maintenance Mgmt</span>
+          <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 30, width: "auto", objectFit: "contain" }} />
         </div>
         <div className="tu-inner">
-          <NavContent user={user} logout={logout} />
+          <NavContent user={user} />
         </div>
       </aside>
-
     </>
   );
 }

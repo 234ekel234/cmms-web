@@ -159,48 +159,48 @@ export default function AssetImportModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Import assets">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-2xl bg-white rounded-xl shadow-2xl border border-gray-100 max-h-[85vh] flex flex-col">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <h3 className="text-sm font-semibold text-gray-800">Bulk Import Assets</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 cursor-pointer text-sm">✕</button>
+      <div className="relative w-full max-w-2xl bg-[var(--tu-bg-surface)] rounded-xl shadow-2xl border border-[var(--tu-border)] max-h-[85vh] flex flex-col">
+        <div className="px-6 py-4 border-b border-[var(--tu-border)] flex items-center justify-between shrink-0">
+          <h3 className="text-sm font-semibold text-[var(--tu-text-heading)]">Bulk Import Assets</h3>
+          <button onClick={onClose} className="text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-body)] cursor-pointer text-sm">✕</button>
         </div>
 
         <div className="px-6 py-4 overflow-y-auto flex-1">
           {!result && (
             <>
-              <p className="text-xs text-gray-500 mb-3">
-                Upload a CSV with columns: <code className="text-[11px] bg-gray-50 px-1 py-0.5 rounded">{COLUMNS.join(", ")}</code>.
+              <p className="text-xs text-[var(--tu-text-subtle)] mb-3">
+                Upload a CSV with columns: <code className="text-[11px] bg-[var(--tu-bg-secondary)] px-1 py-0.5 rounded">{COLUMNS.join(", ")}</code>.
                 Only <code className="text-[11px]">name</code> and <code className="text-[11px]">category</code> are required.
               </p>
               <div className="flex items-center gap-3 mb-4">
                 <button
                   onClick={() => fileRef.current?.click()}
-                  className="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer font-semibold text-gray-700"
+                  className="px-4 py-2 text-sm border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer font-semibold text-[var(--tu-text-body)]"
                 >
                   Choose CSV file
                 </button>
                 <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
                   onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
-                {fileName && <span className="text-xs text-gray-500">{fileName}</span>}
-                <button onClick={downloadTemplate} className="ml-auto text-xs text-[#2166AC] hover:underline cursor-pointer shrink-0">
+                {fileName && <span className="text-xs text-[var(--tu-text-subtle)]">{fileName}</span>}
+                <button onClick={downloadTemplate} className="ml-auto text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer shrink-0">
                   ↓ Download template
                 </button>
               </div>
 
-              {topError && <p className="text-red-500 text-xs mb-3">{topError}</p>}
+              {topError && <p className="text-[var(--tu-on-danger)] text-xs mb-3">{topError}</p>}
 
               {rows.length > 0 && (
                 <>
                   <div className="flex items-center gap-3 mb-2 text-xs">
-                    <span className="font-semibold text-gray-700">{rows.length} row{rows.length === 1 ? "" : "s"} parsed</span>
-                    <span className="text-green-700">{validRows.length} valid</span>
-                    {invalidCount > 0 && <span className="text-red-600">{invalidCount} invalid</span>}
-                    <button onClick={reset} className="ml-auto text-gray-400 hover:text-gray-600 cursor-pointer">Clear</button>
+                    <span className="font-semibold text-[var(--tu-text-body)]">{rows.length} row{rows.length === 1 ? "" : "s"} parsed</span>
+                    <span className="text-[var(--tu-on-success)]">{validRows.length} valid</span>
+                    {invalidCount > 0 && <span className="text-[var(--tu-on-danger)]">{invalidCount} invalid</span>}
+                    <button onClick={reset} className="ml-auto text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-body)] cursor-pointer">Clear</button>
                   </div>
-                  <div className="border border-gray-100 rounded-lg overflow-hidden">
+                  <div className="border border-[var(--tu-border)] rounded-lg overflow-hidden">
                     <table className="w-full text-xs">
                       <thead>
-                        <tr className="bg-gray-50 text-gray-400 font-semibold uppercase tracking-wide">
+                        <tr className="bg-[var(--tu-bg-secondary)] text-[var(--tu-text-subtle)] font-semibold uppercase tracking-wide">
                           <th className="px-3 py-2 text-left">Name</th>
                           <th className="px-3 py-2 text-left">Category</th>
                           <th className="px-3 py-2 text-left">Status</th>
@@ -208,14 +208,14 @@ export default function AssetImportModal({
                           <th className="px-3 py-2 text-left">Issue</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100">
+                      <tbody className="divide-y divide-[var(--tu-border)]">
                         {rows.map((r, i) => (
-                          <tr key={i} className={r.error ? "bg-red-50" : ""}>
-                            <td className="px-3 py-2 text-gray-700">{r.name || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500">{r.category || "—"}</td>
-                            <td className="px-3 py-2 text-gray-500">{r.status || "OPERATIONAL"}</td>
-                            <td className="px-3 py-2 text-gray-500">{r.health || "GOOD"}</td>
-                            <td className="px-3 py-2 text-red-600">{r.error ?? ""}</td>
+                          <tr key={i} className={r.error ? "bg-[var(--tu-soft-danger)]" : ""}>
+                            <td className="px-3 py-2 text-[var(--tu-text-body)]">{r.name || "—"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.category || "—"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.status || "OPERATIONAL"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.health || "GOOD"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-on-danger)]">{r.error ?? ""}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -228,24 +228,24 @@ export default function AssetImportModal({
 
           {result && (
             <div>
-              <p className="text-sm text-gray-800 mb-3">
-                <span className="font-semibold text-green-700">{result.created} asset{result.created === 1 ? "" : "s"} imported.</span>
-                {result.errors.length > 0 && <span className="text-red-600"> {result.errors.length} row{result.errors.length === 1 ? "" : "s"} skipped.</span>}
+              <p className="text-sm text-[var(--tu-text-heading)] mb-3">
+                <span className="font-semibold text-[var(--tu-on-success)]">{result.created} asset{result.created === 1 ? "" : "s"} imported.</span>
+                {result.errors.length > 0 && <span className="text-[var(--tu-on-danger)]"> {result.errors.length} row{result.errors.length === 1 ? "" : "s"} skipped.</span>}
               </p>
               {result.errors.length > 0 && (
-                <div className="border border-gray-100 rounded-lg overflow-hidden">
+                <div className="border border-[var(--tu-border)] rounded-lg overflow-hidden">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 text-gray-400 font-semibold uppercase tracking-wide">
+                      <tr className="bg-[var(--tu-bg-secondary)] text-[var(--tu-text-subtle)] font-semibold uppercase tracking-wide">
                         <th className="px-3 py-2 text-left">Row</th>
                         <th className="px-3 py-2 text-left">Error</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-[var(--tu-border)]">
                       {result.errors.map((e, i) => (
                         <tr key={i}>
-                          <td className="px-3 py-2 text-gray-500">{e.row}</td>
-                          <td className="px-3 py-2 text-red-600">{e.error}</td>
+                          <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{e.row}</td>
+                          <td className="px-3 py-2 text-[var(--tu-on-danger)]">{e.error}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -256,20 +256,20 @@ export default function AssetImportModal({
           )}
         </div>
 
-        <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 shrink-0">
+        <div className="px-6 py-4 border-t border-[var(--tu-border)] flex justify-end gap-3 shrink-0">
           {result ? (
-            <button onClick={onClose} className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] cursor-pointer">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] cursor-pointer">
               Done
             </button>
           ) : (
             <>
-              <button onClick={onClose} className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+              <button onClick={onClose} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">
                 Cancel
               </button>
               <button
                 onClick={submit}
                 disabled={validRows.length === 0 || submitting}
-                className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Importing..." : `Import ${validRows.length || ""} Asset${validRows.length === 1 ? "" : "s"}`}
               </button>

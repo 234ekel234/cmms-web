@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggle, { ThemeHint } from "@/components/ThemeToggle";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
 
@@ -15,9 +16,9 @@ const ROLE_LABELS: Record<Role, string> = {
 
 const ROLE_CLS: Record<Role, string> = {
   GENERAL_MANAGER: "bg-violet-50 text-violet-700",
-  MANAGER:         "bg-blue-50 text-blue-700",
-  SUPERVISOR:      "bg-green-50 text-green-700",
-  CLIENT:          "bg-amber-50 text-amber-700",
+  MANAGER:         "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
+  SUPERVISOR:      "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+  CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
 };
 
 const PREF_LABELS: Record<string, { label: string; description: string }> = {
@@ -129,6 +130,21 @@ export default function SettingsPage() {
           <p style={{ fontSize: 12, color: "var(--tu-text-subtle)" }}>
             To update your name, email, or password, contact your system administrator.
           </p>
+        </div>
+      </div>
+
+      {/* Appearance */}
+      <div className="tu-card" style={{ marginBottom: 24 }}>
+        <div className="tu-card-header">
+          <h2 className="tu-card-title">Appearance</h2>
+        </div>
+        <div style={{ padding: "0 24px 24px" }}>
+          <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+            Choose how the interface looks on this browser. The setting is stored locally,
+            so each device can differ.
+          </p>
+          <ThemeToggle />
+          <ThemeHint />
         </div>
       </div>
 

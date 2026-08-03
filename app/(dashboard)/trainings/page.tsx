@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import EmptyState from "@/components/EmptyState";
 
 type Training = {
   id: string;
@@ -254,21 +255,28 @@ export default function TrainingsPage() {
             <tbody><SkeletonRows count={4} /></tbody>
           </table>
         </div>
+      ) : trainings.length === 0 ? (
+        <div className="tu-card">
+          <EmptyState
+            icon="training"
+            title="No training modules yet"
+            hint="Modules are the courses you assign to employees and track completion against."
+            action={
+              canEdit && (
+                <button onClick={openCreate} className="tu-btn-primary" type="button">
+                  Create the first module
+                </button>
+              )
+            }
+          />
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="tu-card" style={{ padding: "48px 24px", textAlign: "center" }}>
-          <p style={{ color: "var(--tu-text-body)", fontSize: 14 }}>
-            {trainings.length === 0 ? "No training modules yet." : "No modules match your search."}
-          </p>
-          {canEdit && trainings.length === 0 && (
-            <button
-              onClick={openCreate}
-              className="tu-btn-primary"
-              style={{ marginTop: 12 }}
-              type="button"
-            >
-              Create the first module
-            </button>
-          )}
+        <div className="tu-card">
+          <EmptyState
+            icon="search"
+            title="No matching modules"
+            hint="Nothing matches the current search."
+          />
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

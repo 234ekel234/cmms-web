@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type PMLog = {
   id: string;
@@ -20,12 +21,12 @@ type Assignment = {
 };
 
 const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-blue-50 text-blue-700" },
+  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
   WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-amber-50 text-amber-700" },
+  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
   SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-green-50 text-green-700" },
+  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 function getPeriodStart(frequency: string): Date {
@@ -61,9 +62,9 @@ function statusOf(a: Assignment): ChecklistState {
 
 const STATUS_ORDER: ChecklistState[] = ["completed", "draft", "unanswered"];
 const STATUS_META: Record<ChecklistState, { label: string; activeCls: string }> = {
-  completed:  { label: "Completed",  activeCls: "bg-green-600 text-white border-green-600" },
-  draft:      { label: "Draft",      activeCls: "bg-amber-500 text-white border-amber-500" },
-  unanswered: { label: "Unanswered", activeCls: "bg-gray-600 text-white border-gray-600" },
+  completed:  { label: "Completed",  activeCls: "bg-[var(--tu-status-completed)] text-white border-[var(--tu-status-completed)]" },
+  draft:      { label: "Draft",      activeCls: "bg-[var(--tu-priority-high)] text-white border-[var(--tu-priority-high)]" },
+  unanswered: { label: "Unanswered", activeCls: "bg-[var(--tu-text-body)] text-white border-[var(--tu-text-body)]" },
 };
 
 function fmtDate(iso: string) {
@@ -105,7 +106,7 @@ export default function ChecklistsPage() {
   const totalDone = byStatus.completed.length;
 
   function renderCard(a: Assignment) {
-    const freqCfg = FREQUENCY_CONFIG[a.checklist.frequency] ?? { label: a.checklist.frequency, cls: "bg-gray-100 text-gray-600" };
+    const freqCfg = FREQUENCY_CONFIG[a.checklist.frequency] ?? { label: a.checklist.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
     const periodLog = getThisPeriodLog(a.logs, a.checklist.frequency);
     const done = !!periodLog && !periodLog.isDraft;
     const isDraft = !!periodLog && periodLog.isDraft;
@@ -116,37 +117,37 @@ export default function ChecklistsPage() {
       <Link
         key={a.id}
         href={`/accounts/${accountId}/checklists/${a.id}`}
-        className={`block bg-white rounded-xl border shadow-sm p-4 hover:shadow-md transition-shadow ${
-          done ? "border-green-200 bg-green-50/30" :
-          isDraft ? "border-amber-200 bg-amber-50/30" :
-          "border-gray-100"
+        className={`block bg-[var(--tu-bg-surface)] rounded-xl border shadow-sm p-4 hover:shadow-md transition-shadow ${
+          done ? "border-[var(--tu-bd-success)] bg-[var(--tu-soft-success)]/30" :
+          isDraft ? "border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)]/30" :
+          "border-[var(--tu-border)]"
         }`}
       >
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-800 text-sm">{a.checklist.name}</p>
+            <p className="font-semibold text-[var(--tu-text-heading)] text-sm">{a.checklist.name}</p>
             {a.asset && (
-              <p className="text-xs text-[#2166AC] mt-0.5">› {a.asset.name}</p>
+              <p className="text-xs text-[var(--tu-text-brand)] mt-0.5">› {a.asset.name}</p>
             )}
             <div className="flex flex-wrap gap-1.5 mt-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${freqCfg.cls}`}>
                 {freqCfg.label}
               </span>
-              <span className="text-xs text-gray-400">{itemCount} items</span>
-              {lastLog && <span className="text-xs text-gray-400">Last: {fmtDate(lastLog.scheduledDate)}</span>}
+              <span className="text-xs text-[var(--tu-text-subtle)]">{itemCount} items</span>
+              {lastLog && <span className="text-xs text-[var(--tu-text-subtle)]">Last: {fmtDate(lastLog.scheduledDate)}</span>}
             </div>
           </div>
           <div className="flex items-start gap-2 shrink-0">
             <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-              done ? "bg-green-50 text-green-700" :
-              isDraft ? "bg-amber-50 text-amber-700" :
-              "bg-gray-100 text-gray-500"
+              done ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" :
+              isDraft ? "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" :
+              "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]"
             }`}>
               {done ? "Done" : isDraft ? "Partial" : "Pending"}
             </span>
             <button
               onClick={() => handleRemove(a.id)}
-              className="text-xs text-gray-400 hover:text-red-500 transition-colors cursor-pointer"
+              className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] transition-colors cursor-pointer"
             >
               Remove
             </button>
@@ -160,16 +161,16 @@ export default function ChecklistsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">PM Checklists</h2>
+          <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">PM Checklists</h2>
           {!loading && assignments.length > 0 && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
               {totalDone}/{assignments.length} completed this period
             </p>
           )}
         </div>
         <Link
           href={`/accounts/${accountId}/checklists/assign`}
-          className="border border-[#2166AC] text-[#2166AC] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-50 transition-colors"
+          className="border border-[var(--tu-text-brand)] text-[var(--tu-text-brand)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-soft-brand)] transition-colors"
         >
           + Assign Checklist
         </Link>
@@ -177,15 +178,21 @@ export default function ChecklistsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
         </div>
       ) : assignments.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
-          <p className="text-gray-400 text-sm">No checklists assigned.</p>
-          <p className="text-gray-400 text-xs mt-1">
-            Assign checklists from the{" "}
-            <Link href="/pm-checklists" className="text-[#2166AC] hover:underline">PM library</Link>.
-          </p>
+        <div className="tu-card">
+          <EmptyState
+            icon="checklist"
+            title="No checklists assigned"
+            hint={
+              <>
+                Assign checklists from the{" "}
+                <Link href="/pm-checklists" className="tu-link">PM library</Link> to start
+                tracking preventive maintenance here.
+              </>
+            }
+          />
         </div>
       ) : (
         <div>
@@ -195,7 +202,7 @@ export default function ChecklistsPage() {
               type="button"
               onClick={() => setStatusFilter("ALL")}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                statusFilter === "ALL" ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                statusFilter === "ALL" ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
               }`}
             >
               All ({assignments.length})
@@ -208,7 +215,7 @@ export default function ChecklistsPage() {
                   type="button"
                   onClick={() => setStatusFilter(key)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                    active ? STATUS_META[key].activeCls : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                    active ? STATUS_META[key].activeCls : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                   }`}
                 >
                   {STATUS_META[key].label} ({byStatus[key].length})
@@ -223,7 +230,7 @@ export default function ChecklistsPage() {
             if (list.length === 0) return null;
             return (
               <div key={key} className="mb-6">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">
+                <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">
                   {STATUS_META[key].label} ({list.length})
                 </p>
                 <div className="space-y-3">{list.map(renderCard)}</div>
@@ -232,7 +239,7 @@ export default function ChecklistsPage() {
           })}
 
           {statusFilter !== "ALL" && byStatus[statusFilter].length === 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-8 text-center text-gray-400 text-sm">
+            <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-8 text-center text-[var(--tu-text-subtle)] text-sm">
               No {STATUS_META[statusFilter].label.toLowerCase()} checklists this period.
             </div>
           )}

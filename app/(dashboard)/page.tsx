@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 
 type AccountSummary = {
   id: string;
@@ -59,6 +60,27 @@ type DashboardData = {
 
 type Period = "today" | "week" | "month" | "custom";
 
+type OpenOrder = {
+  id: string;
+  title: string;
+  status: string;
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
+  dueDate: string | null;
+  createdAt: string;
+  accountId: string;
+  account: { name: string };
+  assignments: unknown[];
+  /** Days since creation, computed once at fetch time — not during render. */
+  ageDays: number;
+};
+
+const PRIORITY_SERIES = [
+  { key: "CRITICAL", label: "Critical", token: "var(--tu-priority-critical)" },
+  { key: "HIGH",     label: "High",     token: "var(--tu-priority-high)"     },
+  { key: "MEDIUM",   label: "Medium",   token: "var(--tu-priority-medium)"   },
+  { key: "LOW",      label: "Low",      token: "var(--tu-priority-low)"      },
+] as const;
+
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Today",
   week: "This Week",
@@ -75,19 +97,16 @@ function fmtRange(iso: string) {
   return new Date(iso + "T00:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
-const WO_STATUS: { key: keyof DashboardData["workOrders"]; label: string; color: string }[] = [
-  { key: "REQUESTED", label: "Requested", color: "#F59E0B" },
-  { key: "PENDING", label: "Pending", color: "#6366F1" },
-  { key: "IN_PROGRESS", label: "In Progress", color: "#2166AC" },
-  { key: "ON_HOLD", label: "On Hold", color: "#64748B" },
-  { key: "COMPLETED", label: "Completed", color: "#10B981" },
-  { key: "REJECTED", label: "Rejected", color: "#94A3B8" },
-];
+const WO_STATUS = (Object.keys(WORK_ORDER_STATUS) as WorkOrderStatus[]).map((key) => ({
+  key,
+  label: WORK_ORDER_STATUS[key].label,
+  color: WORK_ORDER_STATUS[key].color,
+}));
 
-const COLOR_OPERATIONAL = "#10B981";
-const COLOR_MAINTENANCE = "#F59E0B";
-const COLOR_PRESENT = "#10B981";
-const COLOR_ABSENT = "#EF4444";
+const COLOR_OPERATIONAL = "var(--tu-asset-operational)";
+const COLOR_MAINTENANCE = "var(--tu-asset-maintenance)";
+const COLOR_PRESENT = "var(--tu-health-good)";
+const COLOR_ABSENT = "var(--tu-health-out)";
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -119,6 +138,14 @@ function IconAlert() {
 function IconCheck() {
   return <Svg><path d="M9 11l3 3L22 4" /><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" /></Svg>;
 }
+function IconUserOff() {
+  return <Svg><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><line x1="17" y1="8" x2="22" y2="13" /><line x1="22" y1="8" x2="17" y2="13" /></Svg>;
+}
+
+function IconBox() {
+  return <Svg><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" /><polyline points="3.27 6.96 12 12.01 20.73 6.96" /><line x1="12" y1="22.08" x2="12" y2="12" /></Svg>;
+}
+
 function IconChevron({ open }: { open: boolean }) {
   return (
     <svg className={`tu-freq-chevron${open ? " tu-open" : ""}`} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -138,66 +165,24 @@ function IconArrowRight() {
 
 function BarChart({ data, color }: { data: TrendPoint[]; color: string }) {
   const max = Math.max(1, ...data.map((d) => d.count));
-  const n = data.length || 1;
-  const gap = 2;
-  const barW = (100 - gap * (n - 1)) / n;
   return (
-    <svg viewBox="0 0 100 44" preserveAspectRatio="none" style={{ width: "100%", height: 72, display: "block" }} role="img" aria-label="Daily trend">
-      {data.map((d, i) => {
-        const h = (d.count / max) * 40;
-        return (
-          <rect
-            key={d.date}
-            x={i * (barW + gap)}
-            y={44 - Math.max(h, 1.5)}
-            width={barW}
-            height={Math.max(h, 1.5)}
-            rx={0.8}
-            fill={d.count > 0 ? color : "var(--tu-bg-tertiary)"}
-          >
-            <title>{`${fmtDay(d.date)}: ${d.count}`}</title>
-          </rect>
-        );
-      })}
-    </svg>
-  );
-}
-
-function Donut({ segments, centerNum, centerCap }: { segments: { value: number; color: string }[]; centerNum: string; centerCap: string }) {
-  const size = 120;
-  const stroke = 16;
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const total = segments.reduce((s, x) => s + x.value, 0);
-  let acc = 0;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Distribution">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--tu-bg-tertiary)" strokeWidth={stroke} />
-      {total > 0 &&
-        segments.filter((s) => s.value > 0).map((s, i) => {
-          const len = (s.value / total) * c;
-          const dash = `${len} ${c - len}`;
-          const offset = -acc;
-          acc += len;
-          return (
-            <circle
-              key={i}
-              cx={size / 2}
-              cy={size / 2}
-              r={r}
-              fill="none"
-              stroke={s.color}
-              strokeWidth={stroke}
-              strokeDasharray={dash}
-              strokeDashoffset={offset}
-              strokeLinecap="butt"
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          );
-        })}
-      <text x="50%" y="48%" textAnchor="middle" dominantBaseline="middle" className="tu-ring-center-num">{centerNum}</text>
-      <text x="50%" y="63%" textAnchor="middle" dominantBaseline="middle" className="tu-ring-center-cap">{centerCap}</text>
-    </svg>
+    <div className="tu-trendbars" role="img" aria-label={`Daily trend, ${data.length} days, peak ${max}`}>
+      {data.map((d) => (
+        <div
+          key={d.date}
+          className="tu-trendbar"
+          title={`${fmtDay(d.date)}: ${d.count}`}
+        >
+          <div
+            className="tu-trendbar-fill"
+            style={{
+              height: `${Math.max((d.count / max) * 100, 3)}%`,
+              background: d.count > 0 ? color : "var(--tu-bg-tertiary)",
+            }}
+          />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -219,6 +204,12 @@ function SkeletonRows({ count, cols }: { count: number; cols: number }) {
 
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
+  // Signals the /dashboard aggregate doesn't carry: assignment, priority, and
+  // age all live on the work-order rows themselves, and low stock is a flag on
+  // parts. Both are fetched alongside and degrade silently — the page is fully
+  // usable without them.
+  const [openOrders, setOpenOrders] = useState<OpenOrder[] | null>(null);
+  const [lowStock, setLowStock] = useState<number | null>(null);
   const [accountList, setAccountList] = useState<{ id: string; name: string }[]>([]);
   const [accountFilter, setAccountFilter] = useState<string>(""); // "" = all accounts
   const [period, setPeriod] = useState<Period>("today");
@@ -253,6 +244,41 @@ export default function DashboardPage() {
       if (accountFilter) params.accountId = accountFilter;
       const res = await api.get("/dashboard", { params });
       setData(res.data);
+
+      // Deliberately not awaited with the main request: a slow or failing parts
+      // call must not hold up or blank the dashboard.
+      api
+        .get("/work-orders")
+        .then((r) => {
+          const now = Date.now();
+          const dayMs = 86_400_000;
+          const rows: Omit<OpenOrder, "ageDays">[] = r.data;
+          setOpenOrders(
+            rows
+              .filter(
+                (w) =>
+                  w.status !== "COMPLETED" &&
+                  w.status !== "REJECTED" &&
+                  (!accountFilter || w.accountId === accountFilter),
+              )
+              .map((w) => ({
+                ...w,
+                ageDays: Math.floor((now - new Date(w.createdAt).getTime()) / dayMs),
+              })),
+          );
+        })
+        .catch(() => setOpenOrders([]));
+
+      api
+        .get("/parts")
+        .then((r) => {
+          const rows = (Array.isArray(r.data) ? r.data : r.data?.parts ?? []) as {
+            isLowStock?: boolean;
+            archivedAt?: string | null;
+          }[];
+          setLowStock(rows.filter((x) => x.isLowStock && !x.archivedAt).length);
+        })
+        .catch(() => setLowStock(null));
     } catch {
       setError(true);
     } finally {
@@ -304,6 +330,22 @@ export default function DashboardPage() {
   const woHref = accountFilter ? `/accounts/${accountFilter}/work-orders` : "/work-orders";
   const checklistHref = accountFilter ? `/accounts/${accountFilter}/checklists` : "/pm-checklists";
 
+  const unassignedCount = openOrders?.filter((w) => (w.assignments?.length ?? 0) === 0).length ?? null;
+
+  const priorityCounts = PRIORITY_SERIES.map(({ key }) => ({
+    key,
+    count: openOrders?.filter((w) => w.priority === key).length ?? 0,
+  }));
+  const priorityTotal = priorityCounts.reduce((n, x) => n + x.count, 0);
+
+  // "Stalled" is age-based on purpose. Overdue only fires when dueDate < now, so
+  // an open work order with no due date can never be flagged however long it
+  // sits. This catches that case.
+  const STALL_DAYS = 14;
+  const stalled = (openOrders ?? [])
+    .filter((w) => w.ageDays >= STALL_DAYS)
+    .sort((a, b) => b.ageDays - a.ageDays);
+
   const kpis: {
     label: string;
     accent: string;
@@ -316,7 +358,7 @@ export default function DashboardPage() {
   }[] = [
     {
       label: "Open Work Orders",
-      accent: "#2166AC",
+      accent: "var(--tu-text-brand)",
       icon: <IconClipboard />,
       value: loading ? "—" : String(openWOs),
       valueClass: openWOs > 0 ? "tu-stat-brand" : "",
@@ -326,7 +368,7 @@ export default function DashboardPage() {
     },
     {
       label: "Overdue",
-      accent: "#C70036",
+      accent: "var(--tu-priority-critical)",
       icon: <IconAlert />,
       value: loading ? "—" : String(overdue),
       valueClass: overdue > 0 ? "tu-stat-danger" : "",
@@ -335,15 +377,35 @@ export default function DashboardPage() {
       cta: overdue > 0 ? "Review overdue" : undefined,
     },
     {
+      label: "Unassigned",
+      accent: "var(--tu-status-requested)",
+      icon: <IconUserOff />,
+      value: unassignedCount === null ? "—" : String(unassignedCount),
+      valueClass: (unassignedCount ?? 0) > 0 ? "tu-stat-warning" : "",
+      sub: unassignedCount === null ? " " : "open work with nobody assigned",
+      href: woHref,
+      cta: (unassignedCount ?? 0) > 0 ? "Assign work" : undefined,
+    },
+    {
+      label: "Low Stock",
+      accent: "var(--tu-health-poor)",
+      icon: <IconBox />,
+      value: lowStock === null ? "—" : String(lowStock),
+      valueClass: (lowStock ?? 0) > 0 ? "tu-stat-warning" : "",
+      sub: lowStock === null ? " " : "parts at or below minimum",
+      href: "/parts",
+      cta: (lowStock ?? 0) > 0 ? "Reorder parts" : undefined,
+    },
+    {
       label: "Attendance",
-      accent: "#10B981",
+      accent: "var(--tu-status-completed)",
       icon: <IconCheck />,
       value: loading ? "—" : attendanceRate === null ? "—" : `${attendanceRate}%`,
       sub: loading ? " " : attendanceTotal > 0 ? `${present} present · ${absent} absent` : "no shifts logged",
     },
     {
       label: "PM Checklists",
-      accent: "#F97316",
+      accent: "var(--tu-health-poor)",
       icon: <IconCheck />,
       value: loading ? "—" : `${checklistsDone}/${checklistsTotal}`,
       valueClass: checklistsBehind ? "tu-stat-warning" : "",
@@ -493,7 +555,7 @@ export default function DashboardPage() {
             {loading ? (
               <div className="tu-skeleton" style={{ height: 72, borderRadius: 6 }} aria-hidden="true" />
             ) : (
-              <BarChart data={woTrend} color="#10B981" />
+              <BarChart data={woTrend} color="var(--tu-status-completed)" />
             )}
           </div>
         </div>
@@ -510,7 +572,7 @@ export default function DashboardPage() {
             {loading ? (
               <div className="tu-skeleton" style={{ height: 72, borderRadius: 6 }} aria-hidden="true" />
             ) : (
-              <BarChart data={clTrend} color="#2166AC" />
+              <BarChart data={clTrend} color="var(--tu-text-brand)" />
             )}
           </div>
         </div>
@@ -542,6 +604,41 @@ export default function DashboardPage() {
                 </li>
               ))}
             </ul>
+
+            {/* Urgency, not stage. Kept inside this card rather than given its
+                own: the two answer one question together — what is outstanding
+                and how badly does it need attention. */}
+            {priorityTotal > 0 && (
+              <div className="tu-subchart">
+                <p className="tu-subchart-label">Open by priority</p>
+                <div className="tu-segbar" role="img" aria-label={priorityCounts.map((x) => `${x.key}: ${x.count}`).join(", ")}>
+                  {priorityCounts.map(({ key, count }) => {
+                    if (count === 0) return null;
+                    const meta = PRIORITY_SERIES.find((x) => x.key === key)!;
+                    return (
+                      <span
+                        key={key}
+                        style={{ width: `${(count / priorityTotal) * 100}%`, background: meta.token }}
+                        title={`${meta.label}: ${count}`}
+                      />
+                    );
+                  })}
+                </div>
+                <ul className="tu-legend tu-legend-inline">
+                  {PRIORITY_SERIES.map(({ key, label, token }) => {
+                    const count = priorityCounts.find((x) => x.key === key)?.count ?? 0;
+                    if (count === 0) return null;
+                    return (
+                      <li key={key}>
+                        <span className="tu-dot" style={{ background: token }} />
+                        {label}
+                        <span className="tu-legend-val">{count}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
@@ -554,20 +651,20 @@ export default function DashboardPage() {
             )}
           </div>
           <div className="tu-card-body">
-            <div className="tu-ring-wrap">
-              {loading ? (
-                <div className="tu-skeleton" style={{ width: 120, height: 120, borderRadius: "9999px" }} aria-hidden="true" />
-              ) : (
-                <Donut
-                  segments={[
-                    { value: data?.assets.OPERATIONAL ?? 0, color: COLOR_OPERATIONAL },
-                    { value: data?.assets.UNDER_MAINTENANCE ?? 0, color: COLOR_MAINTENANCE },
-                  ]}
-                  centerNum={String(totalAssets)}
-                  centerCap="assets"
-                />
+            <div className="tu-chart-head">
+              <span className="tu-chart-total">{loading ? "—" : totalAssets}</span>
+              <span className="tu-chart-cap">total assets</span>
+            </div>
+            <div className="tu-segbar" role="img" aria-label={`Assets: ${data?.assets.OPERATIONAL ?? 0} operational, ${data?.assets.UNDER_MAINTENANCE ?? 0} under maintenance`}>
+              {!loading && totalAssets > 0 && (
+                <>
+                  <span style={{ width: `${((data?.assets.OPERATIONAL ?? 0) / totalAssets) * 100}%`, background: COLOR_OPERATIONAL }} title={`Operational: ${data?.assets.OPERATIONAL ?? 0}`} />
+                  <span style={{ width: `${((data?.assets.UNDER_MAINTENANCE ?? 0) / totalAssets) * 100}%`, background: COLOR_MAINTENANCE }} title={`Under Maintenance: ${data?.assets.UNDER_MAINTENANCE ?? 0}`} />
+                </>
               )}
-              <ul className="tu-legend" style={{ margin: 0, flex: 1 }}>
+            </div>
+            <div>
+              <ul className="tu-legend">
                 <li>
                   <span className="tu-dot" style={{ background: COLOR_OPERATIONAL }} />
                   Operational
@@ -579,7 +676,7 @@ export default function DashboardPage() {
                   <span className="tu-legend-val">{loading ? "—" : data?.assets.UNDER_MAINTENANCE ?? 0}</span>
                 </li>
                 <li>
-                  <span className="tu-dot" style={{ background: "#EF4444" }} />
+                  <span className="tu-dot" style={{ background: "var(--tu-health-out)" }} />
                   Poor / Out of Service
                   <span className="tu-legend-val">{loading ? "—" : data?.poorHealthAssets ?? 0}</span>
                 </li>
@@ -641,7 +738,7 @@ export default function DashboardPage() {
               data?.checklistBreakdown.map((f) => {
                 const pct = f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0;
                 const done = f.completed >= f.total && f.total > 0;
-                const color = done ? "#10B981" : pct >= 50 ? "#2166AC" : "#F59E0B";
+                const color = done ? "var(--tu-status-completed)" : pct >= 50 ? "var(--tu-text-brand)" : "var(--tu-health-fair)";
                 const label = f.frequency.replace(/_/g, " ").toLowerCase();
                 const accounts = f.accounts ?? [];
                 const expandable = accounts.length > 1;
@@ -684,7 +781,7 @@ export default function DashboardPage() {
                         {accounts.map((a) => {
                           const apct = a.total > 0 ? Math.round((a.completed / a.total) * 100) : 0;
                           const adone = a.completed >= a.total && a.total > 0;
-                          const acolor = adone ? "#10B981" : apct >= 50 ? "#2166AC" : "#F59E0B";
+                          const acolor = adone ? "var(--tu-status-completed)" : apct >= 50 ? "var(--tu-text-brand)" : "var(--tu-health-fair)";
                           return (
                             <div key={a.id} className="tu-subrow">
                               <span className="tu-subrow-name">{a.name}</span>
@@ -747,31 +844,29 @@ export default function DashboardPage() {
                           <Link
                             href={`/accounts/${acc.id}/work-orders`}
                             style={{ color: "inherit", textDecoration: "none" }}
-                            className="hover:text-[#2166AC] transition-colors"
+                            className="hover:text-[var(--tu-text-brand)] transition-colors"
                           >
                             {acc.name}
                           </Link>
                         </td>
+                        {/* Plain figures, not pills: these are magnitudes, and a
+                            pill per count misaligns the digits down the column.
+                            The header already names the measure, so colour is
+                            emphasis rather than the carrier of meaning. */}
                         <td className="tu-center">
-                          {acc.openWorkOrders > 0 ? (
-                            <span className="tu-badge tu-badge-brand">{acc.openWorkOrders}</span>
-                          ) : (
-                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                          )}
+                          {acc.openWorkOrders > 0
+                            ? <span className="tu-figure">{acc.openWorkOrders}</span>
+                            : <span className="tu-figure-zero">—</span>}
                         </td>
                         <td className="tu-center">
-                          {acc.overdueWorkOrders > 0 ? (
-                            <span className="tu-badge tu-badge-danger">{acc.overdueWorkOrders}</span>
-                          ) : (
-                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                          )}
+                          {acc.overdueWorkOrders > 0
+                            ? <span className="tu-figure tu-figure-danger">{acc.overdueWorkOrders}</span>
+                            : <span className="tu-figure-zero">—</span>}
                         </td>
                         <td className="tu-center">
-                          {acc.poorHealthAssets > 0 ? (
-                            <span className="tu-badge tu-badge-warning">{acc.poorHealthAssets}</span>
-                          ) : (
-                            <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                          )}
+                          {acc.poorHealthAssets > 0
+                            ? <span className="tu-figure tu-figure-warning">{acc.poorHealthAssets}</span>
+                            : <span className="tu-figure-zero">—</span>}
                         </td>
                         <td className="tu-center" style={{ color: "var(--tu-text-body)" }}>
                           {acc.checklistsDone}/{acc.checklistsTotal}
@@ -789,6 +884,44 @@ export default function DashboardPage() {
             </div>
           </div>
         </section>
+
+        {/* Stalled work — age-based, so it catches undated work that the
+            overdue metric structurally cannot see. */}
+        {stalled.length > 0 && (
+          <div className="tu-card" style={{ marginBottom: 24 }}>
+            <div className="tu-card-header">
+              <h2 className="tu-card-title">Stalled Work</h2>
+              <span className="tu-chart-cap">open {STALL_DAYS}+ days</span>
+            </div>
+            <table className="tu-table tu-table-interactive">
+              <tbody>
+                {stalled.slice(0, 6).map((w) => (
+                  <tr key={w.id}>
+                    <td className="tu-strong">
+                      <Link href={`/accounts/${w.accountId}/work-orders/${w.id}`} className="tu-row-link">
+                        {w.title}
+                      </Link>
+                      <span className="tu-row-sub">{w.account?.name}</span>
+                    </td>
+                    <td className="tu-center" style={{ whiteSpace: "nowrap" }}>
+                      <span className={w.ageDays >= 30 ? "tu-figure tu-figure-danger" : "tu-figure tu-figure-warning"}>
+                        {w.ageDays}d
+                      </span>
+                      {!w.dueDate && <span className="tu-chip" style={{ marginLeft: 8 }}>No due date</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {stalled.length > 6 && (
+              <div className="tu-card-body" style={{ paddingTop: 12 }}>
+                <Link href={woHref} className="tu-stat-cta">
+                  {stalled.length - 6} more stalled <IconArrowRight />
+                </Link>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Recent activity */}
         <section aria-labelledby="activity-heading">

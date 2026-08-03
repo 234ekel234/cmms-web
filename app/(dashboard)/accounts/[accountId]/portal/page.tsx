@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
+import EmptyState from "@/components/EmptyState";
 
 // ── Types ────────────────────────────────────────────────
 type Status = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
@@ -31,16 +32,16 @@ type WorkOrder = {
 
 // ── Config ───────────────────────────────────────────────
 const CLIENT_STATUS: Record<Status, { label: string; cls: string }> = {
-  REQUESTED:   { label: "Submitted",   cls: "bg-purple-50 text-purple-700" },
-  PENDING:     { label: "Accepted",    cls: "bg-blue-50 text-blue-700" },
-  IN_PROGRESS: { label: "In Progress", cls: "bg-amber-50 text-amber-700" },
-  ON_HOLD:     { label: "On Hold",     cls: "bg-slate-100 text-slate-700" },
-  COMPLETED:   { label: "Completed",   cls: "bg-green-50 text-green-700" },
-  REJECTED:    { label: "Declined",    cls: "bg-red-50 text-red-700" },
+  REQUESTED:   { label: "Submitted",   cls: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" },
+  PENDING:     { label: "Accepted",    cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
+  IN_PROGRESS: { label: "In Progress", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
+  ON_HOLD:     { label: "On Hold",     cls: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]" },
+  COMPLETED:   { label: "Completed",   cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  REJECTED:    { label: "Declined",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 const PRIORITY_COLOR: Record<Priority, string> = {
-  LOW: "text-gray-500", MEDIUM: "text-blue-600", HIGH: "text-amber-600", CRITICAL: "text-red-600",
+  LOW: "text-[var(--tu-text-subtle)]", MEDIUM: "text-[var(--tu-on-brand)]", HIGH: "text-[var(--tu-on-warning)]", CRITICAL: "text-[var(--tu-on-danger)]",
 };
 
 type FilterKey = "all" | "active" | "completed" | "declined";
@@ -102,10 +103,10 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
   }
 
   return (
-    <div className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 ${isTerminal ? "opacity-90" : ""}`}>
+    <div className={`bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4 ${isTerminal ? "opacity-90" : ""}`}>
       {/* Top row */}
       <div className="flex items-start justify-between gap-3 mb-2">
-        <h3 className={`flex-1 text-base font-bold leading-snug ${isTerminal ? "text-gray-500" : "text-gray-900"}`}>
+        <h3 className={`flex-1 text-base font-bold leading-snug ${isTerminal ? "text-[var(--tu-text-subtle)]" : "text-[var(--tu-text-heading)]"}`}>
           {order.title}
         </h3>
         <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${cfg.cls}`}>{cfg.label}</span>
@@ -114,22 +115,22 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
       {/* Meta */}
       <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
         {order.isSpecialProject && (
-          <span className="rounded px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800">★ Special Project</span>
+          <span className="rounded px-2 py-0.5 text-[11px] font-bold bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]">★ Special Project</span>
         )}
         <span className={`text-xs font-bold ${PRIORITY_COLOR[order.priority]}`}>
           {order.priority.charAt(0) + order.priority.slice(1).toLowerCase()}
         </span>
         {order.category && (
-          <span className="rounded px-2 py-0.5 text-[11px] font-semibold bg-gray-100 text-gray-700">{order.category}</span>
+          <span className="rounded px-2 py-0.5 text-[11px] font-semibold bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]">{order.category}</span>
         )}
-        {order.asset && <span className="text-xs font-medium text-[#2166AC]">› {order.asset.name}</span>}
+        {order.asset && <span className="text-xs font-medium text-[var(--tu-text-brand)]">› {order.asset.name}</span>}
       </div>
 
-      {order.description && <p className="text-[13px] text-gray-600 leading-relaxed mb-3 line-clamp-3">{order.description}</p>}
+      {order.description && <p className="text-[13px] text-[var(--tu-text-body)] leading-relaxed mb-3 line-clamp-3">{order.description}</p>}
 
       {/* Pipeline or declined banner */}
       {isDeclined ? (
-        <div className="bg-red-50 rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-red-800">
+        <div className="bg-[var(--tu-soft-danger)] rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-[var(--tu-on-danger)]">
           This request was declined.
         </div>
       ) : (
@@ -138,13 +139,13 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
 
       {/* Completion remarks */}
       {isCompleted && order.remarks && (
-        <div className="bg-green-50 rounded-lg p-2.5 mb-2.5">
-          <p className="text-[13px] text-green-800 italic">&ldquo;{order.remarks}&rdquo;</p>
+        <div className="bg-[var(--tu-soft-success)] rounded-lg p-2.5 mb-2.5">
+          <p className="text-[13px] text-[var(--tu-on-success)] italic">&ldquo;{order.remarks}&rdquo;</p>
         </div>
       )}
 
       {/* Footer dates */}
-      <div className="flex gap-1.5 text-[11px] text-gray-400 mb-1">
+      <div className="flex gap-1.5 text-[11px] text-[var(--tu-text-subtle)] mb-1">
         <span>Submitted {formatDate(order.createdAt)}</span>
         {order.completedAt && <span>· Done {formatDate(order.completedAt)}</span>}
       </div>
@@ -153,7 +154,7 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
       <button
         type="button"
         onClick={() => setShowComments((v) => !v)}
-        className="mt-1.5 pt-2.5 border-t border-gray-100 w-full text-left text-xs font-semibold text-gray-500 hover:text-gray-700 cursor-pointer"
+        className="mt-1.5 pt-2.5 border-t border-[var(--tu-border)] w-full text-left text-xs font-semibold text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-body)] cursor-pointer"
       >
         {order.comments.length > 0
           ? `${order.comments.length} comment${order.comments.length !== 1 ? "s" : ""}`
@@ -164,15 +165,15 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
       {showComments && (
         <div className="mt-2.5">
           {order.comments.length === 0 ? (
-            <p className="text-xs text-gray-400 mb-2">No comments yet.</p>
+            <p className="text-xs text-[var(--tu-text-subtle)] mb-2">No replies yet.</p>
           ) : (
             order.comments.map((c) => (
-              <div key={c.id} className="bg-gray-50 rounded-lg p-2.5 mb-2">
+              <div key={c.id} className="bg-[var(--tu-bg-secondary)] rounded-lg p-2.5 mb-2">
                 <div className="flex justify-between mb-1">
-                  <span className="text-xs font-bold text-gray-700">{c.authorName}</span>
-                  <span className="text-[11px] text-gray-400">{timeAgo(c.createdAt)}</span>
+                  <span className="text-xs font-bold text-[var(--tu-text-body)]">{c.authorName}</span>
+                  <span className="text-[11px] text-[var(--tu-text-subtle)]">{timeAgo(c.createdAt)}</span>
                 </div>
-                <p className="text-[13px] text-gray-700 leading-snug">{c.body}</p>
+                <p className="text-[13px] text-[var(--tu-text-body)] leading-snug">{c.body}</p>
               </div>
             ))
           )}
@@ -182,18 +183,18 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Add a comment..."
               rows={1}
-              className="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-[13px] resize-none focus:outline-none focus:ring-2 focus:ring-[#2166AC] max-h-20"
+              className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-[13px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] max-h-20"
             />
             <button
               type="button"
               onClick={handleComment}
               disabled={!commentText.trim() || submitting}
-              className="bg-[#2166AC] text-white rounded-lg px-3.5 py-2 text-[13px] font-bold hover:bg-[#1a5490] disabled:bg-blue-300 cursor-pointer"
+              className="bg-[var(--tu-text-brand)] text-white rounded-lg px-3.5 py-2 text-[13px] font-bold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {submitting ? "…" : "Send"}
             </button>
           </div>
-          {commentError && <p className="text-red-500 text-[11px] mt-1.5">Couldn&apos;t send comment. Try again.</p>}
+          {commentError && <p className="text-[var(--tu-on-danger)] text-[11px] mt-1.5">Couldn&apos;t send comment. Try again.</p>}
         </div>
       )}
     </div>
@@ -274,19 +275,19 @@ export default function ClientPortalPage() {
   const inProgressCount = orders.filter((o) => o.status === "IN_PROGRESS").length;
   const completedCount = orders.filter((o) => o.status === "COMPLETED").length;
   const stats = [
-    { label: "Active", value: activeCount, cls: "text-[#2166AC]" },
-    { label: "In Progress", value: inProgressCount, cls: "text-amber-600" },
-    { label: "Completed", value: completedCount, cls: "text-green-600" },
+    { label: "Active", value: activeCount, cls: "text-[var(--tu-text-brand)]" },
+    { label: "In Progress", value: inProgressCount, cls: "text-[var(--tu-on-warning)]" },
+    { label: "Completed", value: completedCount, cls: "text-[var(--tu-on-success)]" },
   ];
 
   return (
     <div className="p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-bold text-gray-900">My Requests</h2>
+        <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">My Requests</h2>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="bg-[#2166AC] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#1a5490] transition-colors cursor-pointer"
+          className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
         >
           + New Request
         </button>
@@ -296,9 +297,9 @@ export default function ClientPortalPage() {
       {!loading && orders.length > 0 && (
         <div className="grid grid-cols-3 gap-3 mb-6">
           {stats.map((s) => (
-            <div key={s.label} className="bg-white rounded-xl border border-gray-100 shadow-sm px-4 py-3">
+            <div key={s.label} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm px-4 py-3">
               <p className={`text-2xl font-bold ${s.cls}`}>{s.value}</p>
-              <p className="text-xs font-semibold text-gray-500 mt-0.5">{s.label}</p>
+              <p className="text-xs font-semibold text-[var(--tu-text-subtle)] mt-0.5">{s.label}</p>
             </div>
           ))}
         </div>
@@ -306,24 +307,24 @@ export default function ClientPortalPage() {
 
       {/* New request form */}
       {showForm && (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
-          <h3 className="text-sm font-semibold text-gray-800 mb-4">New Request</h3>
+        <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
+          <h3 className="text-sm font-semibold text-[var(--tu-text-heading)] mb-4">New Request</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
-              <label htmlFor="req-title" className="block text-xs font-semibold text-gray-500 mb-1">Title *</label>
+              <label htmlFor="req-title" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Title *</label>
               <input
                 id="req-title"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                 value={form.title}
                 onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
                 placeholder="What do you need done?"
               />
             </div>
             <div className="col-span-2">
-              <label htmlFor="req-desc" className="block text-xs font-semibold text-gray-500 mb-1">Description</label>
+              <label htmlFor="req-desc" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Description</label>
               <textarea
                 id="req-desc"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC] resize-none"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-none"
                 rows={3}
                 value={form.description}
                 onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
@@ -331,10 +332,10 @@ export default function ClientPortalPage() {
               />
             </div>
             <div>
-              <label htmlFor="req-priority" className="block text-xs font-semibold text-gray-500 mb-1">Priority</label>
+              <label htmlFor="req-priority" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Priority</label>
               <select
                 id="req-priority"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                 value={form.priority}
                 onChange={(e) => setForm((f) => ({ ...f, priority: e.target.value as Priority }))}
               >
@@ -345,10 +346,10 @@ export default function ClientPortalPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="req-category" className="block text-xs font-semibold text-gray-500 mb-1">Category</label>
+              <label htmlFor="req-category" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Category</label>
               <select
                 id="req-category"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm bg-[var(--tu-bg-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
@@ -360,10 +361,10 @@ export default function ClientPortalPage() {
             </div>
             {assets.length > 0 && (
               <div className="col-span-2">
-                <label htmlFor="req-asset" className="block text-xs font-semibold text-gray-500 mb-1">Equipment / Asset</label>
+                <label htmlFor="req-asset" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Equipment / Asset</label>
                 <select
                   id="req-asset"
-                  className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={form.assetId}
                   onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
                 >
@@ -375,18 +376,18 @@ export default function ClientPortalPage() {
               </div>
             )}
           </div>
-          {formError && <p className="text-red-500 text-xs mt-3">{formError}</p>}
+          {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button
               onClick={() => { setShowForm(false); setFormError(""); }}
-              className="px-4 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
             >
               Cancel
             </button>
             <button
               onClick={createRequest}
               disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-[#2166AC] rounded-lg hover:bg-[#1a5490] disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {saving ? "Submitting..." : "Submit Request"}
             </button>
@@ -402,8 +403,8 @@ export default function ClientPortalPage() {
             onClick={() => setFilter(f.key)}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
               filter === f.key
-                ? "bg-[#2166AC] text-white border-[#2166AC]"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]"
+                : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >
             {f.label}
@@ -412,7 +413,7 @@ export default function ClientPortalPage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3 mb-6">
+        <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3 mb-6">
           Failed to load your requests.
         </div>
       )}
@@ -420,14 +421,19 @@ export default function ClientPortalPage() {
       {/* List */}
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-40 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-40 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
         </div>
       ) : visible.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
-          <p className="text-sm font-semibold text-gray-600 mb-1">
-            {filter === "all" ? "No requests yet" : `No ${filter} requests`}
-          </p>
-          {filter === "all" && <p className="text-xs text-gray-400">Click &ldquo;+ New Request&rdquo; to submit your first request.</p>}
+        <div className="tu-card">
+          <EmptyState
+            icon="inbox"
+            title={filter === "all" ? "No requests yet" : `No ${filter} requests`}
+            hint={
+              filter === "all"
+                ? "Submit a request with the + New Request button and the site team will pick it up."
+                : "Nothing sits under this filter right now."
+            }
+          />
         </div>
       ) : (
         <div className="space-y-3">

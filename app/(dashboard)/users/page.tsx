@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { EmptyRow } from "@/components/EmptyState";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
 
@@ -15,9 +16,9 @@ type User = {
 
 const ROLE_CONFIG: Record<Role, { label: string; cls: string }> = {
   GENERAL_MANAGER: { label: "General Manager", cls: "bg-violet-50 text-violet-700" },
-  MANAGER:         { label: "Manager",          cls: "bg-blue-50 text-blue-700"    },
-  SUPERVISOR:      { label: "Supervisor",       cls: "bg-green-50 text-green-700"  },
-  CLIENT:          { label: "Client",           cls: "bg-amber-50 text-amber-700"  },
+  MANAGER:         { label: "Manager",          cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]"    },
+  SUPERVISOR:      { label: "Supervisor",       cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"  },
+  CLIENT:          { label: "Client",           cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"  },
 };
 
 function SkeletonRows({ count, cols }: { count: number; cols: number }) {
@@ -317,17 +318,20 @@ export default function UsersPage() {
             <tbody>
               {loading ? (
                 <SkeletonRows count={4} cols={isGM ? 4 : 3} />
+              ) : users.length === 0 ? (
+                <EmptyRow
+                  colSpan={isGM ? 4 : 3}
+                  icon="employee"
+                  title="No users yet"
+                  hint="Users are the people who sign in. Create one to give a manager, supervisor, or client access."
+                />
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={isGM ? 4 : 3}
-                    style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}
-                  >
-                    {users.length === 0
-                      ? "No users found."
-                      : "No users match your search."}
-                  </td>
-                </tr>
+                <EmptyRow
+                  colSpan={isGM ? 4 : 3}
+                  icon="search"
+                  title="No matching users"
+                  hint="Nothing matches the current search."
+                />
               ) : (
                 filtered.map((u) => {
                   const cfg = ROLE_CONFIG[u.role];
@@ -356,7 +360,7 @@ export default function UsersPage() {
                           <button
                             type="button"
                             onClick={() => openEdit(u)}
-                            className="text-xs font-semibold text-[#2166AC] hover:underline cursor-pointer"
+                            className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline cursor-pointer"
                           >
                             Edit
                           </button>

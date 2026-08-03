@@ -37,58 +37,58 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="tu-login">
       {/* Left — brand panel */}
-      <div className="hidden lg:flex lg:w-1/2 bg-[#2166AC] flex-col items-center justify-center p-12 gap-6">
-        <div className="bg-white rounded-2xl px-10 py-6 shadow-xl flex flex-col items-center gap-3">
+      <div className="tu-login-brand">
+        <div className="tu-login-logo-card">
           {/* eslint-disable @next/next/no-img-element */}
-          <img src="/fmi_logo.png" alt="FMI" className="h-14 w-auto object-contain" />
-          <div className="w-full h-px bg-gray-100" />
-          <img src="/logo_with_label.png" alt="ServiceMaster" className="h-8 w-auto object-contain" />
+          <img src="/fmi_logo_dark.png" alt="FMI" className="h-14 w-auto object-contain" />
+          <div className="tu-login-logo-rule" />
+          <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="h-8 w-auto object-contain" />
           {/* eslint-enable @next/next/no-img-element */}
         </div>
         <div className="text-center">
-          <p className="text-white text-3xl font-bold">Maintenance Management</p>
-          <p className="text-white/70 text-base mt-2">Track assets, work orders, and PM checklists — all in one place.</p>
+          <p className="tu-login-headline">Maintenance Management</p>
+          <p className="tu-login-sub">Track assets, work orders, and PM checklists — all in one place.</p>
         </div>
-        <div className="mt-8 grid grid-cols-2 gap-4 w-full max-w-sm">
+        <div className="tu-login-features">
           {[
             { label: "Work Orders", desc: "Raise and resolve maintenance requests" },
             { label: "Assets", desc: "Monitor equipment health and history" },
             { label: "PM Checklists", desc: "Schedule and track preventive maintenance" },
             { label: "Reports", desc: "Performance insights across all sites" },
           ].map((f) => (
-            <div key={f.label} className="bg-white/10 rounded-xl p-4">
-              <p className="text-white font-semibold text-sm">{f.label}</p>
-              <p className="text-white/60 text-xs mt-1">{f.desc}</p>
+            <div key={f.label} className="tu-login-feature">
+              <p className="tu-login-feature-name">{f.label}</p>
+              <p className="tu-login-feature-desc">{f.desc}</p>
             </div>
           ))}
         </div>
       </div>
 
       {/* Right — form panel */}
-      <div className="flex-1 flex items-center justify-center bg-white p-8">
-        <div className="w-full max-w-sm">
+      <div className="tu-login-form-panel">
+        <div className="tu-login-form">
           {/* Mobile logo */}
-          <div className="lg:hidden flex flex-col items-center mb-8 gap-3">
+          <div className="tu-login-mobile-logos lg:hidden flex flex-col items-center mb-8 gap-3">
             {/* eslint-disable @next/next/no-img-element */}
-            <img src="/fmi_logo.png" alt="FMI" className="h-10 w-auto object-contain" />
-            <img src="/logo_with_label.png" alt="ServiceMaster" className="h-7 w-auto object-contain" />
+            <img src="/fmi_logo_dark.png" alt="FMI" className="tu-mark-fmi h-10 w-auto object-contain" />
+            <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="tu-mark-sm h-7 w-auto object-contain" />
             {/* eslint-enable @next/next/no-img-element */}
           </div>
 
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Sign in</h1>
-          <p className="text-gray-500 text-sm mb-8">Enter your credentials to continue.</p>
+          <h1 className="tu-login-title">Sign in</h1>
+          <p className="tu-login-lead">Enter your credentials to continue.</p>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 text-sm font-medium rounded-lg px-4 py-3 mb-6">
+            <div className="tu-login-error" role="alert">
               {error}
             </div>
           )}
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="tu-login-label">
                 Email
               </label>
               <input
@@ -98,12 +98,12 @@ export default function LoginPage() {
                 placeholder="you@example.com"
                 autoComplete="email"
                 disabled={loading}
-                className="w-full border border-gray-200 rounded-lg px-4 py-3 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#2166AC] focus:border-transparent disabled:opacity-50 transition"
+                className="tu-login-input"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+              <label className="tu-login-label">
                 Password
               </label>
               <div className="relative">
@@ -114,12 +114,12 @@ export default function LoginPage() {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   disabled={loading}
-                  className="w-full border border-gray-200 rounded-lg px-4 py-3 pr-16 text-sm bg-gray-50 focus:outline-none focus:ring-2 focus:ring-[#2166AC] focus:border-transparent disabled:opacity-50 transition"
+                  className="tu-login-input" style={{ paddingRight: 64 }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-[#2166AC] hover:text-[#1a5490]"
+                  className="tu-login-reveal"
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
@@ -129,15 +129,15 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full bg-[#2166AC] hover:bg-[#1a5490] disabled:opacity-50 text-white font-semibold rounded-lg py-3 text-sm transition cursor-pointer disabled:cursor-not-allowed mt-1"
+              className="tu-login-submit"
             >
               {loading ? "Signing in…" : "Sign In"}
             </button>
           </form>
 
-          <div className="flex justify-center mt-10">
+          <div className="tu-login-footer-mark flex justify-center mt-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo_with_label.png" alt="ServiceMaster" className="h-6 w-auto object-contain opacity-50" />
+            <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="tu-mark-sm h-6 w-auto object-contain opacity-60" />
           </div>
         </div>
       </div>

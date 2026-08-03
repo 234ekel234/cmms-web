@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type ShiftTemplate = {
   id: string;
@@ -37,9 +38,9 @@ type GridData = {
 };
 
 const CELL_CONFIG = {
-  present:  { label: "P", bg: "bg-green-100 text-green-700" },
-  reliever: { label: "R", bg: "bg-amber-100 text-amber-700" },
-  absent:   { label: "A", bg: "bg-red-100 text-red-700" },
+  present:  { label: "P", bg: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  reliever: { label: "R", bg: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
+  absent:   { label: "A", bg: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 function toDateString(d: Date) {
@@ -186,22 +187,22 @@ export default function AttendancePage() {
   }, [view, summaryMonth, cutoff]);
 
   if (!templatesLoaded) {
-    return <div className="p-8"><div className="h-32 bg-white rounded-xl border border-gray-100 animate-pulse" /></div>;
+    return <div className="p-8"><div className="h-32 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" /></div>;
   }
 
   if (shiftTemplates.length === 0) {
     return (
-      <div className="p-8 text-center py-16">
-        <p className="text-sm text-gray-500 font-medium">No shifts yet</p>
-        <p className="text-xs text-gray-400 mt-1 mb-4">
-          Attendance is tracked per shift. Add one on the Schedule tab to get started.
-        </p>
-        <Link
-          href={`/accounts/${accountId}/schedule`}
-          className="inline-block text-xs font-semibold text-white bg-[#2166AC] rounded-lg px-4 py-2 hover:bg-[#1a5490]"
-        >
-          Go to Schedule
-        </Link>
+      <div className="p-8">
+        <EmptyState
+          icon="schedule"
+          title="No shifts yet"
+          hint="Attendance is tracked per shift. Add one on the Schedule tab to get started."
+          action={
+            <Link href={`/accounts/${accountId}/schedule`} className="tu-btn-primary">
+              Go to Schedule
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -211,13 +212,13 @@ export default function AttendancePage() {
   return (
     <div className="p-8">
       {/* View toggle */}
-      <div className="flex rounded-xl overflow-hidden border border-gray-200 w-fit mb-6">
+      <div className="flex rounded-xl overflow-hidden border border-[var(--tu-border)] w-fit mb-6">
         {(["daily", "summary"] as const).map((v) => (
           <button
             key={v}
             onClick={() => setView(v)}
             className={`px-6 py-2.5 text-sm font-semibold cursor-pointer transition-colors ${
-              view === v ? "bg-[#2166AC] text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+              view === v ? "bg-[var(--tu-text-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
             }`}
           >
             {v === "daily" ? "Daily Log" : "Summary"}
@@ -229,50 +230,50 @@ export default function AttendancePage() {
         <div>
           {/* Date navigation */}
           <div className="flex items-center justify-center gap-4 mb-4">
-            <button onClick={() => changeDate(-1)} className="text-2xl text-[#2166AC] cursor-pointer hover:opacity-70">‹</button>
-            <span className="text-sm font-semibold text-gray-700 min-w-[200px] text-center">{formatDate(selectedDate)}</span>
-            <button onClick={() => changeDate(1)} className="text-2xl text-[#2166AC] cursor-pointer hover:opacity-70">›</button>
+            <button onClick={() => changeDate(-1)} className="text-2xl text-[var(--tu-text-brand)] cursor-pointer hover:opacity-70">‹</button>
+            <span className="text-sm font-semibold text-[var(--tu-text-body)] min-w-[200px] text-center">{formatDate(selectedDate)}</span>
+            <button onClick={() => changeDate(1)} className="text-2xl text-[var(--tu-text-brand)] cursor-pointer hover:opacity-70">›</button>
           </div>
 
           {/* Shift tabs */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden mb-2 w-fit">
+          <div className="flex rounded-lg border border-[var(--tu-border)] overflow-hidden mb-2 w-fit">
             {shiftTemplates.map((t, i) => (
               <button
                 key={t.id}
                 onClick={() => selectShift(i)}
                 className={`px-4 py-2 text-sm font-semibold cursor-pointer transition-colors ${
-                  i === selectedIndex ? "bg-[#2166AC] text-white" : "bg-white text-gray-600 hover:bg-gray-50"
+                  i === selectedIndex ? "bg-[var(--tu-text-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
                 }`}
               >
                 {t.name}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mb-6 text-center">
+          <p className="text-xs text-[var(--tu-text-subtle)] mb-6 text-center">
             {activeTemplate?.startTime} – {activeTemplate?.endTime}
           </p>
 
           {loadingAttendance ? (
             <div className="space-y-3">
-              {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+              {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
             </div>
           ) : attendance.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-12">No employees in this account yet.</div>
+            <EmptyState icon="employee" title="No employees in this account" hint="Assign employees to this account before tracking their attendance." />
           ) : (
             <div className="space-y-3">
               {attendance.map((row) => (
-                <div key={row.employee.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                <div key={row.employee.id} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4">
                   <div className="flex items-center justify-between gap-4">
                     <div>
-                      <p className="font-semibold text-gray-800">{row.employee.name}</p>
-                      {row.employee.position && <p className="text-xs text-gray-400">{row.employee.position}</p>}
+                      <p className="font-semibold text-[var(--tu-text-heading)]">{row.employee.name}</p>
+                      {row.employee.position && <p className="text-xs text-[var(--tu-text-subtle)]">{row.employee.position}</p>}
                     </div>
                     <div className="flex gap-2">
                       <button
                         onClick={() => mark(row.employee.id, true)}
                         disabled={saving === row.employee.id}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
-                          row.isPresent === true ? "bg-green-500 text-white" : "border border-gray-200 text-gray-600 hover:border-green-300"
+                          row.isPresent === true ? "bg-[var(--tu-status-completed)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-success)]"
                         }`}
                       >
                         Present
@@ -281,7 +282,7 @@ export default function AttendancePage() {
                         onClick={() => mark(row.employee.id, false)}
                         disabled={saving === row.employee.id}
                         className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
-                          row.isPresent === false ? "bg-red-500 text-white" : "border border-gray-200 text-gray-600 hover:border-red-300"
+                          row.isPresent === false ? "bg-[var(--tu-priority-critical)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-danger)]"
                         }`}
                       >
                         Absent
@@ -289,12 +290,12 @@ export default function AttendancePage() {
                     </div>
                   </div>
                   {row.isPresent === true && (
-                    <div className="mt-3 pt-3 border-t border-gray-100">
-                      <label className="flex items-center gap-2 cursor-pointer text-xs text-gray-500">
+                    <div className="mt-3 pt-3 border-t border-[var(--tu-border)]">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--tu-text-subtle)]">
                         <div
                           onClick={() => toggleReliever(row.employee.id, !row.isReliever)}
                           className={`w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer ${
-                            row.isReliever ? "bg-amber-500 border-amber-500" : "border-gray-300"
+                            row.isReliever ? "bg-[var(--tu-priority-high)] border-[var(--tu-priority-high)]" : "border-[var(--tu-border-strong)]"
                           }`}
                         >
                           {row.isReliever && <span className="text-white text-[10px] font-bold">✓</span>}
@@ -317,7 +318,7 @@ export default function AttendancePage() {
                 key={c}
                 onClick={() => setCutoff(c)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold border cursor-pointer transition-colors ${
-                  cutoff === c ? "bg-[#2166AC] text-white border-[#2166AC]" : "bg-white text-gray-600 border-gray-200 hover:border-gray-400"
+                  cutoff === c ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 {c === "first" ? "1–15" : `16–${lastDayOfMonth(summaryMonth)}`}
@@ -327,54 +328,54 @@ export default function AttendancePage() {
 
           {/* Month navigation */}
           <div className="flex items-center justify-center gap-4 mb-6">
-            <button onClick={() => setSummaryMonth((m) => addMonths(m, -1))} className="text-2xl text-[#2166AC] cursor-pointer hover:opacity-70">‹</button>
-            <span className="text-sm font-semibold text-gray-700 min-w-[160px] text-center">{formatMonth(summaryMonth)}</span>
+            <button onClick={() => setSummaryMonth((m) => addMonths(m, -1))} className="text-2xl text-[var(--tu-text-brand)] cursor-pointer hover:opacity-70">‹</button>
+            <span className="text-sm font-semibold text-[var(--tu-text-body)] min-w-[160px] text-center">{formatMonth(summaryMonth)}</span>
             <button
               onClick={() => setSummaryMonth((m) => addMonths(m, 1))}
               disabled={summaryMonth.getFullYear() === new Date().getFullYear() && summaryMonth.getMonth() === new Date().getMonth()}
-              className="text-2xl text-[#2166AC] cursor-pointer hover:opacity-70 disabled:text-gray-300"
+              className="text-2xl text-[var(--tu-text-brand)] cursor-pointer hover:opacity-70 disabled:text-[var(--tu-text-disabled)]"
             >
               ›
             </button>
           </div>
 
           {loadingGrid ? (
-            <div className="h-48 bg-white rounded-xl border border-gray-100 animate-pulse" />
+            <div className="h-48 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
           ) : !grid || grid.rows.length === 0 ? (
-            <div className="text-center text-gray-400 text-sm py-12">No employees in this account yet.</div>
+            <EmptyState icon="employee" title="No employees in this account" hint="Assign employees to this account before tracking their attendance." />
           ) : (
             <div>
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
+              <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-x-auto">
                 <table className="text-xs">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-100">
-                      <th className="px-3 py-2 text-left font-semibold text-gray-500 sticky left-0 bg-gray-50 min-w-[140px]">Employee</th>
+                    <tr className="bg-[var(--tu-bg-secondary)] border-b border-[var(--tu-border)]">
+                      <th className="px-3 py-2 text-left font-semibold text-[var(--tu-text-subtle)] sticky left-0 bg-[var(--tu-bg-secondary)] min-w-[140px]">Employee</th>
                       {grid.dates.map((d) => (
-                        <th key={d} className="px-1 py-2 text-center font-semibold text-gray-400 w-8">{dayNum(d)}</th>
+                        <th key={d} className="px-1 py-2 text-center font-semibold text-[var(--tu-text-subtle)] w-8">{dayNum(d)}</th>
                       ))}
-                      <th className="px-3 py-2 text-center font-semibold text-gray-500 min-w-[56px]">P / A</th>
+                      <th className="px-3 py-2 text-center font-semibold text-[var(--tu-text-subtle)] min-w-[56px]">P / A</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-50">
+                  <tbody className="divide-y divide-[var(--tu-border)]">
                     {grid.rows.map((row) => (
-                      <tr key={row.id} className="hover:bg-gray-50">
-                        <td className="px-3 py-2 sticky left-0 bg-white">
-                          <p className="font-semibold text-gray-800 text-xs truncate max-w-[130px]">{row.name}</p>
-                          {row.position && <p className="text-[10px] text-gray-400 truncate max-w-[130px]">{row.position}</p>}
+                      <tr key={row.id} className="hover:bg-[var(--tu-bg-secondary)]">
+                        <td className="px-3 py-2 sticky left-0 bg-[var(--tu-bg-surface)]">
+                          <p className="font-semibold text-[var(--tu-text-heading)] text-xs truncate max-w-[130px]">{row.name}</p>
+                          {row.position && <p className="text-[10px] text-[var(--tu-text-subtle)] truncate max-w-[130px]">{row.position}</p>}
                         </td>
                         {grid.dates.map((d) => {
                           const status = row.days[d];
                           const cfg = status ? CELL_CONFIG[status] : null;
                           return (
-                            <td key={d} className={`w-8 py-2 text-center font-bold ${cfg ? cfg.bg : "text-gray-200"}`}>
+                            <td key={d} className={`w-8 py-2 text-center font-bold ${cfg ? cfg.bg : "text-[var(--tu-text-disabled)]"}`}>
                               {cfg ? cfg.label : "·"}
                             </td>
                           );
                         })}
                         <td className="px-3 py-2 text-center">
-                          <span className="text-green-600 font-bold">{row.present}</span>
-                          <span className="text-gray-300"> / </span>
-                          <span className="text-red-500 font-bold">{row.absent}</span>
+                          <span className="text-[var(--tu-on-success)] font-bold">{row.present}</span>
+                          <span className="text-[var(--tu-text-disabled)]"> / </span>
+                          <span className="text-[var(--tu-on-danger)] font-bold">{row.absent}</span>
                         </td>
                       </tr>
                     ))}
@@ -382,11 +383,11 @@ export default function AttendancePage() {
                 </table>
               </div>
               {/* Legend */}
-              <div className="flex gap-4 mt-3 text-xs text-gray-500">
-                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-green-100 text-green-700 flex items-center justify-center font-bold">P</span> Present</div>
-                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-amber-100 text-amber-700 flex items-center justify-center font-bold">R</span> Covering</div>
-                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-red-100 text-red-700 flex items-center justify-center font-bold">A</span> Absent</div>
-                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded border border-gray-200 flex items-center justify-center text-gray-300">·</span> No shift</div>
+              <div className="flex gap-4 mt-3 text-xs text-[var(--tu-text-subtle)]">
+                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] flex items-center justify-center font-bold">P</span> Present</div>
+                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] flex items-center justify-center font-bold">R</span> Covering</div>
+                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)] flex items-center justify-center font-bold">A</span> Absent</div>
+                <div className="flex items-center gap-1"><span className="w-5 h-5 rounded border border-[var(--tu-border)] flex items-center justify-center text-[var(--tu-text-disabled)]">·</span> No shift</div>
               </div>
             </div>
           )}

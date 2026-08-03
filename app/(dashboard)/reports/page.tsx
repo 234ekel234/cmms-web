@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import AccountFilter from "@/components/AccountFilter";
 
 type Period = "today" | "week" | "month";
 
@@ -40,6 +42,17 @@ type EmployeeReport = {
   training: { total: number; completed: number; rate: number | null };
 };
 
+// Lifecycle order. This is also the order the colour palette was validated in:
+// the adjacent-pair CVD gate depends on it, so do not reorder casually.
+const STATUS_SERIES = [
+  { label: "Requested",   key: "REQUESTED",   token: "var(--tu-status-requested)"   },
+  { label: "Accepted",    key: "PENDING",     token: "var(--tu-status-pending)"     },
+  { label: "In Progress", key: "IN_PROGRESS", token: "var(--tu-status-in-progress)" },
+  { label: "On Hold",     key: "ON_HOLD",     token: "var(--tu-status-on-hold)"     },
+  { label: "Completed",   key: "COMPLETED",   token: "var(--tu-status-completed)"   },
+  { label: "Rejected",    key: "REJECTED",    token: "var(--tu-status-rejected)"    },
+] as const;
+
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Today",
   week:  "This Week",
@@ -51,17 +64,25 @@ function pct(a: number, b: number) {
   return Math.round((a / b) * 100);
 }
 
+/**
+ * A single ratio against a limit — a meter, not a chart.
+ *
+ * The threshold colour is a status signal, so it comes from the status tokens
+ * rather than raw hex (the old values were hardcoded and ignored dark mode).
+ * The percentage is always rendered, so colour is never the only thing saying
+ * "this is bad".
+ */
 function PctBar({ value, danger = false }: { value: number | null; danger?: boolean }) {
-  if (value === null) return <span style={{ color: "var(--tu-text-subtle)", fontSize: 12 }}>—</span>;
-  const color = danger
-    ? value > 20 ? "#ef4444" : "#16a34a"
-    : value >= 90 ? "#16a34a" : value >= 70 ? "#f59e0b" : "#ef4444";
+  if (value === null) return <span className="tu-figure-zero" style={{ fontSize: 12 }}>—</span>;
+  const tone = danger
+    ? value > 20 ? "critical" : "good"
+    : value >= 90 ? "good" : value >= 70 ? "warning" : "critical";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-      <div style={{ flex: 1, height: 6, background: "var(--tu-bg-tertiary)", borderRadius: 3, overflow: "hidden" }}>
-        <div style={{ width: `${Math.min(value, 100)}%`, height: "100%", background: color, borderRadius: 3, transition: "width 400ms" }} />
+    <div className="tu-meter">
+      <div className="tu-meter-track">
+        <div className={`tu-meter-fill tu-meter-${tone}`} style={{ width: `${Math.min(value, 100)}%` }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 700, color, minWidth: 32, textAlign: "right" }}>{value}%</span>
+      <span className={`tu-meter-value tu-meter-${tone}`}>{value}%</span>
     </div>
   );
 }
@@ -124,13 +145,31 @@ function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], peri
 }
 
 export default function ReportsPage() {
+  const router = useRouter();
+  // Full permitted list for the filter's options. Kept separate from
+  // data.accounts, which reflects the *current* filter and would otherwise
+  // shrink the option list to whatever is already selected.
+  const [allAccounts, setAllAccounts] = useState<{ id: string; name: string }[]>([]);
+  const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
   const [data, setData] = useState<DashboardData | null>(null);
   const [employees, setEmployees] = useState<EmployeeReport[]>([]);
   const [period, setPeriod] = useState<Period>("month");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
-  useEffect(() => { fetchData(); }, [period]);
+  // Key on the contents, not the Set identity — AccountFilter hands back a new
+  // Set on every interaction, which would otherwise refetch on a no-op change.
+  const accountKey = useMemo(
+    () => Array.from(selectedAccounts).sort().join(","),
+    [selectedAccounts],
+  );
+
+  useEffect(() => { fetchData(); }, [period, accountKey]);
+
+  // Option list is fetched once and never narrowed by the filter itself.
+  useEffect(() => {
+    api.get("/accounts").then((r) => setAllAccounts(r.data)).catch(() => setAllAccounts([]));
+  }, []);
 
   async function fetchData() {
     setLoading(true);
@@ -138,8 +177,9 @@ export default function ReportsPage() {
     try {
       // Employee performance rides alongside the dashboard so the CSV export can
       // include a per-employee section; a failure there shouldn't blank the page.
+      const accountIds = selectedAccounts.size > 0 ? Array.from(selectedAccounts).join(",") : undefined;
       const [dash, emp] = await Promise.all([
-        api.get("/dashboard", { params: { period } }),
+        api.get("/dashboard", { params: { period, accountIds } }),
         api.get("/reports/employees", { params: { period } }).catch(() => null),
       ]);
       setData(dash.data);
@@ -173,6 +213,9 @@ export default function ReportsPage() {
             >
               ↓ Export CSV
             </button>
+          )}
+          {allAccounts.length > 1 && (
+            <AccountFilter accounts={allAccounts} selected={selectedAccounts} onChange={setSelectedAccounts} />
           )}
           <div className="tu-filter-group" role="group" aria-label="Select period">
             {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
@@ -230,18 +273,16 @@ export default function ReportsPage() {
       <div className="tu-card">
         <div className="tu-card-header">
           <h2 className="tu-card-title">Per-Account Breakdown</h2>
-          <p style={{ fontSize: 13, color: "var(--tu-text-subtle)" }}>
-            Click an account to view its full detailed report.
-          </p>
+          <span className="tu-result-count">Click a row for the full account report</span>
         </div>
         <div style={{ overflowX: "auto" }}>
-          <table className="tu-table" aria-label="Per-account report">
+          <table className="tu-table tu-table-interactive" aria-label="Per-account report">
             <thead>
               <tr>
                 <th scope="col">Account</th>
                 <th scope="col" className="tu-center">Open WOs</th>
                 <th scope="col" className="tu-center">Overdue</th>
-                <th scope="col" className="tu-center">Poor Assets</th>
+                <th scope="col" className="tu-center">Assets at risk</th>
                 <th scope="col" style={{ minWidth: 160 }}>Checklists</th>
                 <th scope="col" style={{ minWidth: 160 }}>Attendance</th>
                 <th scope="col" style={{ width: 110 }}></th>
@@ -260,8 +301,11 @@ export default function ReportsPage() {
                 ))
               ) : !data?.accounts.length ? (
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                    No accounts found.
+                  <td colSpan={7}>
+                    <div className="tu-empty tu-empty-sm">
+                      <p className="tu-empty-title">No accounts to report on</p>
+                      <p className="tu-empty-hint">Once an account has work orders or shifts, its figures appear here.</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
@@ -269,47 +313,48 @@ export default function ReportsPage() {
                   const checklistPct = pct(acc.checklistsDone, acc.checklistsTotal);
                   const attendancePct = pct(acc.attendancePresent, acc.attendanceTotal);
                   return (
-                    <tr key={acc.id}>
+                    <tr key={acc.id} onClick={() => router.push(`/accounts/${acc.id}/reports`)}>
                       <td className="tu-strong">{acc.name}</td>
+                      {/* Plain tabular figures rather than pills: these are
+                          magnitudes, and a pill around each one misaligns the
+                          digits and turns the column into confetti. The header
+                          already says "Overdue", so colour is emphasis here,
+                          not the sole carrier of meaning. */}
                       <td className="tu-center">
-                        {acc.openWorkOrders > 0 ? (
-                          <span className="tu-badge tu-badge-brand">{acc.openWorkOrders}</span>
-                        ) : (
-                          <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                        )}
+                        {acc.openWorkOrders > 0
+                          ? <span className="tu-figure">{acc.openWorkOrders}</span>
+                          : <span className="tu-figure-zero">—</span>}
                       </td>
                       <td className="tu-center">
-                        {acc.overdueWorkOrders > 0 ? (
-                          <span className="tu-badge tu-badge-danger">{acc.overdueWorkOrders}</span>
-                        ) : (
-                          <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                        )}
+                        {acc.overdueWorkOrders > 0
+                          ? <span className="tu-figure tu-figure-danger">{acc.overdueWorkOrders}</span>
+                          : <span className="tu-figure-zero">—</span>}
                       </td>
                       <td className="tu-center">
-                        {acc.poorHealthAssets > 0 ? (
-                          <span className="tu-badge tu-badge-warning">{acc.poorHealthAssets}</span>
-                        ) : (
-                          <span style={{ color: "var(--tu-text-subtle)" }}>—</span>
-                        )}
+                        {acc.poorHealthAssets > 0
+                          ? <span className="tu-figure tu-figure-warning">{acc.poorHealthAssets}</span>
+                          : <span className="tu-figure-zero">—</span>}
                       </td>
                       <td>
                         {acc.checklistsTotal > 0 ? (
                           <PctBar value={checklistPct} />
                         ) : (
-                          <span style={{ color: "var(--tu-text-subtle)", fontSize: 12 }}>None assigned</span>
+                          <span className="tu-figure-zero" style={{ fontSize: 12 }}>None assigned</span>
                         )}
                       </td>
                       <td>
                         {acc.attendanceTotal > 0 ? (
                           <PctBar value={attendancePct} />
                         ) : (
-                          <span style={{ color: "var(--tu-text-subtle)", fontSize: 12 }}>No shifts logged</span>
+                          <span className="tu-figure-zero" style={{ fontSize: 12 }}>No shifts logged</span>
                         )}
                       </td>
                       <td>
                         <Link
                           href={`/accounts/${acc.id}/reports`}
-                          style={{ fontSize: 13, fontWeight: 600, color: "var(--tu-text-brand)", textDecoration: "none", whiteSpace: "nowrap" }}
+                          className="tu-row-link tu-row-link-brand"
+                          style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}
+                          onClick={(e) => e.stopPropagation()}
                         >
                           Full Report →
                         </Link>
@@ -323,41 +368,49 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      {/* Work order status breakdown */}
+      {/* Work order status breakdown.
+          Six statuses that sum to the total is a part-to-whole question, so it
+          is one stacked bar rather than six separate tiles — the tiles showed
+          the counts but never the proportion. Colours come from the validated
+          --tu-status-* set; every segment is direct-labelled and repeated in the
+          legend, which is what licenses the red/green CVD pair in light mode. */}
       {!loading && data && totalWOs > 0 && (
         <div className="tu-card" style={{ marginTop: 24 }}>
           <div className="tu-card-header">
             <h2 className="tu-card-title">Work Order Breakdown</h2>
+            <span className="tu-result-count">{totalWOs} total</span>
           </div>
-          <div style={{ padding: "0 24px 24px", display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 12 }}>
-            {[
-              { label: "Requested",   key: "REQUESTED",   color: "#a855f7" },
-              { label: "Accepted",    key: "PENDING",     color: "#3b82f6" },
-              { label: "In Progress", key: "IN_PROGRESS", color: "#f59e0b" },
-              { label: "On Hold",     key: "ON_HOLD",     color: "#64748b" },
-              { label: "Completed",   key: "COMPLETED",   color: "#16a34a" },
-              { label: "Rejected",    key: "REJECTED",    color: "#ef4444" },
-            ].map(({ label, key, color }) => {
-              const count = wo?.[key as keyof typeof wo] ?? 0;
-              const share = pct(count, totalWOs);
-              return (
-                <div
-                  key={key}
-                  style={{
-                    background: "var(--tu-bg-secondary)",
-                    borderRadius: 10,
-                    padding: "14px 16px",
-                    borderLeft: `3px solid ${color}`,
-                  }}
-                >
-                  <p style={{ fontSize: 22, fontWeight: 800, color: "var(--tu-text-heading)", lineHeight: 1 }}>{count}</p>
-                  <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", marginTop: 4 }}>{label}</p>
-                  {share !== null && (
-                    <p style={{ fontSize: 11, fontWeight: 600, color, marginTop: 4 }}>{share}%</p>
-                  )}
-                </div>
-              );
-            })}
+          <div className="tu-card-body">
+            <div className="tu-segbar tu-segbar-lg" role="img" aria-label={STATUS_SERIES.map(({ label, key }) => `${label}: ${wo?.[key as keyof typeof wo] ?? 0}`).join(", ")}>
+              {STATUS_SERIES.map(({ label, key, token }) => {
+                const count = wo?.[key as keyof typeof wo] ?? 0;
+                if (count === 0) return null;
+                return (
+                  <span
+                    key={key}
+                    style={{ width: `${(count / totalWOs) * 100}%`, background: token }}
+                    title={`${label}: ${count} (${pct(count, totalWOs)}%)`}
+                  />
+                );
+              })}
+            </div>
+
+            <ul className="tu-legend tu-legend-grid">
+              {STATUS_SERIES.map(({ label, key, token }) => {
+                const count = wo?.[key as keyof typeof wo] ?? 0;
+                const share = pct(count, totalWOs);
+                return (
+                  <li key={key}>
+                    <span className="tu-dot" style={{ background: token }} aria-hidden="true" />
+                    <span className="tu-legend-name">{label}</span>
+                    <span className="tu-legend-val">
+                      {count}
+                      <span className="tu-legend-share">{share !== null ? ` ${share}%` : ""}</span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         </div>
       )}

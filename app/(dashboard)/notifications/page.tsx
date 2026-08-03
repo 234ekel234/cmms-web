@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type Notification = {
   id: string;
@@ -16,13 +17,14 @@ type Notification = {
 };
 
 const ACTION_DOT: Record<string, string> = {
-  WORK_ORDER_REQUESTED: "bg-purple-400",
-  WORK_ORDER_ACCEPTED:  "bg-green-500",
-  WORK_ORDER_REJECTED:  "bg-red-400",
-  WORK_ORDER_STARTED:   "bg-amber-400",
-  WORK_ORDER_COMPLETED: "bg-green-500",
-  WORK_ORDER_OVERDUE:   "bg-red-400",
-  CHECKLIST_INCOMPLETE: "bg-amber-400",
+  WORK_ORDER_REQUESTED: "bg-[var(--tu-status-pending)]",
+  WORK_ORDER_ACCEPTED:  "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_REJECTED:  "bg-[var(--tu-priority-critical)]",
+  WORK_ORDER_STARTED:   "bg-[var(--tu-priority-high)]",
+  WORK_ORDER_COMPLETED: "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_OVERDUE:   "bg-[var(--tu-priority-critical)]",
+  CHECKLIST_INCOMPLETE: "bg-[var(--tu-priority-high)]",
+  PART_LOW_STOCK:       "bg-[var(--tu-health-poor)]",
 };
 
 const WORK_ORDER_ACTIONS = new Set([
@@ -84,15 +86,15 @@ export default function NotificationsPage() {
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Notifications</h1>
+          <h1 className="text-2xl font-bold text-[var(--tu-text-heading)]">Notifications</h1>
           {unreadCount > 0 && (
-            <p className="text-sm text-gray-400 mt-0.5">{unreadCount} unread</p>
+            <p className="text-sm text-[var(--tu-text-subtle)] mt-0.5">{unreadCount} unread</p>
           )}
         </div>
         {unreadCount > 0 && (
           <button
             onClick={markAllRead}
-            className="text-sm text-gray-500 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+            className="text-sm text-[var(--tu-text-subtle)] bg-[var(--tu-bg-secondary-strong)] hover:bg-[var(--tu-bg-tertiary)] px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
           >
             Mark all read
           </button>
@@ -101,16 +103,20 @@ export default function NotificationsPage() {
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3, 4, 5].map((i) => <div key={i} className="h-20 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
         </div>
       ) : notifications.length === 0 ? (
-        <div className="text-center text-gray-400 py-16">
-          <p className="text-lg mb-1">No notifications yet.</p>
+        <div className="tu-card">
+          <EmptyState
+            icon="notification"
+            title="No notifications yet"
+            hint="Overdue work orders, PM reminders, and status changes on your accounts land here."
+          />
         </div>
       ) : (
         <div className="space-y-2">
           {notifications.map((n) => {
-            const dotCls = ACTION_DOT[n.action] ?? "bg-gray-300";
+            const dotCls = ACTION_DOT[n.action] ?? "bg-[var(--tu-text-disabled)]";
             const isDeepLinkable = WORK_ORDER_ACTIONS.has(n.action) && n.entityId && n.accountId;
 
             function handleClick() {
@@ -120,21 +126,21 @@ export default function NotificationsPage() {
             const content = (
               <div
                 onClick={handleClick}
-                className={`flex gap-0 bg-white rounded-xl border shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
-                  !n.isRead ? "border-blue-100 bg-blue-50/30" : "border-gray-100"
+                className={`flex gap-0 bg-[var(--tu-bg-surface)] rounded-xl border shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
+                  !n.isRead ? "border-[var(--tu-bd-info)] bg-[var(--tu-soft-brand)]/30" : "border-[var(--tu-border)]"
                 }`}
               >
                 <div className={`w-1 shrink-0 ${dotCls}`} />
                 <div className="flex-1 px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900">{n.title}</p>
-                    {!n.isRead && <div className="w-2 h-2 rounded-full bg-blue-400 shrink-0 mt-1" />}
+                    <p className="text-sm font-semibold text-[var(--tu-text-heading)]">{n.title}</p>
+                    {!n.isRead && <div className="w-2 h-2 rounded-full bg-[var(--tu-priority-medium)] shrink-0 mt-1" />}
                   </div>
-                  <p className="text-sm text-gray-600 mt-0.5">{n.body}</p>
+                  <p className="text-sm text-[var(--tu-text-body)] mt-0.5">{n.body}</p>
                   <div className="flex items-center justify-between mt-1.5">
-                    <span className="text-xs text-gray-400">{timeAgo(n.createdAt)}</span>
+                    <span className="text-xs text-[var(--tu-text-subtle)]">{timeAgo(n.createdAt)}</span>
                     {isDeepLinkable && (
-                      <span className="text-xs text-[#2166AC] font-semibold">View →</span>
+                      <span className="text-xs text-[var(--tu-text-brand)] font-semibold">View →</span>
                     )}
                   </div>
                 </div>

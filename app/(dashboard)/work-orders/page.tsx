@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
+import RowMenu from "@/components/RowMenu";
+import { EmptyRow } from "@/components/EmptyState";
 
 type Account = { id: string; name: string };
 
@@ -38,7 +40,7 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "ALL",         label: "All"         },
   { key: "OVERDUE",     label: "Overdue"     },
   { key: "REQUESTED",   label: "Requested"   },
-  { key: "PENDING",     label: "Pending"     },
+  { key: "PENDING",     label: "Accepted"    },
   { key: "IN_PROGRESS", label: "In Progress" },
   { key: "ON_HOLD",     label: "On Hold"     },
   { key: "COMPLETED",   label: "Completed"   },
@@ -93,13 +95,14 @@ function smartCompare(a: WorkOrder, b: WorkOrder) {
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
 
+// One tone per status so the column is scannable; mirrors lib/statuses.ts.
 const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> = {
-  REQUESTED:   { cls: "tu-badge tu-badge-brand",   label: "Requested"   },
-  PENDING:     { cls: "tu-badge tu-badge-warning",  label: "Pending"     },
-  IN_PROGRESS: { cls: "tu-badge tu-badge-brand",    label: "In Progress" },
-  ON_HOLD:     { cls: "tu-badge tu-badge-neutral",  label: "On Hold"     },
-  COMPLETED:   { cls: "tu-badge tu-badge-success",  label: "Completed"   },
-  REJECTED:    { cls: "tu-badge tu-badge-danger",   label: "Rejected"    },
+  REQUESTED:   { cls: "tu-badge tu-badge-warning", label: "Requested"   },
+  PENDING:     { cls: "tu-badge tu-badge-info",    label: "Accepted"    },
+  IN_PROGRESS: { cls: "tu-badge tu-badge-brand",   label: "In Progress" },
+  ON_HOLD:     { cls: "tu-badge tu-badge-neutral", label: "On Hold"     },
+  COMPLETED:   { cls: "tu-badge tu-badge-success", label: "Completed"   },
+  REJECTED:    { cls: "tu-badge tu-badge-danger",  label: "Rejected"    },
 };
 
 const PRIORITY_BADGE: Record<NonNullable<WorkOrder["priority"]>, { cls: string }> = {
@@ -107,6 +110,24 @@ const PRIORITY_BADGE: Record<NonNullable<WorkOrder["priority"]>, { cls: string }
   MEDIUM:   { cls: "tu-badge tu-badge-warning" },
   HIGH:     { cls: "tu-badge tu-badge-danger"  },
   CRITICAL: { cls: "tu-badge tu-badge-danger"  },
+};
+
+function IconSearch() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  );
+}
+
+// Columns that map onto an existing sort key, so the header can drive the same
+// state as the dropdown instead of duplicating the sort logic.
+const COLUMN_SORT: Partial<Record<string, SortKey>> = {
+  Title: "TITLE",
+  Account: "ACCOUNT",
+  Priority: "PRIORITY",
+  "Due Date": "DUE_SOON",
 };
 
 function formatDate(iso: string) {
@@ -124,6 +145,7 @@ function formatHM(minutes: number) {
 }
 
 export default function WorkOrdersPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const isClient = user?.role === "CLIENT";
@@ -262,7 +284,7 @@ export default function WorkOrdersPage() {
         </div>
 
         <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
-          <div role="tablist" aria-label="View" style={{ display: "inline-flex", border: "1px solid var(--tu-border)", borderRadius: 8, overflow: "hidden" }}>
+          <div className="tu-segmented" role="tablist" aria-label="View">
             {([
               { key: "list" as const, label: "List" },
               { key: "calendar" as const, label: "Calendar" },
@@ -273,15 +295,7 @@ export default function WorkOrdersPage() {
                 aria-selected={view === v.key}
                 type="button"
                 onClick={() => setView(v.key)}
-                style={{
-                  padding: "8px 16px",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  border: "none",
-                  background: view === v.key ? "var(--tu-bg-brand-soft)" : "var(--tu-bg-surface)",
-                  color: view === v.key ? "var(--tu-text-brand)" : "var(--tu-text-subtle)",
-                }}
+                className={view === v.key ? "tu-active" : undefined}
               >
                 {v.label}
               </button>
@@ -310,15 +324,7 @@ export default function WorkOrdersPage() {
             >
               {tab.label}
               {counts[tab.key] > 0 && (
-                <span
-                  style={{
-                    marginLeft: 6,
-                    fontSize: 11,
-                    fontWeight: 600,
-                    color: statusFilter === tab.key ? "var(--tu-text-brand)" : "var(--tu-text-subtle)",
-                  }}
-                  aria-label={`${counts[tab.key]} items`}
-                >
+                <span className="tu-tab-count" aria-label={`${counts[tab.key]} items`}>
                   {counts[tab.key]}
                 </span>
               )}
@@ -327,16 +333,19 @@ export default function WorkOrdersPage() {
         </div>
 
         {/* Search + priority + sort */}
-        <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--tu-border)", display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <input
-            id="wo-search"
-            className="tu-input"
-            style={{ width: 280 }}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, asset, account, assignee…"
-            aria-label="Search work orders"
-          />
+        <div className="tu-toolbar tu-toolbar-inset">
+          <label className="tu-search" style={{ width: 280 }}>
+            <span className="tu-search-icon"><IconSearch /></span>
+            <input
+              id="wo-search"
+              className="tu-input"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title, asset, account, assignee…"
+              aria-label="Search work orders"
+            />
+          </label>
 
           <select
             id="wo-priority"
@@ -370,31 +379,48 @@ export default function WorkOrdersPage() {
             </button>
           )}
 
-          <span style={{ marginLeft: "auto", fontSize: 13, color: "var(--tu-text-subtle)" }}>
+          <span className="tu-toolbar-spacer tu-result-count">
             {sorted.length} work order{sorted.length !== 1 ? "s" : ""}
           </span>
         </div>
 
         {view === "list" ? (
           <div id="wo-tabpanel" role="tabpanel" style={{ overflowX: "auto" }}>
-            <table className="tu-table" aria-label="Work orders">
+            <table className="tu-table tu-table-interactive" aria-label="Work orders">
               <thead>
                 <tr>
-                  <th scope="col">Title</th>
-                  <th scope="col">Account</th>
-                  <th scope="col">Asset</th>
-                  <th scope="col">Status</th>
-                  <th scope="col">Priority</th>
-                  <th scope="col">Due Date</th>
-                  <th scope="col" title="Actual logged / Estimated">Man-Hours</th>
-                  <th scope="col">Assigned To</th>
+                  {["Title", "Account", "Asset", "Status", "Priority", "Due Date", "Man-Hours", "Assigned To"].map((col) => {
+                    const key = COLUMN_SORT[col];
+                    if (!key) {
+                      return (
+                        <th key={col} scope="col" title={col === "Man-Hours" ? "Actual logged / Estimated" : undefined}>
+                          {col}
+                        </th>
+                      );
+                    }
+                    const active = sortKey === key;
+                    return (
+                      <th key={col} scope="col" aria-sort={active ? "ascending" : "none"}>
+                        <button
+                          type="button"
+                          className={`tu-th-sort${active ? " tu-active" : ""}`}
+                          onClick={() => setSortKey(key)}
+                          title={`Sort by ${col.toLowerCase()}`}
+                        >
+                          {col}
+                          <span className="tu-th-arrow" aria-hidden="true">{active ? "\u2191" : ""}</span>
+                        </button>
+                      </th>
+                    );
+                  })}
+                  <th scope="col"><span className="tu-sr-only">Actions</span></th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
                   Array.from({ length: 4 }).map((_, i) => (
                     <tr key={i} aria-hidden="true">
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 9 }).map((__, j) => (
                         <td key={j} style={{ padding: "14px 24px" }}>
                           <div className="tu-skeleton" style={{ height: 14, borderRadius: 4 }} />
                         </td>
@@ -402,29 +428,39 @@ export default function WorkOrdersPage() {
                     </tr>
                   ))
                 ) : workOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                      No work orders yet.
-                    </td>
-                  </tr>
+                  <EmptyRow
+                    colSpan={9}
+                    icon="workOrder"
+                    title="No work orders yet"
+                    hint="Work orders raised on any of your accounts will appear here."
+                  />
                 ) : sorted.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} style={{ textAlign: "center", padding: "40px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                      No work orders match these filters.
-                    </td>
-                  </tr>
+                  <EmptyRow
+                    colSpan={9}
+                    icon="search"
+                    title="No matching work orders"
+                    hint="Nothing matches the current filters."
+                    action={
+                      <button type="button" className="tu-btn-secondary tu-btn-sm" onClick={resetFilters}>
+                        Clear filters
+                      </button>
+                    }
+                  />
                 ) : (
                   sorted.map((wo) => {
                     const st = STATUS_BADGE[wo.status];
                     const pri = wo.priority ? PRIORITY_BADGE[wo.priority] : null;
                     const overdue = isOverdue(wo);
                     return (
-                      <tr key={wo.id}>
+                      <tr
+                        key={wo.id}
+                        onClick={() => router.push(`/accounts/${wo.accountId}/work-orders/${wo.id}`)}
+                      >
                         <td className="tu-strong">
                           <Link
                             href={`/accounts/${wo.accountId}/work-orders/${wo.id}`}
-                            style={{ color: "inherit", textDecoration: "none" }}
                             className="tu-row-link"
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {wo.title}
                           </Link>
@@ -439,7 +475,11 @@ export default function WorkOrdersPage() {
                           )}
                         </td>
                         <td>
-                          <Link href={`/accounts/${wo.accountId}`} className="tu-row-link" style={{ color: "var(--tu-text-brand)", textDecoration: "none" }}>
+                          <Link
+                            href={`/accounts/${wo.accountId}`}
+                            className="tu-row-link tu-row-link-brand"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             {wo.account.name}
                           </Link>
                         </td>
@@ -450,10 +490,22 @@ export default function WorkOrdersPage() {
                         <td>
                           {pri ? <span className={pri.cls}>{wo.priority}</span> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                         </td>
-                        <td style={{ color: overdue ? "var(--tu-danger)" : "var(--tu-text-body)", fontWeight: overdue ? 500 : undefined }}>
-                          {wo.dueDate ? <time dateTime={wo.dueDate}>{formatDate(wo.dueDate)}</time> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        <td>
+                          {wo.dueDate ? (
+                            overdue ? (
+                              // Colour alone was carrying this (and was broken);
+                              // the pill states it outright and survives greyscale.
+                              <span className="tu-badge tu-badge-danger" title="Past due">
+                                <time dateTime={wo.dueDate}>{formatDate(wo.dueDate)}</time>
+                              </span>
+                            ) : (
+                              <time dateTime={wo.dueDate} style={{ color: "var(--tu-text-body)" }}>{formatDate(wo.dueDate)}</time>
+                            )
+                          ) : (
+                            <span className="tu-figure-zero">—</span>
+                          )}
                         </td>
-                        <td style={{ color: "var(--tu-text-body)", whiteSpace: "nowrap" }}>
+                        <td style={{ whiteSpace: "nowrap" }}>
                           {(() => {
                             const est = wo.estimatedMinutes;
                             const running = wo.timerStartedAt != null;
@@ -462,21 +514,15 @@ export default function WorkOrdersPage() {
                               (running ? (Date.now() + getServerClockOffset() - new Date(wo.timerStartedAt!).getTime()) / 60000 : 0);
                             const hasActual = wo.actualSeconds > 0 || running;
                             if (est == null && !hasActual) {
-                              return <span style={{ color: "var(--tu-text-subtle)" }}>—</span>;
+                              return <span className="tu-figure-zero">—</span>;
                             }
                             const over = est != null && actualMin > est;
                             return (
-                              <>
-                                <span style={{ color: over ? "var(--tu-danger, #C70036)" : undefined, fontWeight: over ? 600 : undefined }}>
-                                  {hasActual ? formatHM(actualMin) : "0m"}
-                                </span>
-                                {est != null && (
-                                  <span style={{ color: "var(--tu-text-subtle)" }}> / {formatHM(est)}</span>
-                                )}
-                                {running && (
-                                  <span title="Timer running" aria-label="Timer running" style={{ marginLeft: 5, color: "#16a34a" }}>●</span>
-                                )}
-                              </>
+                              <span className={`tu-timer${running ? " tu-timer-running" : over ? " tu-timer-over" : ""}`}>
+                                {running && <span className="tu-timer-dot" aria-hidden="true" />}
+                                <span>{hasActual ? formatHM(actualMin) : "0m"}</span>
+                                {est != null && <span className="tu-timer-est">/ {formatHM(est)}</span>}
+                              </span>
                             );
                           })()}
                           {wo.status === "IN_PROGRESS" && !isClient && (
@@ -484,19 +530,8 @@ export default function WorkOrdersPage() {
                               onClick={() => toggleTimer(wo)}
                               disabled={timerBusyId === wo.id}
                               title={wo.timerStartedAt ? "Pause timer" : "Resume timer"}
-                              style={{
-                                marginLeft: 8,
-                                padding: "2px 8px",
-                                fontSize: 11,
-                                fontWeight: 700,
-                                borderRadius: 9999,
-                                border: "none",
-                                cursor: "pointer",
-                                whiteSpace: "nowrap",
-                                background: wo.timerStartedAt ? "#e2e8f0" : "#16a34a",
-                                color: wo.timerStartedAt ? "#334155" : "#fff",
-                                opacity: timerBusyId === wo.id ? 0.5 : 1,
-                              }}
+                              className={`tu-timer-btn ${wo.timerStartedAt ? "tu-timer-btn-pause" : "tu-timer-btn-resume"}`}
+                              style={{ marginLeft: 8 }}
                             >
                               {timerBusyId === wo.id ? "…" : wo.timerStartedAt ? "❚❚ Pause" : "▶ Resume"}
                             </button>
@@ -505,7 +540,19 @@ export default function WorkOrdersPage() {
                         <td style={{ color: "var(--tu-text-body)" }}>
                           {wo.assignments.length > 0
                             ? wo.assignments.map((a) => a.employee.name).join(", ")
-                            : <span style={{ color: "var(--tu-text-subtle)" }}>Unassigned</span>}
+                            : <span className="tu-figure-zero">Unassigned</span>}
+                        </td>
+                        <td className="tu-menu-cell">
+                          <RowMenu
+                            label={wo.title}
+                            actions={[
+                              { label: "Open work order", onSelect: () => router.push(`/accounts/${wo.accountId}/work-orders/${wo.id}`) },
+                              { label: "Open account", onSelect: () => router.push(`/accounts/${wo.accountId}`) },
+                              ...(wo.asset
+                                ? [{ label: "View asset", onSelect: () => router.push(`/accounts/${wo.accountId}/assets/${wo.asset!.id}`) }]
+                                : []),
+                            ]}
+                          />
                         </td>
                       </tr>
                     );

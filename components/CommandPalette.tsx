@@ -128,37 +128,37 @@ export default function CommandPalette() {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] px-4" role="dialog" aria-modal="true" aria-label="Search">
       <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} aria-hidden="true" />
-      <div className="relative w-full max-w-lg bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden">
+      <div className="relative w-full max-w-lg bg-[var(--tu-bg-surface)] rounded-xl shadow-2xl border border-[var(--tu-border)] overflow-hidden">
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
           onKeyDown={onInputKey}
           placeholder="Search accounts, assets, work orders, pages…"
-          className="w-full px-4 py-3.5 text-sm border-b border-gray-100 focus:outline-none"
+          className="w-full px-4 py-3.5 text-sm border-b border-[var(--tu-border)] focus:outline-none"
           aria-label="Search"
         />
         <div className="max-h-80 overflow-y-auto py-1">
-          {loading && <p className="px-4 py-3 text-sm text-gray-400">Loading…</p>}
+          {loading && <p className="px-4 py-3 text-sm text-[var(--tu-text-subtle)]">Loading…</p>}
           {!loading && results.length === 0 && (
-            <p className="px-4 py-6 text-sm text-gray-400 text-center">No matches.</p>
+            <p className="px-4 py-6 text-sm text-[var(--tu-text-subtle)] text-center">No matches.</p>
           )}
           {results.map((it, i) => (
             <button
               key={it.id}
               onClick={() => go(it)}
               onMouseEnter={() => setActiveIdx(i)}
-              className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer ${i === safeIdx ? "bg-gray-50" : ""}`}
+              className={`w-full text-left px-4 py-2.5 flex items-center justify-between gap-3 cursor-pointer ${i === safeIdx ? "bg-[var(--tu-bg-secondary)]" : ""}`}
             >
               <span className="min-w-0">
-                <span className="text-sm text-gray-800 block truncate">{it.label}</span>
-                {it.sub && <span className="text-xs text-gray-400 block truncate">{it.sub}</span>}
+                <span className="text-sm text-[var(--tu-text-heading)] block truncate">{it.label}</span>
+                {it.sub && <span className="text-xs text-[var(--tu-text-subtle)] block truncate">{it.sub}</span>}
               </span>
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 shrink-0">{it.kind}</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-[var(--tu-text-subtle)] shrink-0">{it.kind}</span>
             </button>
           ))}
         </div>
-        <div className="px-4 py-2 border-t border-gray-100 text-[11px] text-gray-400 flex gap-3">
+        <div className="px-4 py-2 border-t border-[var(--tu-border)] text-[11px] text-[var(--tu-text-subtle)] flex gap-3">
           <span>↑↓ navigate</span><span>↵ open</span><span>esc close</span>
         </div>
       </div>

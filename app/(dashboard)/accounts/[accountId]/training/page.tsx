@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
+import EmptyState from "@/components/EmptyState";
 
 type Training = { id: string; title: string; category: string | null; durationHours: number | null };
 type Assignment = {
@@ -114,9 +115,9 @@ export default function TrainingPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-bold text-gray-900">Training</h2>
+          <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Training</h2>
           {!loading && (
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
               {totalCompleted}/{totalAssigned} completed across {employees.length} employees
             </p>
           )}
@@ -126,17 +127,21 @@ export default function TrainingPage() {
           placeholder="Search employees…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30 w-52"
+          className="border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 w-52"
         />
       </div>
 
       {loading ? (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-24 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
         </div>
       ) : filteredEmployees.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
-          <p className="text-gray-400 text-sm">No employees found.</p>
+        <div className="tu-card">
+          <EmptyState
+            icon="employee"
+            title="No employees found"
+            hint="Assign employees to this account before tracking their training."
+          />
         </div>
       ) : (
         <div className="space-y-4">
@@ -145,29 +150,29 @@ export default function TrainingPage() {
             const total = emp.trainingAssignments.length;
 
             return (
-              <div key={emp.id} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+              <div key={emp.id} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">
                 {/* Employee header */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-[var(--tu-border)]">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-[#2166AC]/10 flex items-center justify-center shrink-0">
-                      <span className="text-[#2166AC] text-sm font-bold">{emp.name[0].toUpperCase()}</span>
+                    <div className="w-8 h-8 rounded-full bg-[var(--tu-text-brand)]/10 flex items-center justify-center shrink-0">
+                      <span className="text-[var(--tu-text-brand)] text-sm font-bold">{emp.name[0].toUpperCase()}</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-gray-900">{emp.name}</p>
-                      {emp.position && <p className="text-xs text-gray-400">{emp.position}</p>}
+                      <p className="text-sm font-semibold text-[var(--tu-text-heading)]">{emp.name}</p>
+                      {emp.position && <p className="text-xs text-[var(--tu-text-subtle)]">{emp.position}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     {total > 0 && (
                       <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        completed === total ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                        completed === total ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]"
                       }`}>
                         {completed}/{total} done
                       </span>
                     )}
                     <button
                       onClick={() => { setAssignTarget(emp); setAssignSearch(""); }}
-                      className="text-xs font-semibold text-[#2166AC] border border-[#2166AC] px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"
+                      className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-soft-brand)] transition-colors cursor-pointer"
                     >
                       + Assign
                     </button>
@@ -176,41 +181,41 @@ export default function TrainingPage() {
 
                 {/* Training list */}
                 {emp.trainingAssignments.length === 0 ? (
-                  <p className="text-xs text-gray-400 px-5 py-3 italic">No trainings assigned.</p>
+                  <p className="text-xs text-[var(--tu-text-subtle)] px-5 py-3 italic">No trainings assigned.</p>
                 ) : (
-                  <div className="divide-y divide-gray-50">
+                  <div className="divide-y divide-[var(--tu-border)]">
                     {emp.trainingAssignments.map((a) => (
                       <div key={a.trainingId} className="flex items-center justify-between px-5 py-3 gap-4">
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">{a.training.title}</p>
+                          <p className="text-sm font-medium text-[var(--tu-text-heading)] truncate">{a.training.title}</p>
                           <div className="flex items-center gap-2 mt-0.5">
                             {a.training.category && (
-                              <span className="text-xs text-gray-400">{a.training.category}</span>
+                              <span className="text-xs text-[var(--tu-text-subtle)]">{a.training.category}</span>
                             )}
                             {a.training.durationHours && (
-                              <span className="text-xs text-gray-400">{a.training.durationHours}h</span>
+                              <span className="text-xs text-[var(--tu-text-subtle)]">{a.training.durationHours}h</span>
                             )}
-                            <span className="text-xs text-gray-400">Assigned {fmtDate(a.assignedAt)}</span>
+                            <span className="text-xs text-[var(--tu-text-subtle)]">Assigned {fmtDate(a.assignedAt)}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-3 shrink-0">
                           {a.status === "COMPLETED" ? (
                             <div className="text-right">
-                              <span className="text-xs font-semibold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-semibold bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] px-2 py-0.5 rounded-full">
                                 Completed
                               </span>
                               {a.completedAt && (
-                                <p className="text-xs text-gray-400 mt-0.5">{fmtDate(a.completedAt)}</p>
+                                <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">{fmtDate(a.completedAt)}</p>
                               )}
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-semibold bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full">
+                              <span className="text-xs font-semibold bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] px-2 py-0.5 rounded-full">
                                 Assigned
                               </span>
                               <button
                                 onClick={() => setCompleteTarget({ employee: emp, trainingId: a.trainingId, title: a.training.title })}
-                                className="text-xs text-gray-400 hover:text-green-700 font-medium transition-colors cursor-pointer"
+                                className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-success)] font-medium transition-colors cursor-pointer"
                               >
                                 Mark done
                               </button>
@@ -230,10 +235,10 @@ export default function TrainingPage() {
       {/* Assign modal */}
       {assignTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-              <h3 className="text-base font-bold text-gray-900">Assign Training</h3>
-              <p className="text-sm text-gray-400 mt-0.5">to {assignTarget.name}</p>
+          <div className="bg-[var(--tu-bg-surface)] rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="px-6 pt-6 pb-4 border-b border-[var(--tu-border)]">
+              <h3 className="text-base font-bold text-[var(--tu-text-heading)]">Assign Training</h3>
+              <p className="text-sm text-[var(--tu-text-subtle)] mt-0.5">to {assignTarget.name}</p>
             </div>
             <div className="p-4">
               <input
@@ -242,7 +247,7 @@ export default function TrainingPage() {
                 value={assignSearch}
                 onChange={(e) => setAssignSearch(e.target.value)}
                 autoFocus
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#2166AC]/30 mb-3"
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 mb-3"
               />
               <div className="space-y-1 max-h-72 overflow-y-auto">
                 {allTrainings
@@ -256,10 +261,10 @@ export default function TrainingPage() {
                       key={t.id}
                       onClick={() => !assigning && handleAssign(assignTarget.id, t.id)}
                       disabled={assigning}
-                      className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer disabled:opacity-50"
+                      className="w-full text-left px-3 py-2.5 rounded-lg hover:bg-[var(--tu-soft-brand)] transition-colors cursor-pointer disabled:opacity-50"
                     >
-                      <p className="text-sm font-medium text-gray-800">{t.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">
+                      <p className="text-sm font-medium text-[var(--tu-text-heading)]">{t.title}</p>
+                      <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
                         {t.category ?? "Uncategorized"}{t.durationHours ? ` · ${t.durationHours}h` : ""}
                       </p>
                     </button>
@@ -269,7 +274,7 @@ export default function TrainingPage() {
                   const matchSearch = `${t.title} ${t.category ?? ""}`.toLowerCase().includes(assignSearch.toLowerCase());
                   return !alreadyAssigned && matchSearch;
                 }).length === 0 && (
-                  <p className="text-sm text-gray-400 text-center py-6">
+                  <p className="text-sm text-[var(--tu-text-subtle)] text-center py-6">
                     {assignSearch ? "No matches found." : "All trainings already assigned."}
                   </p>
                 )}
@@ -278,7 +283,7 @@ export default function TrainingPage() {
             <div className="px-6 pb-6">
               <button
                 onClick={() => { setAssignTarget(null); setAssignSearch(""); }}
-                className="w-full border border-gray-200 text-gray-600 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors cursor-pointer"
+                className="w-full border border-[var(--tu-border)] text-[var(--tu-text-body)] py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -290,23 +295,23 @@ export default function TrainingPage() {
       {/* Mark complete modal */}
       {completeTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-base font-bold text-gray-900 mb-2">Mark Training Complete</h3>
-            <p className="text-sm text-gray-500 mb-6">
+          <div className="bg-[var(--tu-bg-surface)] rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-bold text-[var(--tu-text-heading)] mb-2">Mark Training Complete</h3>
+            <p className="text-sm text-[var(--tu-text-subtle)] mb-6">
               Confirm that <strong>{completeTarget.employee.name}</strong> has completed{" "}
               <strong>{completeTarget.title}</strong>?
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setCompleteTarget(null)}
-                className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-50 transition-colors cursor-pointer"
+                className="flex-1 border border-[var(--tu-border)] text-[var(--tu-text-body)] py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleComplete(completeTarget.employee, completeTarget.trainingId)}
                 disabled={completing}
-                className="flex-1 bg-green-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-green-700 disabled:opacity-50 transition-colors cursor-pointer"
+                className="flex-1 bg-[var(--tu-status-completed)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-status-completed)] disabled:opacity-50 transition-colors cursor-pointer"
               >
                 {completing ? "Saving…" : "Mark Complete"}
               </button>

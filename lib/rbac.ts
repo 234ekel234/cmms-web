@@ -41,6 +41,7 @@ function rolesForPath(path: string): Role[] {
   if (path.startsWith("/users")) return MANAGERS;
   if (path.startsWith("/work-orders")) return STAFF;
   if (path.startsWith("/assets")) return STAFF;
+  if (path.startsWith("/parts")) return STAFF;
   if (path.startsWith("/employees")) return STAFF;
   if (path.startsWith("/pm-checklists")) return STAFF;
   if (path.startsWith("/trainings")) return STAFF;

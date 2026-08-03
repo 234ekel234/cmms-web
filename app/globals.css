@@ -1,60 +1,241 @@
 @import "tailwindcss";
 
+/* Theme is driven entirely by data-theme on <html>, set by the inline script in
+   app/layout.tsx before first paint. "System" resolves to light or dark there
+   rather than in a media query, so the OS preference and an explicit user
+   choice go through one code path instead of two that can disagree. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
 
-  /* TypeUI Dashboard Design System — color tokens */
+  /* The page canvas is deliberately a shade darker than --tu-bg-surface so that
+     white cards read as raised panels. When both were #ffffff every card
+     flattened into its own outline. */
+  --background: #f4f6fa;
+  --foreground: #0f172a;
+
+  /* TypeUI Dashboard Design System — color tokens.
+     Neutrals run on a cool slate ramp; each step is a real perceptual jump so
+     surface / hover / track never collapse into each other. */
   --tu-bg-surface: #ffffff;
-  --tu-bg-secondary: #f9fafb;
-  --tu-bg-secondary-strong: #f9fafb;
-  --tu-bg-tertiary: #f3f4f6;
-  --tu-bg-brand-soft: #eef6ff;
-  --tu-text-heading: #111827;
-  --tu-text-body: #4b5563;
-  --tu-text-subtle: #6b7280;
+  --tu-bg-secondary: #f8fafc;
+  --tu-bg-secondary-strong: #eef2f8;
+  --tu-bg-tertiary: #e7ecf3;
+  --tu-bg-brand-soft: #eaf2fb;
+  --tu-text-heading: #0f172a;
+  --tu-text-body: #475569;
+  --tu-text-subtle: #64748b;
   --tu-text-brand: #2166AC;
   --tu-text-brand-strong: #1a5490;
-  --tu-text-disabled: #9ca3af;
-  --tu-border: #e5e7eb;
+  --tu-text-disabled: #94a3b8;
+  --tu-border: #e2e8f0;
+  /* A stronger hairline for dividers that need to carry structural weight. */
+  --tu-border-strong: #cbd5e1;
   --tu-focus-ring: #2166AC;
-  --tu-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --tu-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --tu-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --tu-danger: #C70036;
+
+  /* Layered shadows tinted toward the page's blue-slate rather than pure black,
+     so elevation reads as light falling on a surface instead of a gray haze. */
+  --tu-shadow-xs: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
+  --tu-shadow-sm: 0 1px 3px 0 rgb(16 24 40 / 0.06), 0 4px 8px -2px rgb(16 24 40 / 0.06);
+  --tu-shadow-md: 0 4px 8px -2px rgb(16 24 40 / 0.08), 0 12px 20px -6px rgb(16 24 40 / 0.08);
+  --tu-shadow-lg: 0 4px 8px -2px rgb(16 24 40 / 0.06), 0 16px 32px -8px rgb(16 24 40 / 0.14);
+
+  /* Radius scale — one step softer than the old flat 8px everywhere. */
+  --tu-radius-sm: 6px;
+  --tu-radius-md: 10px;
+  --tu-radius-lg: 14px;
+
+  /* Soft tonal fills + their on-colors. These back the badge/pill pairs that
+     used to be hardcoded (bg-red-50 + text-red-700 and friends), so those
+     pills now flip with the theme instead of staying light on a dark page. */
+  --tu-soft-danger: #fef2f2;
+  --tu-soft-success: #ecfdf5;
+  --tu-soft-warning: #fffbeb;
+  --tu-soft-brand: #eff6ff;
+  --tu-soft-info: #faf5ff;
+  --tu-soft-accent: #fff7ed;
+  --tu-soft-neutral: #f1f5f9;
+  --tu-on-danger: #b42318;
+  --tu-on-success: #027a48;
+  --tu-on-warning: #b54708;
+  --tu-on-brand: #1a5490;
+  --tu-on-info: #6941c6;
+  --tu-on-accent: #c4320a;
+  --tu-on-neutral: #475569;
+  --tu-bd-danger: #fecdca;
+  --tu-bd-success: #a7f3d0;
+  --tu-bd-warning: #fed7aa;
+  --tu-bd-info: #e9d7fe;
+  --tu-bd-neutral: #e2e8f0;
+
+  /* Semantic status colors — consumed via lib/statuses.ts for chart fills,
+     dots, and segment bars. Distinct hues so all values read together in a
+     legend. Status pills use the .tu-badge-* variants instead. */
+  /* Validated as a set for chart use (see scripts/validate_palette.js in the
+     dataviz skill): lightness band, chroma floor, adjacent CVD separation and
+     the normal-vision floor all pass in light and dark.
+     The previous values failed: on-hold #64748B and rejected #94A3B8 sat below
+     the chroma floor (they read as gray), and on-hold vs in-progress was ΔE
+     10.3 normal-vision — under the 15 floor, i.e. hard to tell apart even with
+     full colour vision. Hue order follows the lifecycle, which is what the
+     adjacent-pair gate is computed against.
+     Light-mode caveats, discharged by the chart itself: red/green is ΔE 7.2 for
+     protanopia (the 6-8 band, legal only with secondary encoding) and #EDA100
+     is under 3:1 — so every chart using these ships direct labels, a legend,
+     segment gaps, and a table. */
+  --tu-status-requested: #EDA100;
+  --tu-status-pending: #2A78D6;
+  --tu-status-in-progress: #EB6834;
+  --tu-status-on-hold: #4A3AA7;
+  --tu-status-completed: #008300;
+  --tu-status-rejected: #E34948;
+
+  --tu-health-new: #2166AC;
+  --tu-health-good: #10B981;
+  --tu-health-fair: #F59E0B;
+  --tu-health-poor: #F97316;
+  --tu-health-out: #EF4444;
+
+  --tu-asset-operational: #10B981;
+  --tu-asset-maintenance: #F59E0B;
+
+  --tu-priority-low: #16A34A;
+  --tu-priority-medium: #3B82F6;
+  --tu-priority-high: #F59E0B;
+  --tu-priority-critical: #EF4444;
+
+  /* Extra categorical hues for checklist answer charts. */
+  --tu-chart-teal: #0891B2;
+  --tu-chart-amber: #D97706;
+  --tu-chart-pink: #DB2777;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-    --tu-bg-surface: #101828;
-    --tu-bg-secondary: #1e2939;
-    --tu-bg-secondary-strong: #333e4f;
-    --tu-bg-tertiary: #333e4f;
-    --tu-bg-brand-soft: #14243d;
-    --tu-text-heading: #ffffff;
-    --tu-text-body: #9ca3af;
-    --tu-text-subtle: #9ca3af;
-    --tu-text-brand: #6ba8e0;
-    --tu-text-brand-strong: #a9ccec;
-    --tu-text-disabled: #6b7280;
-    --tu-border: #1f2937;
-    --tu-focus-ring: #6ba8e0;
-  }
+  /* Canvas sits below the surface here too, so cards lift rather than merge. */
+  --background: #080d18;
+  --foreground: #e8edf5;
+
+  --tu-bg-surface: #111827;
+  --tu-bg-secondary: #1a2333;
+  --tu-bg-secondary-strong: #253049;
+  --tu-bg-tertiary: #253049;
+  --tu-bg-brand-soft: #14243d;
+  --tu-text-heading: #f8fafc;
+  /* Lifted off the old #9ca3af so body copy clears AA on dark surfaces and
+     no longer ties with --tu-text-subtle. */
+  --tu-text-body: #b6c2d4;
+  --tu-text-subtle: #94a3b8;
+  --tu-text-brand: #6ba8e0;
+  --tu-text-brand-strong: #a9ccec;
+  --tu-text-disabled: #64748b;
+  --tu-border: #232e42;
+  --tu-border-strong: #33405a;
+  --tu-focus-ring: #6ba8e0;
+  --tu-danger: #FF6B81;
+
+  /* Tonal fills invert to dim, saturated washes with light on-colors. */
+  --tu-soft-danger: #3f1512;
+  --tu-soft-success: #052e22;
+  --tu-soft-warning: #3b2408;
+  --tu-soft-brand: #14243d;
+  --tu-soft-info: #2c1a4d;
+  --tu-soft-accent: #3d1e08;
+  --tu-soft-neutral: #1e2839;
+  --tu-on-danger: #fda29b;
+  --tu-on-success: #6ce9a6;
+  --tu-on-warning: #fdb022;
+  --tu-on-brand: #a9ccec;
+  --tu-on-info: #d0b5fb;
+  --tu-on-accent: #fb923c;
+  --tu-on-neutral: #b6c2d4;
+  --tu-bd-danger: #7a241d;
+  --tu-bd-success: #074d36;
+  --tu-bd-warning: #6b3d0a;
+  --tu-bd-info: #4a2c7a;
+  --tu-bd-neutral: #33405a;
+
+  /* Dark UIs get no help from soft gray shadows — deepen toward black. */
+  --tu-shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --tu-shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.36), 0 4px 8px -2px rgb(0 0 0 / 0.3);
+  --tu-shadow-md: 0 4px 8px -2px rgb(0 0 0 / 0.4), 0 12px 20px -6px rgb(0 0 0 / 0.36);
+  --tu-shadow-lg: 0 4px 8px -2px rgb(0 0 0 / 0.4), 0 16px 32px -8px rgb(0 0 0 / 0.5);
+
+  /* Re-stepped for the dark surface and validated as a set, not flipped. */
+  --tu-status-requested: #C98500;
+  --tu-status-pending: #3987E5;
+  --tu-status-in-progress: #D95926;
+  --tu-status-on-hold: #9085E9;
+  --tu-status-completed: #008300;
+  --tu-status-rejected: #E66767;
+
+  --tu-health-new: #6BA8E0;
+  --tu-health-good: #34D399;
+  --tu-health-fair: #FBBF24;
+  --tu-health-poor: #FB923C;
+  --tu-health-out: #F87171;
+
+  --tu-asset-operational: #34D399;
+  --tu-asset-maintenance: #FBBF24;
+
+  /* Re-stepped for the dark surface and validated as a set. The previous
+     values were simply brightened versions of the light ones and sat at
+     L 0.71-0.84 against the 0.48-0.67 dark band — too light to hold their
+     weight, and red/amber were ΔE 13 apart in normal vision. Critical is
+     pushed toward rose to clear amber. */
+  --tu-priority-low: #008300;
+  --tu-priority-medium: #3987E5;
+  --tu-priority-high: #C98500;
+  --tu-priority-critical: #D6455F;
+
+  --tu-chart-teal: #22D3EE;
+  --tu-chart-amber: #FBBF24;
+  --tu-chart-pink: #F472B6;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Inter, Arial, Helvetica, sans-serif;
+  /* Named --font-inter rather than --font-sans: Tailwind's theme owns
+     --font-sans, and having both defined at :root specificity made the winner
+     depend on stylesheet order. */
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* "ss02" is Inter's disambiguation set — it gives capital-I serifs and a
+     tailed lowercase l, so I/l/1 stop looking identical in IDs and part
+     numbers. "cv05" keeps that tailed l consistent everywhere. */
+  font-feature-settings: "ss02", "cv05";
+  /* 15px base: the old implicit 16px/14px mix ran small for all-day reading. */
+  font-size: 15px;
+  line-height: 1.55;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Headings tighten as they grow — large type set at default tracking is the
+   single most "default template" tell in a dashboard. */
+h1, h2, h3, .tu-page-title, .tu-stat-value, .tu-chart-total {
+  letter-spacing: -0.018em;
+}
+
+/* Every figure in the product should be tabular so columns of numbers line up
+   and live timers stop jittering. */
+.tu-stat-value,
+.tu-chart-total,
+.tu-table td,
+.tu-legend .tu-legend-val,
+.tu-metric-value {
+  font-variant-numeric: tabular-nums;
+}
+
+code, kbd, pre, .tu-mono {
+  font-family: var(--font-jetbrains), ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ── TypeUI Sidebar ─────────────────────────────────────── */
@@ -82,11 +263,6 @@ body {
   border-bottom: 1px solid var(--tu-border);
   flex-shrink: 0;
 }
-.tu-logo-label {
-  font-size: 11px;
-  color: var(--tu-text-subtle);
-  white-space: nowrap;
-}
 
 /* Scrollable inner column */
 .tu-inner {
@@ -99,74 +275,10 @@ body {
   scrollbar-color: var(--tu-border) transparent;
 }
 
-/* User identity header */
-.tu-user-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 4px 14px;
-  border-bottom: 1px solid var(--tu-border);
-  margin-bottom: 16px;
-}
-.tu-avatar {
-  width: 36px;
-  height: 36px;
-  border-radius: 9999px;
-  background: var(--tu-text-brand);
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  user-select: none;
-}
-.tu-user-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-.tu-user-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--tu-text-heading);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
-}
-.tu-user-email {
-  font-size: 12px;
-  color: var(--tu-text-body);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
-}
-.tu-chevron-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  min-height: 28px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  color: var(--tu-text-body);
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background-color 150ms;
-}
-.tu-chevron-btn:hover { background: var(--tu-bg-secondary); }
-.tu-chevron-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-
 /* Primary nav */
 .tu-nav { margin-bottom: 4px; }
 .tu-nav ul,
-.tu-section ul,
-.tu-utility-group ul {
+.tu-section ul {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -181,7 +293,7 @@ body {
   gap: 12px;
   padding: 8px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--tu-text-heading);
   text-decoration: none;
@@ -211,7 +323,7 @@ body {
   border-top: 1px solid var(--tu-border);
 }
 .tu-section-heading {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -224,7 +336,7 @@ body {
   gap: 8px;
   padding: 6px 8px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--tu-text-heading);
   background: transparent;
   border: none;
@@ -262,7 +374,7 @@ body {
   margin-top: 8px;
   padding: 8px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--tu-text-body);
   background: var(--tu-bg-secondary);
@@ -276,58 +388,6 @@ body {
   color: var(--tu-text-heading);
 }
 .tu-add-project-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-
-/* Utility group (pinned to bottom) */
-.tu-utility-group {
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--tu-border);
-}
-.tu-utility-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--tu-text-body);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-  transition: background-color 150ms, color 150ms;
-}
-.tu-utility-item:hover {
-  background: var(--tu-bg-secondary);
-  color: var(--tu-text-heading);
-}
-.tu-utility-item:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
-
-/* Mobile toggle */
-.tu-mobile-toggle {
-  display: flex;
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 50;
-  padding: 8px;
-  border-radius: 8px;
-  background: var(--tu-bg-surface);
-  border: 1px solid var(--tu-border);
-  color: var(--tu-text-heading);
-  box-shadow: var(--tu-shadow-xs);
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  transition: background-color 150ms;
-  min-width: 44px;
-  min-height: 44px;
-}
-.tu-mobile-toggle:hover { background: var(--tu-bg-secondary); }
-.tu-mobile-toggle:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-@media (min-width: 1024px) { .tu-mobile-toggle { display: none; } }
 
 /* Mobile overlay */
 .tu-overlay {
@@ -389,8 +449,11 @@ body {
 
 .tu-page {
   padding: 32px;
-  max-width: 1280px;
+  max-width: 1360px;
   margin: 0 auto;
+}
+@media (max-width: 640px) {
+  .tu-page { padding: 20px 16px; }
 }
 
 .tu-page-header {
@@ -398,20 +461,20 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   flex-wrap: wrap;
 }
 
 .tu-page-title {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 26px;
+  font-weight: 650;
   color: var(--tu-text-heading);
-  line-height: 1.25;
+  line-height: 1.2;
   margin: 0;
 }
 
 .tu-page-sub {
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--tu-text-body);
   margin: 4px 0 0;
 }
@@ -429,7 +492,7 @@ body {
 .tu-period-pill {
   padding: 6px 14px;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 500;
   border: none;
   cursor: pointer;
@@ -458,7 +521,7 @@ body {
   margin-bottom: 24px;
 }
 @media (min-width: 1024px) {
-  .tu-kpi-grid { grid-template-columns: repeat(4, 1fr); }
+  .tu-kpi-grid { grid-template-columns: repeat(3, 1fr); }
 }
 
 .tu-stat-card {
@@ -469,7 +532,7 @@ body {
   padding: 20px;
 }
 .tu-stat-label {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -484,18 +547,13 @@ body {
   margin: 0 0 6px;
 }
 .tu-stat-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--tu-text-body);
   margin: 0;
 }
-.tu-stat-danger { color: #C70036; }
-.tu-stat-warning { color: #F97316; }
-.tu-stat-brand { color: #2166AC; }
-@media (prefers-color-scheme: dark) {
-  .tu-stat-danger { color: #C70036; }
-  .tu-stat-warning { color: #F97316; }
-  .tu-stat-brand { color: #6BA8E0; }
-}
+.tu-stat-danger { color: var(--tu-priority-critical); }
+.tu-stat-warning { color: var(--tu-health-poor); }
+.tu-stat-brand { color: var(--tu-text-brand); }
 
 .tu-content-grid {
   display: grid;
@@ -509,7 +567,7 @@ body {
 .tu-card {
   background: var(--tu-bg-surface);
   border: 1px solid var(--tu-border);
-  border-radius: 8px;
+  border-radius: var(--tu-radius-lg);
   box-shadow: var(--tu-shadow-xs);
   overflow: hidden;
 }
@@ -518,34 +576,37 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 24px;
+  gap: 12px;
+  padding: 15px 20px;
   border-bottom: 1px solid var(--tu-border);
+  flex-wrap: wrap;
 }
 
 .tu-card-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--tu-text-heading);
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .tu-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 14.5px;
 }
 .tu-table thead tr {
   background: var(--tu-bg-secondary);
   border-bottom: 1px solid var(--tu-border);
 }
 .tu-table th {
-  padding: 12px 24px;
+  padding: 11px 20px;
   text-align: left;
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: var(--tu-text-body);
+  color: var(--tu-text-subtle);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   white-space: nowrap;
 }
 .tu-table th.tu-center,
@@ -561,8 +622,9 @@ body {
 }
 .tu-table-interactive tbody tr:hover { background: var(--tu-bg-secondary); }
 .tu-table td {
-  padding: 14px 24px;
+  padding: 13px 20px;
   color: var(--tu-text-body);
+  vertical-align: middle;
 }
 .tu-table td.tu-strong {
   color: var(--tu-text-heading);
@@ -575,10 +637,13 @@ body {
   justify-content: center;
   padding: 2px 8px;
   border-radius: 9999px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   border: 1px solid;
   line-height: 1.6;
+  /* Status pills are labels, not prose — "In Progress" and "Under Maintenance"
+     were breaking onto a second line in narrow table columns. */
+  white-space: nowrap;
 }
 .tu-badge-danger {
   background: #FEF0F2;
@@ -605,7 +670,12 @@ body {
   border-color: var(--tu-border);
   color: var(--tu-text-body);
 }
-@media (prefers-color-scheme: dark) {
+.tu-badge-info {
+  background: var(--tu-soft-info);
+  border-color: var(--tu-bd-info);
+  color: var(--tu-on-info);
+}
+:root[data-theme="dark"] {
   .tu-badge-danger { background: #4D0218; border-color: #8B0836; color: #F87171; }
   .tu-badge-warning { background: #7C2D12; border-color: #7C2D12; color: #FBBF24; }
   .tu-badge-brand { background: #14345a; border-color: #1e4c7d; color: #a9ccec; }
@@ -618,13 +688,13 @@ body {
 }
 .tu-activity-item:last-child { border-bottom: none; }
 .tu-activity-desc {
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--tu-text-heading);
   line-height: 1.4;
   margin: 0 0 4px;
 }
 .tu-activity-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--tu-text-body);
   margin: 0;
 }
@@ -633,7 +703,7 @@ body {
   background: #FEF0F2;
   border: 1px solid #FECDD3;
   color: #881337;
-  font-size: 14px;
+  font-size: 14.5px;
   padding: 12px 16px;
   border-radius: 8px;
   margin-bottom: 24px;
@@ -660,7 +730,7 @@ body {
 }
 .tu-tab {
   padding: 12px 16px;
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 500;
   color: var(--tu-text-body);
   background: transparent;
@@ -688,28 +758,28 @@ body {
 .tu-select {
   display: block;
   padding: 8px 32px 8px 12px;
-  font-size: 14px;
+  font-size: 14.5px;
   color: var(--tu-text-heading);
   background: var(--tu-bg-secondary);
   border: 1px solid var(--tu-border);
-  border-radius: 8px;
+  border-radius: var(--tu-radius-md);
   box-shadow: var(--tu-shadow-xs);
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 10px center;
   cursor: pointer;
   min-width: 180px;
-  transition: border-color 150ms;
+  transition: border-color 150ms, box-shadow 150ms;
 }
-.tu-select:hover { border-color: var(--tu-text-subtle); }
+.tu-select:hover { border-color: var(--tu-border-strong); }
 .tu-select:focus {
   outline: none;
   border-color: var(--tu-text-brand);
-  box-shadow: 0 0 0 1px var(--tu-text-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tu-text-brand) 18%, transparent);
 }
 .tu-select-label {
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--tu-text-subtle);
   display: block;
@@ -719,7 +789,7 @@ body {
 /* Form elements */
 .tu-label {
   display: block;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--tu-text-subtle);
   margin-bottom: 4px;
@@ -729,60 +799,119 @@ body {
 .tu-input {
   display: block;
   width: 100%;
-  padding: 8px 12px;
-  font-size: 14px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 14.5px;
   color: var(--tu-text-heading);
   background: var(--tu-bg-surface);
   border: 1px solid var(--tu-border);
-  border-radius: 8px;
+  border-radius: var(--tu-radius-md);
   box-shadow: var(--tu-shadow-xs);
   transition: border-color 150ms, box-shadow 150ms;
   outline: none;
 }
 .tu-input::placeholder { color: var(--tu-text-disabled); }
-.tu-input:hover { border-color: var(--tu-text-subtle); }
+.tu-input:hover { border-color: var(--tu-border-strong); }
+/* A soft 3px halo instead of a hard 1px ring — reads as focus, not as error. */
 .tu-input:focus {
   border-color: var(--tu-text-brand);
-  box-shadow: 0 0 0 1px var(--tu-text-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tu-text-brand) 18%, transparent);
 }
 
 /* Buttons */
 .tu-btn-primary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 9px 16px;
+  font-size: 14.5px;
   font-weight: 600;
   color: #ffffff;
   background: var(--tu-text-brand);
-  border: none;
-  border-radius: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--tu-radius-md);
+  box-shadow: var(--tu-shadow-xs);
   cursor: pointer;
-  transition: background 150ms;
+  transition: background 150ms, box-shadow 150ms, transform 100ms;
   white-space: nowrap;
+  letter-spacing: -0.005em;
 }
-.tu-btn-primary:hover { background: var(--tu-text-brand-strong); }
+.tu-btn-primary:hover { background: var(--tu-text-brand-strong); box-shadow: var(--tu-shadow-sm); }
+/* A 1px press keeps the button feeling physical without moving layout. */
+.tu-btn-primary:active { transform: translateY(1px); box-shadow: none; }
 .tu-btn-primary:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-.tu-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.tu-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
 .tu-btn-secondary {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 9px 16px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--tu-text-body);
   background: var(--tu-bg-surface);
   border: 1px solid var(--tu-border);
-  border-radius: 8px;
+  border-radius: var(--tu-radius-md);
+  box-shadow: var(--tu-shadow-xs);
   cursor: pointer;
-  transition: background 150ms, border-color 150ms;
+  transition: background 150ms, border-color 150ms, transform 100ms;
+  white-space: nowrap;
+  letter-spacing: -0.005em;
+}
+.tu-btn-secondary:hover { background: var(--tu-bg-secondary); border-color: var(--tu-border-strong); color: var(--tu-text-heading); }
+.tu-btn-secondary:active { transform: translateY(1px); box-shadow: none; }
+.tu-btn-secondary:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+/* Low-emphasis action for table rows and card headers. */
+.tu-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--tu-text-body);
+  background: transparent;
+  border: none;
+  border-radius: var(--tu-radius-sm);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
   white-space: nowrap;
 }
-.tu-btn-secondary:hover { background: var(--tu-bg-secondary); border-color: var(--tu-text-subtle); }
-.tu-btn-secondary:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-btn-ghost:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
+.tu-btn-ghost:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 1px; }
+
+.tu-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #b42318;
+  background: var(--tu-bg-surface);
+  border: 1px solid #fecdca;
+  border-radius: var(--tu-radius-md);
+  box-shadow: var(--tu-shadow-xs);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, transform 100ms;
+  white-space: nowrap;
+}
+.tu-btn-danger:hover { background: #fef3f2; border-color: #fda29b; }
+.tu-btn-danger:active { transform: translateY(1px); box-shadow: none; }
+.tu-btn-danger:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+:root[data-theme="dark"] {
+  .tu-btn-danger { color: #fda29b; border-color: #5b1a15; }
+  .tu-btn-danger:hover { background: #3a100d; border-color: #7a241d; }
+}
+
+.tu-btn-sm { padding: 6px 12px; font-size: 13px; }
 
 /* ── Dashboard: KPI accents, trends, distributions ──────── */
 .tu-stat-card { position: relative; overflow: hidden; }
@@ -817,13 +946,22 @@ body {
 
 .tu-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
 .tu-chart-total { font-size: 28px; font-weight: 700; color: var(--tu-text-heading); line-height: 1; }
-.tu-chart-cap { font-size: 12px; color: var(--tu-text-subtle); }
+.tu-chart-cap { font-size: 13px; color: var(--tu-text-subtle); }
 
-.tu-segbar { display: flex; height: 10px; border-radius: 9999px; overflow: hidden; background: var(--tu-bg-tertiary); }
-.tu-segbar > span { height: 100%; }
+.tu-segbar {
+  display: flex;
+  height: 12px;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--tu-bg-tertiary);
+  /* A 2px surface gap between fills — required so adjacent segments stay
+     separable without depending on their hues differing. */
+  gap: 2px;
+}
+.tu-segbar > span { height: 100%; min-width: 3px; }
 
 .tu-legend { list-style: none; margin: 16px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
-.tu-legend li { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--tu-text-body); }
+.tu-legend li { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--tu-text-body); }
 .tu-legend .tu-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .tu-legend .tu-legend-val { margin-left: auto; font-weight: 600; color: var(--tu-text-heading); font-variant-numeric: tabular-nums; }
 
@@ -832,13 +970,10 @@ body {
 
 .tu-freq-row { display: flex; align-items: center; gap: 14px; padding: 13px 24px; border-bottom: 1px solid var(--tu-border); }
 .tu-freq-row:last-child { border-bottom: none; }
-.tu-freq-name { width: 130px; flex-shrink: 0; font-size: 13px; font-weight: 500; color: var(--tu-text-heading); text-transform: capitalize; }
+.tu-freq-name { width: 130px; flex-shrink: 0; font-size: 13.5px; font-weight: 500; color: var(--tu-text-heading); text-transform: capitalize; }
 .tu-freq-bar { flex: 1; min-width: 0; }
-.tu-freq-val { width: 64px; text-align: right; font-size: 13px; color: var(--tu-text-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tu-freq-val { width: 64px; text-align: right; font-size: 13.5px; color: var(--tu-text-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-.tu-ring-wrap { display: flex; align-items: center; gap: 20px; }
-.tu-ring-center-num { font-size: 22px; font-weight: 700; fill: var(--tu-text-heading); }
-.tu-ring-center-cap { font-size: 9px; font-weight: 600; letter-spacing: 0.06em; fill: var(--tu-text-subtle); text-transform: uppercase; }
 
 .tu-row-link:hover { color: var(--tu-text-brand) !important; text-decoration: underline !important; }
 
@@ -846,7 +981,7 @@ body {
 a.tu-stat-card { text-decoration: none; color: inherit; transition: box-shadow 150ms ease, transform 150ms ease; }
 a.tu-stat-card:hover { box-shadow: var(--tu-shadow-lg); transform: translateY(-2px); }
 a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-.tu-stat-cta { margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--tu-text-brand); display: inline-flex; align-items: center; gap: 4px; }
+.tu-stat-cta { margin-top: 10px; font-size: 12.5px; font-weight: 600; color: var(--tu-text-brand); display: inline-flex; align-items: center; gap: 4px; }
 
 /* Expandable frequency drilldown */
 .tu-freq-toggle { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; width: 100%; padding: 13px 24px; border-bottom: 1px solid var(--tu-border); cursor: pointer; }
@@ -856,8 +991,8 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 .tu-freq-chevron.tu-open { transform: rotate(90deg); }
 .tu-freq-spacer { width: 16px; flex-shrink: 0; }
 .tu-subrow { display: flex; align-items: center; gap: 14px; padding: 9px 24px 9px 54px; background: var(--tu-bg-secondary); border-bottom: 1px solid var(--tu-border); }
-.tu-subrow-name { flex: 1; min-width: 0; font-size: 12.5px; color: var(--tu-text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tu-subrow-val { width: 64px; text-align: right; font-size: 12.5px; color: var(--tu-text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tu-subrow-name { flex: 1; min-width: 0; font-size: 13px; color: var(--tu-text-body); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tu-subrow-val { width: 64px; text-align: right; font-size: 13px; color: var(--tu-text-subtle); font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Custom date range bar */
 .tu-custom-range { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 24px; background: var(--tu-bg-surface); border: 1px solid var(--tu-border); border-radius: 12px; box-shadow: var(--tu-shadow-xs); }
@@ -869,3 +1004,1396 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 .tu-trend-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .tu-trend-section-head h2 { font-size: 15px; font-weight: 600; color: var(--tu-text-heading); margin: 0; }
 .tu-pill-sm { padding: 4px 11px; font-size: 13px; }
+
+/* ── Shared workspace components ─────────────────────────
+   Vocabulary for the per-account pages. These replace the ad-hoc Tailwind
+   literals (bg-white / text-gray-500 / border-gray-200) that made those pages
+   ignore the theme and drift from the rest of the app. */
+
+/* Empty states — one shape everywhere instead of 25 hand-rolled variants. */
+.tu-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 4px;
+}
+.tu-empty-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 10px;
+  border-radius: 50%;
+  background: var(--tu-bg-secondary-strong);
+  color: var(--tu-text-subtle);
+}
+.tu-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tu-text-heading);
+  margin: 0;
+}
+.tu-empty-hint {
+  font-size: 14px;
+  color: var(--tu-text-subtle);
+  margin: 0;
+  max-width: 42ch;
+  line-height: 1.5;
+}
+.tu-empty-action { margin-top: 14px; }
+/* Compact variant for empty table bodies. */
+.tu-empty-sm { padding: 28px 20px; }
+.tu-empty-sm .tu-empty-icon { width: 34px; height: 34px; margin-bottom: 6px; }
+.tu-empty-sm .tu-empty-icon svg { width: 18px; height: 18px; }
+.tu-empty-sm .tu-empty-title { font-size: 14px; }
+.tu-empty-sm .tu-empty-hint { font-size: 13px; }
+/* An empty state occupying a table body — no cell padding fighting the centred
+   layout, and none of the row affordances, since there is nothing to click.
+   The specificity here has to clear `.tu-table-interactive tbody tr:hover`. */
+.tu-empty-row td { padding: 0; background: transparent; }
+.tu-table-interactive tbody tr.tu-empty-row,
+.tu-table-interactive tbody tr.tu-empty-row:hover {
+  background: transparent;
+  cursor: default;
+}
+
+/* Filter / action bar that sits above a list. */
+.tu-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.tu-toolbar-spacer { margin-left: auto; }
+
+/* Search field with a leading icon slot. */
+.tu-search { position: relative; display: flex; align-items: center; min-width: 220px; }
+.tu-search .tu-search-icon {
+  position: absolute;
+  left: 10px;
+  display: flex;
+  color: var(--tu-text-disabled);
+  pointer-events: none;
+}
+.tu-search .tu-input { padding-left: 32px; }
+
+/* Label/value pairs on detail pages. */
+.tu-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 18px 24px;
+}
+.tu-detail-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tu-text-subtle);
+  margin: 0 0 4px;
+}
+.tu-detail-value {
+  font-size: 15px;
+  color: var(--tu-text-heading);
+  margin: 0;
+  line-height: 1.5;
+}
+.tu-detail-value-muted { color: var(--tu-text-subtle); }
+
+/* Inline metric row for detail headers. */
+.tu-metric-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tu-text-subtle);
+  margin: 0 0 2px;
+}
+.tu-metric-value {
+  font-size: 20px;
+  font-weight: 650;
+  color: var(--tu-text-heading);
+  margin: 0;
+  line-height: 1.2;
+}
+
+/* Modal / dialog shell. */
+.tu-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgb(8 13 24 / 0.55);
+  backdrop-filter: blur(3px);
+}
+.tu-modal {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-lg);
+  box-shadow: var(--tu-shadow-lg);
+  overflow: hidden;
+}
+.tu-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--tu-border);
+  flex-shrink: 0;
+}
+.tu-modal-title {
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--tu-text-heading);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+.tu-modal-body { padding: 20px; overflow-y: auto; }
+.tu-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--tu-border);
+  background: var(--tu-bg-secondary);
+  flex-shrink: 0;
+}
+
+/* Textarea matches .tu-input so forms read as one control family. */
+.tu-textarea {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--tu-text-heading);
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-md);
+  box-shadow: var(--tu-shadow-xs);
+  transition: border-color 150ms, box-shadow 150ms;
+  outline: none;
+  resize: vertical;
+  min-height: 84px;
+}
+.tu-textarea::placeholder { color: var(--tu-text-disabled); }
+.tu-textarea:hover { border-color: var(--tu-border-strong); }
+.tu-textarea:focus {
+  border-color: var(--tu-text-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tu-text-brand) 18%, transparent);
+}
+
+/* Form field stack. */
+.tu-field { display: flex; flex-direction: column; margin-bottom: 14px; }
+.tu-field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+}
+
+/* Small neutral chip for counts and inline metadata. */
+.tu-chip {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--tu-text-body);
+  background: var(--tu-bg-secondary-strong);
+}
+
+/* Section heading between stacked cards. */
+.tu-section-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--tu-text-subtle);
+  margin: 0 0 12px;
+}
+
+.tu-stack { display: flex; flex-direction: column; gap: 20px; }
+
+/* ── Account workspace chrome ────────────────────────────
+   Header + scoped tab bar that wraps every accounts/[accountId] page. */
+
+.tu-acct-header {
+  background: var(--tu-bg-surface);
+  border-bottom: 1px solid var(--tu-border);
+  padding: 22px 32px 0;
+}
+@media (max-width: 640px) {
+  .tu-acct-header { padding: 16px 16px 0; }
+}
+
+.tu-acct-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--tu-text-subtle);
+  text-decoration: none;
+  transition: color 150ms;
+}
+.tu-acct-back:hover { color: var(--tu-text-brand); }
+.tu-acct-back:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; border-radius: 4px; }
+
+.tu-acct-title {
+  font-size: 21px;
+  font-weight: 650;
+  color: var(--tu-text-heading);
+  margin: 4px 0 0;
+  line-height: 1.25;
+}
+.tu-acct-sub {
+  font-size: 14.5px;
+  color: var(--tu-text-subtle);
+  margin: 3px 0 0;
+}
+
+/* "You are acting on THIS account" marker at the head of the tab bar. */
+.tu-scope-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  max-width: 200px;
+  padding: 4px 10px;
+  border-radius: var(--tu-radius-sm);
+  background: var(--tu-bg-brand-soft);
+  color: var(--tu-text-brand-strong);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.tu-scope-chip svg { flex-shrink: 0; }
+.tu-scope-chip .tu-scope-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.tu-scope-divider {
+  height: 20px;
+  width: 1px;
+  background: var(--tu-border);
+  flex-shrink: 0;
+}
+
+.tu-subnav-row { display: flex; align-items: center; gap: 12px; }
+.tu-subnav { display: flex; align-items: stretch; gap: 2px; }
+
+.tu-subnav-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 14px;
+  font-size: 14.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--tu-text-subtle);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: color 150ms, border-color 150ms;
+}
+.tu-subnav-tab:hover { color: var(--tu-text-heading); border-bottom-color: var(--tu-border-strong); }
+.tu-subnav-tab:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; border-radius: 4px 4px 0 0; }
+.tu-subnav-tab.tu-active {
+  color: var(--tu-text-brand);
+  border-bottom-color: var(--tu-text-brand);
+  font-weight: 600;
+}
+.tu-subnav-chevron { transition: transform 200ms ease; }
+.tu-subnav-tab[aria-expanded="true"] .tu-subnav-chevron { transform: rotate(180deg); }
+
+/* Dropdown menu shared by the grouped tabs. */
+.tu-menu {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  z-index: 20;
+  margin-top: 4px;
+  min-width: 184px;
+  padding: 4px;
+  border-radius: var(--tu-radius-md);
+  border: 1px solid var(--tu-border);
+  background: var(--tu-bg-surface);
+  box-shadow: var(--tu-shadow-lg);
+}
+.tu-menu-item {
+  display: block;
+  padding: 8px 12px;
+  border-radius: var(--tu-radius-sm);
+  font-size: 14px;
+  color: var(--tu-text-body);
+  text-decoration: none;
+  transition: background 150ms, color 150ms;
+}
+.tu-menu-item:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
+.tu-menu-item:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
+.tu-menu-item.tu-active {
+  background: var(--tu-bg-brand-soft);
+  color: var(--tu-text-brand-strong);
+  font-weight: 600;
+}
+
+/* The workspace body sits on the canvas so cards inside it lift. */
+.tu-acct-body { flex: 1; background: var(--background); }
+
+/* Segmented control (List / Calendar). */
+.tu-segmented {
+  display: inline-flex;
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-md);
+  overflow: hidden;
+  box-shadow: var(--tu-shadow-xs);
+}
+.tu-segmented button {
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: capitalize;
+  color: var(--tu-text-body);
+  background: var(--tu-bg-surface);
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.tu-segmented button + button { border-left: 1px solid var(--tu-border); }
+.tu-segmented button:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
+.tu-segmented button.tu-active { background: var(--tu-text-brand); color: #ffffff; }
+.tu-segmented button.tu-active:hover { background: var(--tu-text-brand-strong); }
+.tu-segmented button:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
+
+/* Filter pill row — the count chips above a list. */
+.tu-filter-pill {
+  padding: 6px 12px;
+  border-radius: 9999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tu-text-body);
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, color 150ms;
+  white-space: nowrap;
+}
+.tu-filter-pill:hover { border-color: var(--tu-border-strong); color: var(--tu-text-heading); }
+.tu-filter-pill:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-filter-pill.tu-active {
+  background: var(--tu-text-brand);
+  border-color: var(--tu-text-brand);
+  color: #ffffff;
+}
+
+/* Squared variant used for the primary view switch. */
+.tu-view-pill {
+  padding: 8px 16px;
+  border-radius: var(--tu-radius-md);
+  font-size: 14.5px;
+  font-weight: 500;
+  color: var(--tu-text-body);
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms, color 150ms;
+  white-space: nowrap;
+}
+.tu-view-pill:hover { border-color: var(--tu-text-brand); color: var(--tu-text-brand); }
+.tu-view-pill:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-view-pill.tu-active {
+  background: var(--tu-text-brand);
+  border-color: var(--tu-text-brand);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+/* Work-order list card. */
+.tu-wo-card {
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-lg);
+  box-shadow: var(--tu-shadow-xs);
+  padding: 16px 18px;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+.tu-wo-card:hover { box-shadow: var(--tu-shadow-md); border-color: var(--tu-border-strong); }
+.tu-wo-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--tu-text-heading);
+  text-decoration: none;
+}
+.tu-wo-title:hover { color: var(--tu-text-brand); }
+.tu-wo-desc {
+  font-size: 14px;
+  color: var(--tu-text-body);
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+.tu-wo-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12.5px;
+  color: var(--tu-text-subtle);
+}
+.tu-wo-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--tu-border);
+  flex-wrap: wrap;
+}
+.tu-danger-text { color: #dc2626; }
+:root[data-theme="dark"] { .tu-danger-text { color: #f87171; } }
+
+/* Man-hour timer chip on work-order cards. */
+.tu-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--tu-text-body);
+  background: var(--tu-bg-secondary-strong);
+}
+.tu-timer-running {
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--tu-status-completed) 16%, transparent);
+  color: var(--tu-status-completed);
+}
+.tu-timer-over {
+  background: color-mix(in srgb, var(--tu-priority-critical) 16%, transparent);
+  color: var(--tu-priority-critical);
+}
+.tu-timer-clock { font-size: 15px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.tu-timer-est { opacity: 0.7; font-weight: 500; }
+.tu-timer-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: tu-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@media (prefers-reduced-motion: reduce) { .tu-timer-dot { animation: none; } }
+
+/* Start / pause control that sits beside the timer chip. */
+.tu-timer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 9999px;
+  font-size: 12.5px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms;
+}
+.tu-timer-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.tu-timer-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-timer-btn-pause { background: var(--tu-bg-tertiary); color: var(--tu-text-heading); }
+.tu-timer-btn-pause:hover:not(:disabled) { background: var(--tu-border-strong); }
+.tu-timer-btn-resume { background: var(--tu-status-completed); color: #ffffff; }
+.tu-timer-btn-resume:hover:not(:disabled) { filter: brightness(0.92); }
+
+/* Inline notice inside a card (e.g. "this work order was rejected"). */
+.tu-inline-notice {
+  border-radius: var(--tu-radius-md);
+  padding: 10px 12px;
+  margin: 10px 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+.tu-inline-notice-danger {
+  background: color-mix(in srgb, var(--tu-priority-critical) 12%, transparent);
+  color: var(--tu-priority-critical);
+}
+
+/* Status transition buttons in the card footer. */
+.tu-action-btn {
+  padding: 5px 12px;
+  border-radius: var(--tu-radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms, filter 150ms;
+  background: var(--tu-text-brand);
+  color: #ffffff;
+}
+.tu-action-btn:hover { background: var(--tu-text-brand-strong); }
+.tu-action-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-action-reject {
+  background: color-mix(in srgb, var(--tu-priority-critical) 14%, transparent);
+  color: var(--tu-priority-critical);
+}
+.tu-action-reject:hover { background: color-mix(in srgb, var(--tu-priority-critical) 24%, transparent); }
+.tu-action-complete {
+  background: color-mix(in srgb, var(--tu-status-completed) 14%, transparent);
+  color: var(--tu-status-completed);
+}
+.tu-action-complete:hover { background: color-mix(in srgb, var(--tu-status-completed) 24%, transparent); }
+.tu-action-hold { background: var(--tu-bg-tertiary); color: var(--tu-text-heading); }
+.tu-action-hold:hover { background: var(--tu-border-strong); }
+
+/* Inline text link used inside meta rows. */
+.tu-link {
+  color: var(--tu-text-brand);
+  font-weight: 600;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: inherit;
+}
+.tu-link:hover { text-decoration: underline; }
+.tu-link:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; border-radius: 3px; }
+
+/* Selectable row inside a picker modal. */
+.tu-pick-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 20px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.tu-pick-row:hover { background: var(--tu-bg-secondary); }
+.tu-pick-row:disabled { opacity: 0.6; cursor: not-allowed; }
+.tu-pick-row:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
+.tu-pick-name { display: block; font-size: 14.5px; font-weight: 500; color: var(--tu-text-heading); }
+.tu-pick-sub { display: block; font-size: 12.5px; color: var(--tu-text-subtle); }
+.tu-pick-check {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--tu-radius-sm);
+  border: 1px solid var(--tu-border-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: transparent;
+  transition: background 150ms, border-color 150ms;
+}
+.tu-pick-check.tu-checked {
+  background: var(--tu-text-brand);
+  border-color: var(--tu-text-brand);
+  color: #ffffff;
+}
+
+/* ── Status pipeline stepper ─────────────────────────────── */
+.tu-pipeline { display: flex; align-items: flex-start; margin: 16px 0; }
+.tu-pipe-step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+.tu-pipe-line {
+  position: absolute;
+  top: 11px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--tu-bg-tertiary);
+}
+.tu-pipe-line.tu-filled { background: var(--tu-text-brand); }
+.tu-pipe-node {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--tu-bg-tertiary);
+  border: 2px solid var(--tu-bg-tertiary);
+  color: transparent;
+}
+.tu-pipe-node.tu-done {
+  background: var(--tu-text-brand);
+  border-color: var(--tu-text-brand);
+  color: #ffffff;
+}
+.tu-pipe-node.tu-current {
+  background: var(--tu-bg-surface);
+  border: 3px solid var(--tu-text-brand);
+}
+.tu-pipe-node.tu-paused {
+  background: var(--tu-bg-surface);
+  border: 3px solid var(--tu-status-on-hold);
+}
+.tu-pipe-inner { width: 8px; height: 8px; border-radius: 9999px; background: var(--tu-text-brand); }
+.tu-pipe-pause { display: flex; gap: 2px; }
+.tu-pipe-pause span { width: 3px; height: 9px; border-radius: 2px; background: var(--tu-status-on-hold); }
+.tu-pipe-label {
+  margin-top: 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--tu-text-disabled);
+}
+.tu-pipe-label.tu-done { color: var(--tu-text-brand); }
+.tu-pipe-label.tu-paused { color: var(--tu-status-on-hold); }
+
+/* ── Breadcrumbs ─────────────────────────────────────────── */
+.tu-crumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--tu-text-subtle);
+}
+.tu-crumb-link { color: inherit; text-decoration: none; transition: color 150ms; }
+.tu-crumb-link:hover { color: var(--tu-text-brand); }
+.tu-crumb-link:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; border-radius: 3px; }
+.tu-crumb-current { color: var(--tu-text-heading); font-weight: 500; }
+.tu-crumb-sep { color: var(--tu-text-disabled); }
+
+/* ── Navigation surface (deep navy) ──────────────────────
+   The sidebar is its own visual zone: a dark panel that anchors the layout and
+   makes the light content canvas read as deliberate.
+
+   Rather than rewriting every nav, project, and utility rule, this
+   re-points the generic surface/text tokens within the nav scope only. Custom
+   properties inherit, so every descendant rule picks up the dark treatment for
+   free and there is exactly one place to retune the palette. */
+.tu-sidebar,
+.tu-drawer {
+  --tu-nav-bg: #0F1B2D;
+  --tu-nav-hover: #1B2B44;
+  --tu-nav-active-bg: #1C3454;
+  --tu-nav-active-text: #7CB2E8;
+  --tu-nav-border: #1E2D44;
+  --tu-nav-text: #E8EEF7;
+  --tu-nav-text-dim: #93A7C2;
+
+  --tu-bg-surface: var(--tu-nav-bg);
+  --tu-bg-secondary: var(--tu-nav-hover);
+  --tu-bg-secondary-strong: var(--tu-nav-active-bg);
+  --tu-bg-tertiary: var(--tu-nav-hover);
+  --tu-border: var(--tu-nav-border);
+  --tu-border-strong: #2A3C58;
+  --tu-text-heading: var(--tu-nav-text);
+  --tu-text-body: var(--tu-nav-text-dim);
+  --tu-text-subtle: var(--tu-nav-text-dim);
+  --tu-text-disabled: #64748B;
+  --tu-text-brand-strong: var(--tu-nav-active-text);
+  --tu-focus-ring: #7CB2E8;
+}
+
+/* The active item also gets a brand rail so it stays findable at a glance. */
+.tu-nav-item.tu-active,
+.tu-project-item.tu-active {
+  position: relative;
+}
+.tu-nav-item.tu-active::before,
+.tu-project-item.tu-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--tu-nav-active-text);
+}
+
+/* The nav uses fmi_logo_light.png — a real reversed asset (white mark, red
+   accent preserved). No CSS filter anywhere: several of these brand PNGs ship
+   with a baked white background and zero transparency, so a
+   brightness(0)+invert(1) knockout paints the whole tile white instead of the
+   mark. Reversed variants are generated as real assets instead. */
+
+/* The ⌘K hint chip inside the nav. */
+.tu-kbd-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--tu-nav-text-dim);
+  border: 1px solid var(--tu-nav-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+/* Mobile drawer overlay reads darker now that the drawer itself is dark. */
+.tu-overlay { background: rgb(4 8 16 / 0.6); }
+
+/* ── Login ───────────────────────────────────────────────
+   The brand panel deliberately reuses the navy of the app sidebar, so signing
+   in reads as walking into the same product rather than a separate page. */
+.tu-login { min-height: 100vh; display: flex; }
+
+.tu-login-brand {
+  display: none;
+  width: 50%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 48px;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 90% at 15% 0%, #1C3454 0%, transparent 60%),
+    linear-gradient(160deg, #14243D 0%, #0F1B2D 55%, #0B1524 100%);
+}
+@media (min-width: 1024px) { .tu-login-brand { display: flex; } }
+
+/* Faint grid, to keep a very large flat panel from looking empty. */
+.tu-login-brand::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(90% 70% at 50% 40%, #000 0%, transparent 100%);
+  pointer-events: none;
+}
+.tu-login-brand > * { position: relative; z-index: 1; }
+
+.tu-login-logo-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 24px 40px;
+  box-shadow: 0 16px 40px -12px rgb(0 0 0 / 0.5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.tu-login-logo-rule { width: 100%; height: 1px; background: #e2e8f0; }
+
+.tu-login-headline {
+  color: #ffffff;
+  font-size: 30px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.tu-login-sub { color: rgb(255 255 255 / 0.68); font-size: 15px; margin: 8px 0 0; line-height: 1.5; }
+
+.tu-login-features {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  width: 100%;
+  max-width: 400px;
+}
+.tu-login-feature {
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.09);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.tu-login-feature-name { color: #ffffff; font-weight: 600; font-size: 13.5px; margin: 0; }
+.tu-login-feature-desc { color: rgb(255 255 255 / 0.6); font-size: 12px; margin: 4px 0 0; line-height: 1.45; }
+
+.tu-login-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--tu-bg-surface);
+}
+.tu-login-form { width: 100%; max-width: 380px; }
+.tu-login-title { font-size: 25px; font-weight: 650; color: var(--tu-text-heading); margin: 0 0 4px; }
+.tu-login-lead { font-size: 14px; color: var(--tu-text-subtle); margin: 0 0 28px; }
+
+.tu-login-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tu-text-body);
+  margin-bottom: 6px;
+}
+/* Roomier than the dense in-app .tu-input — this is the only form on the page. */
+.tu-login-input {
+  width: 100%;
+  padding: 12px 14px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--tu-text-heading);
+  background: var(--tu-bg-secondary);
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-md);
+  outline: none;
+  transition: border-color 150ms, box-shadow 150ms, background 150ms;
+}
+.tu-login-input::placeholder { color: var(--tu-text-disabled); }
+.tu-login-input:focus {
+  background: var(--tu-bg-surface);
+  border-color: var(--tu-text-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--tu-text-brand) 18%, transparent);
+}
+.tu-login-input:disabled { opacity: 0.5; }
+
+.tu-login-reveal {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tu-text-brand);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.tu-login-reveal:hover { color: var(--tu-text-brand-strong); }
+.tu-login-reveal:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; border-radius: 4px; }
+
+.tu-login-submit {
+  width: 100%;
+  padding: 12px;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  background: var(--tu-text-brand);
+  border: none;
+  border-radius: var(--tu-radius-md);
+  cursor: pointer;
+  transition: background 150ms, transform 100ms;
+}
+.tu-login-submit:hover:not(:disabled) { background: var(--tu-text-brand-strong); }
+.tu-login-submit:active:not(:disabled) { transform: translateY(1px); }
+.tu-login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.tu-login-submit:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+.tu-login-error {
+  background: var(--tu-soft-danger);
+  border: 1px solid var(--tu-bd-danger);
+  color: var(--tu-on-danger);
+  font-size: 13.5px;
+  font-weight: 500;
+  border-radius: var(--tu-radius-md);
+  padding: 11px 14px;
+  margin-bottom: 22px;
+}
+
+/* On a dark form panel the marks swap to their reversed assets. Same reason as
+   above: these PNGs are opaque, so a filter would flatten them to blank tiles. */
+:root[data-theme="dark"] {
+  .tu-login-mobile-logos .tu-mark-fmi { content: url("/fmi_logo_light.png"); }
+  .tu-login-mobile-logos .tu-mark-sm,
+  .tu-login-footer-mark .tu-mark-sm { content: url("/logo_with_label_light.png"); }
+}
+
+/* ── Readability ─────────────────────────────────────────
+   Applied last so it wins over the component rules above. Inter is optically
+   small at a given px size and tightens up as it shrinks, so anything under
+   ~13px gets a little positive tracking to keep counters open. */
+
+.tu-table td { line-height: 1.5; }
+.tu-wo-desc { line-height: 1.6; }
+.tu-detail-value { line-height: 1.55; }
+.tu-activity-desc { line-height: 1.5; }
+.tu-menu-item { line-height: 1.45; }
+
+/* Micro-copy: meta rows, captions, chips, breadcrumbs. */
+.tu-wo-meta,
+.tu-crumbs,
+.tu-chip,
+.tu-badge,
+.tu-stat-sub,
+.tu-activity-meta,
+.tu-pick-sub,
+.tu-usermenu-email,
+.tu-pipe-label,
+.tu-kbd-hint {
+  letter-spacing: 0.006em;
+}
+
+/* Uppercase micro-labels need the most tracking of all — set solid, they read
+   as a block rather than as words. */
+.tu-stat-label,
+.tu-detail-label,
+.tu-metric-label,
+.tu-label,
+.tu-section-heading,
+.tu-section-title,
+.tu-table th {
+  letter-spacing: 0.07em;
+}
+
+/* Form controls inherit the body face rather than the browser's default UI
+   font, which was rendering inputs noticeably smaller than their labels. */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+}
+
+/* ── App shell + top bar ─────────────────────────────────
+   The sidebar is a full-height rail; the top bar spans only the content column
+   beside it, so the two never fight over the corner. */
+
+.tu-shell { display: flex; min-height: 100vh; background: var(--background); }
+.tu-shell-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.tu-shell-content { flex: 1; min-width: 0; }
+
+.tu-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 20px;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--tu-bg-surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--tu-border);
+}
+@media (max-width: 640px) { .tu-topbar { padding: 0 12px; gap: 8px; } }
+
+/* Drawer trigger: only where the rail is hidden. */
+.tu-topbar-burger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border-radius: var(--tu-radius-md);
+  border: 1px solid var(--tu-border);
+  background: var(--tu-bg-surface);
+  color: var(--tu-text-body);
+  cursor: pointer;
+  transition: background 150ms, color 150ms;
+}
+.tu-topbar-burger:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
+.tu-topbar-burger:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+@media (min-width: 1024px) { .tu-topbar-burger { display: none; } }
+
+/* Search reads as a field, not a button — it opens the ⌘K palette. */
+.tu-topbar-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: var(--tu-radius-md);
+  border: 1px solid var(--tu-border);
+  background: var(--tu-bg-secondary);
+  color: var(--tu-text-subtle);
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: border-color 150ms, background 150ms;
+}
+.tu-topbar-search:hover { border-color: var(--tu-border-strong); background: var(--tu-bg-surface); }
+.tu-topbar-search:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-topbar-search-label { flex: 1; text-align: left; }
+@media (max-width: 520px) {
+  .tu-topbar-search { max-width: none; width: 38px; padding: 8px; justify-content: center; }
+  .tu-topbar-search .tu-topbar-search-label,
+  .tu-topbar-search .tu-kbd-hint { display: none; }
+}
+
+.tu-topbar-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+
+.tu-topbar-icon-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--tu-radius-md);
+  border: none;
+  background: transparent;
+  color: var(--tu-text-body);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 150ms, color 150ms;
+}
+.tu-topbar-icon-btn:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
+.tu-topbar-icon-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+/* Unread count on the bell. */
+.tu-topbar-dot {
+  position: absolute;
+  top: 5px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 9999px;
+  background: var(--tu-priority-critical);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+  /* Ring in the bar colour so the badge stays legible over the icon. */
+  box-shadow: 0 0 0 2px var(--tu-bg-surface);
+}
+
+.tu-topbar-divider {
+  width: 1px;
+  height: 24px;
+  margin: 0 4px;
+  background: var(--tu-border);
+  flex-shrink: 0;
+}
+
+.tu-topbar-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: var(--tu-text-brand);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 650;
+  user-select: none;
+}
+
+/* ── User menu ───────────────────────────────────────────── */
+.tu-usermenu { position: relative; }
+
+.tu-usermenu-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px 4px 4px;
+  border-radius: 9999px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+.tu-usermenu-trigger:hover { background: var(--tu-bg-secondary); border-color: var(--tu-border); }
+.tu-usermenu-trigger:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+.tu-usermenu-id {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+  max-width: 170px;
+  line-height: 1.25;
+}
+.tu-usermenu-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tu-text-heading);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.tu-usermenu-email {
+  font-size: 12px;
+  color: var(--tu-text-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+.tu-usermenu-chevron { color: var(--tu-text-subtle); flex-shrink: 0; transition: transform 200ms ease; }
+.tu-usermenu-chevron.tu-open { transform: rotate(180deg); }
+
+/* Below md the trigger collapses to just the avatar; the panel still shows the
+   full identity, so nothing is lost. */
+@media (max-width: 768px) {
+  .tu-usermenu-id, .tu-usermenu-chevron { display: none; }
+  .tu-usermenu-trigger { padding: 4px; }
+}
+
+.tu-usermenu-panel { left: auto; right: 0; min-width: 236px; }
+
+.tu-usermenu-header {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--tu-border);
+}
+.tu-usermenu-header .tu-usermenu-name { font-size: 14px; white-space: normal; }
+.tu-usermenu-header .tu-usermenu-email { font-size: 12.5px; white-space: normal; }
+.tu-usermenu-role { margin-top: 6px; }
+
+.tu-menu-item-icon { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; cursor: pointer; }
+.tu-menu-item-icon svg { flex-shrink: 0; color: var(--tu-text-subtle); }
+.tu-menu-item-danger { color: var(--tu-on-danger); }
+.tu-menu-item-danger:hover { background: var(--tu-soft-danger); color: var(--tu-on-danger); }
+.tu-menu-item-danger svg { color: currentColor; }
+
+/* Trailing shortcut hint inside a menu item. */
+.tu-menu-item-hint { margin-left: auto; }
+
+/* ── Table figures ───────────────────────────────────────
+   Numeric cells in list views. Zero reads as an em-dash so a busy column shows
+   only the accounts that actually need attention. */
+.tu-figure { font-weight: 600; color: var(--tu-text-heading); font-variant-numeric: tabular-nums; }
+.tu-figure-danger  { color: var(--tu-on-danger); }
+.tu-figure-warning { color: var(--tu-on-warning); }
+.tu-figure-success { color: var(--tu-on-success); }
+.tu-figure-zero    { color: var(--tu-text-disabled); }
+/* Stats load after the list, so cells hold their shape with a dimmed dash. */
+.tu-figure-pending { color: var(--tu-border-strong); }
+
+/* Secondary line under a table row's primary cell. */
+.tu-row-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--tu-text-subtle);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 42ch;
+}
+
+/* Row-level links inherit colour until hovered (see .tu-row-link). */
+.tu-table-interactive .tu-row-link { color: inherit; text-decoration: none; }
+
+/* Shift editor rows in the new-account modal. */
+.tu-shift-row {
+  display: grid;
+  grid-template-columns: 1fr 120px 120px auto;
+  gap: 10px;
+  align-items: end;
+}
+@media (max-width: 560px) {
+  .tu-shift-row { grid-template-columns: 1fr 1fr; }
+  .tu-shift-row > button { grid-column: 2; justify-self: end; }
+}
+.tu-shift-label {
+  display: block;
+  font-size: 12px;
+  color: var(--tu-text-subtle);
+  margin-bottom: 4px;
+}
+.tu-shift-remove {
+  padding: 9px 12px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--tu-text-subtle);
+  background: var(--tu-bg-surface);
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-md);
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms, background 150ms;
+}
+.tu-shift-remove:hover:not(:disabled) {
+  color: var(--tu-on-danger);
+  border-color: var(--tu-bd-danger);
+  background: var(--tu-soft-danger);
+}
+.tu-shift-remove:disabled { opacity: 0.4; cursor: not-allowed; }
+.tu-shift-remove:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+/* Inline form-level error message. */
+.tu-form-error {
+  margin: 14px 0 0;
+  padding: 9px 12px;
+  border-radius: var(--tu-radius-md);
+  background: var(--tu-soft-danger);
+  border: 1px solid var(--tu-bd-danger);
+  color: var(--tu-on-danger);
+  font-size: 13px;
+}
+
+/* ── Row overflow menu ───────────────────────────────────── */
+.tu-menu-cell { width: 1%; white-space: nowrap; text-align: right; }
+
+.tu-row-menu-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--tu-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--tu-text-subtle);
+  cursor: pointer;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.tu-row-menu-btn:hover {
+  background: var(--tu-bg-surface);
+  border-color: var(--tu-border);
+  color: var(--tu-text-heading);
+}
+.tu-row-menu-btn[aria-expanded="true"] {
+  background: var(--tu-bg-surface);
+  border-color: var(--tu-border-strong);
+  color: var(--tu-text-heading);
+}
+.tu-row-menu-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 1px; }
+
+/* Sits above the sticky top bar (z-index 30). */
+.tu-row-menu { z-index: 40; min-width: 180px; }
+.tu-row-menu .tu-menu-item { cursor: pointer; }
+
+/* Visually hidden, still announced. */
+.tu-sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Toolbar variant that sits inside a card, between the tabs and the table. */
+.tu-toolbar-inset {
+  padding: 12px 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--tu-border);
+}
+.tu-result-count { font-size: 13px; color: var(--tu-text-subtle); white-space: nowrap; }
+
+/* Count beside a status tab label. */
+.tu-tab-count { margin-left: 6px; font-size: 11.5px; font-weight: 600; color: var(--tu-text-subtle); }
+.tu-active-tab .tu-tab-count { color: var(--tu-text-brand); }
+
+/* A row link that keeps the brand colour rather than inheriting. */
+.tu-table-interactive .tu-row-link-brand { color: var(--tu-text-brand); }
+
+/* Sortable column header. Inherits the th's uppercase/tracking treatment so an
+   interactive header is indistinguishable from a static one until hovered. */
+.tu-th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 150ms;
+}
+.tu-th-sort:hover { color: var(--tu-text-heading); }
+.tu-th-sort:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; border-radius: 3px; }
+.tu-th-sort.tu-active { color: var(--tu-text-brand); }
+.tu-th-arrow { font-size: 10px; line-height: 1; }
+
+/* ── Meter (single ratio against a limit) ────────────────
+   Threshold tones are status signals, so they use the reserved status colours
+   and always ship the number alongside — colour never carries it alone. */
+.tu-meter { display: flex; align-items: center; gap: 8px; }
+.tu-meter-track {
+  flex: 1;
+  height: 6px;
+  min-width: 60px;
+  background: var(--tu-bg-tertiary);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.tu-meter-fill { height: 100%; border-radius: 3px; transition: width 400ms ease; }
+.tu-meter-value { font-size: 12px; font-weight: 700; min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
+.tu-meter-good     { color: var(--tu-on-success); }
+.tu-meter-warning  { color: var(--tu-on-warning); }
+.tu-meter-critical { color: var(--tu-on-danger); }
+.tu-meter-fill.tu-meter-good     { background: var(--tu-status-completed); }
+.tu-meter-fill.tu-meter-warning  { background: var(--tu-status-requested); }
+.tu-meter-fill.tu-meter-critical { background: var(--tu-status-rejected); }
+
+
+/* Legend laid out as a grid so six entries stay compact under the bar. */
+.tu-legend-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px 20px;
+}
+.tu-legend-name { color: var(--tu-text-body); }
+.tu-legend-share { color: var(--tu-text-subtle); font-weight: 500; margin-left: 4px; }
+
+/* ── Trend bars ──────────────────────────────────────────
+   Plain flex columns rather than an SVG with preserveAspectRatio="none",
+   which stretched the bars non-uniformly and turned rounded ends into
+   skewed ellipses. */
+.tu-trendbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+}
+.tu-trendbar {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+.tu-trendbar-fill {
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transition: height 300ms ease;
+}
+.tu-trendbar:hover .tu-trendbar-fill { filter: brightness(1.08); }
+@media (prefers-reduced-motion: reduce) { .tu-trendbar-fill { transition: none; } }
+/* Taller variant for a bar that is the focus of its card. */
+.tu-segbar-lg { height: 16px; }
+
+/* A secondary chart nested under a primary one in the same card. */
+.tu-subchart {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--tu-border);
+}
+.tu-subchart-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--tu-text-subtle);
+  margin: 0 0 10px;
+}
+/* Compact legend that wraps horizontally instead of stacking. */
+.tu-legend-inline { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
+.tu-legend-inline li { font-size: 12.5px; }
+.tu-legend-inline .tu-legend-val { margin-left: 4px; }
