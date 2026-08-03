@@ -2397,3 +2397,32 @@ button {
 .tu-legend-inline { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; margin-top: 12px; }
 .tu-legend-inline li { font-size: 12.5px; }
 .tu-legend-inline .tu-legend-val { margin-left: 4px; }
+
+/* Remove control on an attachment thumbnail. Sits over the top-right corner,
+   and only firms up on hover so a grid of photos does not read as a row of
+   delete buttons. */
+.tu-attachment-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  background: rgba(15, 27, 45, 0.55);
+  color: #ffffff;
+  opacity: 0;
+  transition: opacity 120ms, background 120ms;
+}
+figure:hover .tu-attachment-remove,
+.tu-attachment-remove:focus-visible { opacity: 1; }
+.tu-attachment-remove:hover { background: var(--tu-priority-critical); }
+.tu-attachment-remove:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-attachment-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+/* Pointer devices only — on touch there is no hover, so keep it visible. */
+@media (hover: none) {
+  .tu-attachment-remove { opacity: 1; }
+}

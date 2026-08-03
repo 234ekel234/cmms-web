@@ -1,7 +1,9 @@
 import axios from "axios";
 
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
+
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api",
+  baseURL: API_BASE_URL,
 });
 
 // Difference (ms) between the API server's clock and this browser's clock,

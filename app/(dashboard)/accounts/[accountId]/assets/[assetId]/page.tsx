@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { fmtQty, type Part } from "@/lib/parts";
 import EmptyState from "@/components/EmptyState";
+import Attachments from "@/components/Attachments";
 
 type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 type AssetStatus = "OPERATIONAL" | "UNDER_MAINTENANCE";
@@ -430,6 +431,11 @@ export default function AssetDetailPage() {
             ))}
           </div>
         )}
+      </div>
+
+      {/* Documents — manuals, warranty scans, nameplate photos */}
+      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
+        <Attachments parent="assets" parentId={asset.id} canUpload canDelete />
       </div>
 
       {/* PM checklists */}

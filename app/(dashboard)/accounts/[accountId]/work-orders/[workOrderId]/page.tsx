@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import StatusPipeline from "@/components/StatusPipeline";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
+import Attachments from "@/components/Attachments";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -1160,6 +1161,16 @@ export default function WorkOrderDetailPage() {
           )}
         </div>
       )}
+
+      {/* Attachments — job photos, before/after, paperwork */}
+      <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
+        <Attachments
+          parent="work-orders"
+          parentId={order.id}
+          canUpload
+          canDelete={canManage}
+        />
+      </div>
 
       {/* Comments */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
