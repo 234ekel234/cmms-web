@@ -23,6 +23,11 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  // Resolves relative URLs in generated metadata (Open Graph, canonical) against
+  // the canonical origin rather than localhost. NEXT_PUBLIC_SITE_URL lets a
+  // preview deployment describe itself accurately instead of claiming to be
+  // production.
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cmms.servicemasterph.com"),
   title: {
     default: "FMI CMMS",
     template: "%s · FMI CMMS",
