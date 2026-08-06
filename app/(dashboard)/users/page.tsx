@@ -51,9 +51,10 @@ export default function UsersPage() {
   const [formError, setFormError] = useState("");
 
   const isManager = me?.role === "GENERAL_MANAGER" || me?.role === "MANAGER";
-  // Only a General Manager can provision privileged (Manager / GM) accounts,
-  // via the GM-only POST /users endpoint. Managers can still add front-line
-  // staff (Supervisor / Client) through public self-registration.
+  // Everyone is provisioned through POST /users — there is no public signup.
+  // Only a General Manager can create privileged (Manager / GM) accounts;
+  // managers are limited to front-line staff (Supervisor / Client), which the
+  // API enforces independently of the options offered here.
   const isGM = me?.role === "GENERAL_MANAGER";
   const ROLE_OPTIONS: { value: Role; label: string }[] = isGM
     ? [
@@ -121,10 +122,7 @@ export default function UsersPage() {
         if (form.password) payload.password = form.password;
         await api.patch(`/users/${editingId}`, payload);
       } else {
-        // GMs provision through the privileged endpoint (any role); everyone
-        // else uses public self-registration (Supervisor / Client only).
-        const endpoint = isGM ? "/users" : "/auth/register";
-        await api.post(endpoint, {
+        await api.post("/users", {
           name: form.name.trim(),
           email: form.email.trim().toLowerCase(),
           password: form.password,
