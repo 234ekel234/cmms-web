@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type ShiftTemplate = {
   id: string;
@@ -84,6 +86,13 @@ function getCurrentShiftIndex(templates: ShiftTemplate[]): number {
 export default function AttendancePage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // The Daily Log is a *marking* surface: it opens the day's shift log with a
+  // POST before it can show anyone, and that write is staff-only. Handing it to
+  // a client would leave a silently empty roster, so they get the Summary —
+  // the cut-off timesheet, per person per day — which is the record they
+  // actually want and is read-only throughout.
+  const writable = canManage(user?.role);
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
@@ -112,21 +121,39 @@ export default function AttendancePage() {
     }).catch(() => setTemplatesLoaded(true));
   }, [accountId]);
 
+  // Reads the roster. Viewing a day must not write one: this used to POST
+  // /shift-logs just to display, which created the log, seeded every rostered
+  // employee as absent, and fired the daily-checklist notification — so paging
+  // back through the calendar invented absences and spammed the team.
   const loadAttendance = useCallback(async (templateId: string, date: Date) => {
     setLoadingAttendance(true);
     setAttendance([]);
     try {
-      const logRes = await api.post("/shift-logs", { shiftTemplateId: templateId, date: toDateString(date) });
-      const logId = logRes.data.id;
-      setShiftLogId(logId);
-      const attRes = await api.get(`/shift-logs/${logId}/attendance`);
-      setAttendance(attRes.data);
+      const res = await api.get(`/shift-templates/${templateId}/attendance`, {
+        params: { date: toDateString(date) },
+      });
+      // null until this shift has actually been marked.
+      setShiftLogId(res.data.shiftLogId);
+      setAttendance(res.data.attendance);
     } catch {
       // silent
     } finally {
       setLoadingAttendance(false);
     }
   }, []);
+
+  // The log is created by the first real mark, not by looking at the day.
+  async function ensureShiftLog(): Promise<string | null> {
+    if (shiftLogId) return shiftLogId;
+    const template = shiftTemplates[selectedIndex];
+    if (!template) return null;
+    const res = await api.post("/shift-logs", {
+      shiftTemplateId: template.id,
+      date: toDateString(selectedDate),
+    });
+    setShiftLogId(res.data.id);
+    return res.data.id;
+  }
 
   useEffect(() => {
     if (templatesLoaded && shiftTemplates.length > 0) {
@@ -146,11 +173,19 @@ export default function AttendancePage() {
   }
 
   async function mark(employeeId: string, isPresent: boolean) {
-    if (!shiftLogId) return;
     setSaving(employeeId);
     try {
-      await api.post(`/shift-logs/${shiftLogId}/attendance`, { employeeId, isPresent });
-      setAttendance((prev) => prev.map((r) => r.employee.id === employeeId ? { ...r, isPresent } : r));
+      const wasUnopened = !shiftLogId;
+      const logId = await ensureShiftLog();
+      if (!logId) return;
+      await api.post(`/shift-logs/${logId}/attendance`, { employeeId, isPresent });
+      if (wasUnopened) {
+        // Opening the log seeds a row per rostered employee, so re-read rather
+        // than patch one entry into a roster that just moved underneath us.
+        await loadAttendance(shiftTemplates[selectedIndex].id, selectedDate);
+      } else {
+        setAttendance((prev) => prev.map((r) => r.employee.id === employeeId ? { ...r, isPresent } : r));
+      }
     } catch {
       // silent
     } finally {
@@ -159,6 +194,7 @@ export default function AttendancePage() {
   }
 
   async function toggleReliever(employeeId: string, isReliever: boolean) {
+    // Only reachable once someone is marked present, so the log already exists.
     if (!shiftLogId) return;
     try {
       await api.post(`/shift-logs/${shiftLogId}/attendance`, { employeeId, isReliever });
@@ -268,33 +304,45 @@ export default function AttendancePage() {
                       <p className="font-semibold text-[var(--tu-text-heading)]">{row.employee.name}</p>
                       {row.employee.position && <p className="text-xs text-[var(--tu-text-subtle)]">{row.employee.position}</p>}
                     </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => mark(row.employee.id, true)}
-                        disabled={saving === row.employee.id}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
-                          row.isPresent === true ? "bg-[var(--tu-status-completed)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-success)]"
-                        }`}
-                      >
-                        Present
-                      </button>
-                      <button
-                        onClick={() => mark(row.employee.id, false)}
-                        disabled={saving === row.employee.id}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
-                          row.isPresent === false ? "bg-[var(--tu-priority-critical)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-danger)]"
-                        }`}
-                      >
-                        Absent
-                      </button>
-                    </div>
+                    {writable ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => mark(row.employee.id, true)}
+                          disabled={saving === row.employee.id}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
+                            row.isPresent === true ? "bg-[var(--tu-status-completed)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-success)]"
+                          }`}
+                        >
+                          Present
+                        </button>
+                        <button
+                          onClick={() => mark(row.employee.id, false)}
+                          disabled={saving === row.employee.id}
+                          className={`px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors ${
+                            row.isPresent === false ? "bg-[var(--tu-priority-critical)] text-white" : "border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:border-[var(--tu-bd-danger)]"
+                          }`}
+                        >
+                          Absent
+                        </button>
+                      </div>
+                    ) : (
+                      // Read-only: an unmarked shift reads as "not recorded",
+                      // which is not the same as absent.
+                      <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                        row.isPresent === true ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"
+                        : row.isPresent === false ? "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]"
+                        : "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]"
+                      }`}>
+                        {row.isPresent === true ? "Present" : row.isPresent === false ? "Absent" : "Not recorded"}
+                      </span>
+                    )}
                   </div>
                   {row.isPresent === true && (
                     <div className="mt-3 pt-3 border-t border-[var(--tu-border)]">
                       <label className="flex items-center gap-2 cursor-pointer text-xs text-[var(--tu-text-subtle)]">
                         <div
-                          onClick={() => toggleReliever(row.employee.id, !row.isReliever)}
-                          className={`w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer ${
+                          onClick={() => { if (writable) toggleReliever(row.employee.id, !row.isReliever); }}
+                          className={`w-4 h-4 rounded border-2 flex items-center justify-center ${writable ? "cursor-pointer" : ""} ${
                             row.isReliever ? "bg-[var(--tu-priority-high)] border-[var(--tu-priority-high)]" : "border-[var(--tu-border-strong)]"
                           }`}
                         >

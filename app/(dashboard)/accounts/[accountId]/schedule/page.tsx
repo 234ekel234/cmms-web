@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type ShiftTemplate = {
   id: string;
@@ -89,6 +91,11 @@ function getIsoWeekday(date: Date): number {
 export default function SchedulePage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // A client reads the week — who is rostered on their site and when — but
+  // every cell here opens an assignment editor, so for them the grid is a
+  // display: the counts stay, the click does not.
+  const writable = canManage(user?.role);
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
@@ -304,14 +311,16 @@ export default function SchedulePage() {
           <button onClick={() => setWeekStart((w) => addDays(w, -7))} className="text-2xl text-[var(--tu-text-brand)] leading-none cursor-pointer hover:opacity-70">‹</button>
           <span className="text-sm font-semibold text-[var(--tu-text-body)] flex-1 text-center">{formatWeekRange(weekStart)}</span>
           <button onClick={() => setWeekStart((w) => addDays(w, 7))} className="text-2xl text-[var(--tu-text-brand)] leading-none cursor-pointer hover:opacity-70">›</button>
-          <button
-            onClick={copyToNextWeek}
-            disabled={copying}
-            className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-brand)] cursor-pointer disabled:opacity-50"
-          >
-            {copying ? "Copying..." : "Copy →"}
-          </button>
-          {!showShiftForm && (
+          {writable && (
+            <button
+              onClick={copyToNextWeek}
+              disabled={copying}
+              className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-brand)] cursor-pointer disabled:opacity-50"
+            >
+              {copying ? "Copying..." : "Copy →"}
+            </button>
+          )}
+          {writable && !showShiftForm && (
             <button
               onClick={openShiftForm}
               className="text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer"
@@ -433,7 +442,8 @@ export default function SchedulePage() {
                         <td key={ds} className="px-3 py-3 text-center">
                           <button
                             onClick={() => setModalSlot({ template, date: day })}
-                            className={`w-full rounded-lg py-2 text-xs font-semibold cursor-pointer transition-colors ${
+                            disabled={!writable}
+                            className={`w-full rounded-lg py-2 text-xs font-semibold transition-colors ${writable ? "cursor-pointer" : "cursor-default"} ${
                               totalCount > 0
                                 ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] hover:bg-[var(--tu-soft-success)]"
                                 : "bg-[var(--tu-bg-secondary)] text-[var(--tu-text-subtle)] hover:bg-[var(--tu-bg-secondary-strong)]"

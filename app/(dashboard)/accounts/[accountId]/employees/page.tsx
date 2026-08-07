@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type Employee = {
   id: string;
@@ -34,6 +36,10 @@ function attColor(rate: number | null) {
 export default function EmployeesPage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // Clients read the roster — it is their site's staffing — but assigning and
+  // unassigning is ours. See lib/rbac.ts.
+  const writable = canManage(user?.role);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -147,12 +153,14 @@ export default function EmployeesPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Employees</h2>
-        <button
-          onClick={openAssignModal}
-          className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
-        >
-          + Assign
-        </button>
+        {writable && (
+          <button
+            onClick={openAssignModal}
+            className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+          >
+            + Assign
+          </button>
+        )}
       </div>
 
       {error && (
@@ -218,7 +226,9 @@ export default function EmployeesPage() {
           <EmptyState
             icon="employee"
             title="No employees assigned"
-            hint="Assign employees from the registry to schedule them and log their attendance here."
+            hint={writable
+              ? "Assign employees from the registry to schedule them and log their attendance here."
+              : "Nobody is assigned to this site yet."}
           />
         </div>
       ) : visible.length === 0 ? (
@@ -253,13 +263,15 @@ export default function EmployeesPage() {
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={() => unassign(emp)}
-                  disabled={unassigning === emp.id}
-                  className="text-xs text-[var(--tu-on-danger)] border border-[var(--tu-bd-danger)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-danger)] cursor-pointer disabled:opacity-50"
-                >
-                  {unassigning === emp.id ? "..." : "Remove"}
-                </button>
+                {writable && (
+                  <button
+                    onClick={() => unassign(emp)}
+                    disabled={unassigning === emp.id}
+                    className="text-xs text-[var(--tu-on-danger)] border border-[var(--tu-bd-danger)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-danger)] cursor-pointer disabled:opacity-50"
+                  >
+                    {unassigning === emp.id ? "..." : "Remove"}
+                  </button>
+                )}
               </div>
               {emp.attendance && emp.attendance.total > 0 && (
                 <div className="mt-3 pt-3 border-t border-[var(--tu-border)] flex gap-4 text-xs">

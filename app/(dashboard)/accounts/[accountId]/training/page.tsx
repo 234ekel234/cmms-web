@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type Training = { id: string; title: string; category: string | null; durationHours: number | null };
 type Assignment = {
@@ -22,6 +24,10 @@ function fmtDate(iso: string) {
 export default function TrainingPage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // Who is trained on what is exactly the assurance a client is buying, so the
+  // record is theirs to read. Assigning training and signing it off are ours.
+  const writable = canManage(user?.role);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [allTrainings, setAllTrainings] = useState<Training[]>([]);
@@ -170,12 +176,14 @@ export default function TrainingPage() {
                         {completed}/{total} done
                       </span>
                     )}
-                    <button
-                      onClick={() => { setAssignTarget(emp); setAssignSearch(""); }}
-                      className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-soft-brand)] transition-colors cursor-pointer"
-                    >
-                      + Assign
-                    </button>
+                    {writable && (
+                      <button
+                        onClick={() => { setAssignTarget(emp); setAssignSearch(""); }}
+                        className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-soft-brand)] transition-colors cursor-pointer"
+                      >
+                        + Assign
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -213,12 +221,14 @@ export default function TrainingPage() {
                               <span className="text-xs font-semibold bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] px-2 py-0.5 rounded-full">
                                 Assigned
                               </span>
-                              <button
-                                onClick={() => setCompleteTarget({ employee: emp, trainingId: a.trainingId, title: a.training.title })}
-                                className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-success)] font-medium transition-colors cursor-pointer"
-                              >
-                                Mark done
-                              </button>
+                              {writable && (
+                                <button
+                                  onClick={() => setCompleteTarget({ employee: emp, trainingId: a.trainingId, title: a.training.title })}
+                                  className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-success)] font-medium transition-colors cursor-pointer"
+                                >
+                                  Mark done
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>

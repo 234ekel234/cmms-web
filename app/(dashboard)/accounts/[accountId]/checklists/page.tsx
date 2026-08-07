@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type PMLog = {
   id: string;
@@ -74,6 +76,11 @@ function fmtDate(iso: string) {
 export default function ChecklistsPage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // A client sees which checklists are assigned and whether they were done this
+  // period; assigning them and filling them in are staff jobs, and the cards
+  // stop being links for a client because the detail page is the fill-in form.
+  const writable = canManage(user?.role);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
@@ -113,16 +120,19 @@ export default function ChecklistsPage() {
     const lastLog = a.logs[0] ?? null;
     const itemCount = a.checklist.sections.reduce((sum, s) => sum + (s.items as unknown[]).length, 0);
 
-    return (
-      <Link
-        key={a.id}
-        href={`/accounts/${accountId}/checklists/${a.id}`}
-        className={`block bg-[var(--tu-bg-surface)] rounded-xl border shadow-sm p-4 hover:shadow-md transition-shadow ${
-          done ? "border-[var(--tu-bd-success)] bg-[var(--tu-soft-success)]/30" :
-          isDraft ? "border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)]/30" :
-          "border-[var(--tu-border)]"
-        }`}
-      >
+    const cardClass = `block bg-[var(--tu-bg-surface)] rounded-xl border shadow-sm p-4 ${
+      writable ? "hover:shadow-md transition-shadow" : ""
+    } ${
+      done ? "border-[var(--tu-bd-success)] bg-[var(--tu-soft-success)]/30" :
+      isDraft ? "border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)]/30" :
+      "border-[var(--tu-border)]"
+    }`;
+
+    // The detail page is the fill-in form, so for a client the card is the
+    // whole thing — a link that only bounces them back would be worse than no
+    // link at all.
+    const body = (
+      <>
         <div className="flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-[var(--tu-text-heading)] text-sm">{a.checklist.name}</p>
@@ -145,15 +155,25 @@ export default function ChecklistsPage() {
             }`}>
               {done ? "Done" : isDraft ? "Partial" : "Pending"}
             </span>
-            <button
-              onClick={() => handleRemove(a.id)}
-              className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] transition-colors cursor-pointer"
-            >
-              Remove
-            </button>
+            {writable && (
+              <button
+                onClick={() => handleRemove(a.id)}
+                className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] transition-colors cursor-pointer"
+              >
+                Remove
+              </button>
+            )}
           </div>
         </div>
+      </>
+    );
+
+    return writable ? (
+      <Link key={a.id} href={`/accounts/${accountId}/checklists/${a.id}`} className={cardClass}>
+        {body}
       </Link>
+    ) : (
+      <div key={a.id} className={cardClass}>{body}</div>
     );
   }
 
@@ -168,12 +188,14 @@ export default function ChecklistsPage() {
             </p>
           )}
         </div>
-        <Link
-          href={`/accounts/${accountId}/checklists/assign`}
-          className="border border-[var(--tu-text-brand)] text-[var(--tu-text-brand)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-soft-brand)] transition-colors"
-        >
-          + Assign Checklist
-        </Link>
+        {writable && (
+          <Link
+            href={`/accounts/${accountId}/checklists/assign`}
+            className="border border-[var(--tu-text-brand)] text-[var(--tu-text-brand)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-soft-brand)] transition-colors"
+          >
+            + Assign Checklist
+          </Link>
+        )}
       </div>
 
       {loading ? (
@@ -185,13 +207,15 @@ export default function ChecklistsPage() {
           <EmptyState
             icon="checklist"
             title="No checklists assigned"
-            hint={
+            hint={writable ? (
               <>
                 Assign checklists from the{" "}
                 <Link href="/pm-checklists" className="tu-link">PM library</Link> to start
                 tracking preventive maintenance here.
               </>
-            }
+            ) : (
+              "No preventive maintenance checklists are set up for this site yet."
+            )}
           />
         </div>
       ) : (

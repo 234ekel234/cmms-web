@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 
@@ -49,7 +50,9 @@ export default function EmployeeDetailPage() {
   const accountId = params.accountId as string;
   const employeeId = params.employeeId as string;
 
-  const canEdit = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER" || user?.role === "SUPERVISOR";
+  // This page was already role-aware before clients could reach it; the rule now
+  // comes from lib/rbac.ts so it stays in step with every other section.
+  const canEdit = canManage(user?.role);
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [trainings, setTrainings] = useState<TrainingAssignment[]>([]);

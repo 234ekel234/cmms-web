@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { fmtQty, type Part } from "@/lib/parts";
 import EmptyState from "@/components/EmptyState";
@@ -137,6 +139,10 @@ function warrantyStatus(expiry: string | null, now: number) {
 
 export default function AssetDetailPage() {
   const params = useParams();
+  const { user } = useAuth();
+  // A client reads their own site's equipment — the API already withholds
+  // purchase cost — but archiving it and editing its health or status is ours.
+  const writable = canManage(user?.role);
   const accountId = params.accountId as string;
   const assetId = params.assetId as string;
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -260,17 +266,19 @@ export default function AssetDetailPage() {
                 + New Work Order
               </Link>
             )}
-            <button
-              onClick={toggleArchive}
-              disabled={saving}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                asset.archivedAt
-                  ? "border-[var(--tu-bd-success)] text-[var(--tu-on-success)] hover:bg-[var(--tu-soft-success)]"
-                  : "border-[var(--tu-border)] text-[var(--tu-text-subtle)] hover:bg-[var(--tu-bg-secondary)]"
-              }`}
-            >
-              {asset.archivedAt ? "Unarchive" : "Archive"}
-            </button>
+            {writable && (
+              <button
+                onClick={toggleArchive}
+                disabled={saving}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
+                  asset.archivedAt
+                    ? "border-[var(--tu-bd-success)] text-[var(--tu-on-success)] hover:bg-[var(--tu-soft-success)]"
+                    : "border-[var(--tu-border)] text-[var(--tu-text-subtle)] hover:bg-[var(--tu-bg-secondary)]"
+                }`}
+              >
+                {asset.archivedAt ? "Unarchive" : "Archive"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -296,7 +304,7 @@ export default function AssetDetailPage() {
           ) : (
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${hCfg.cls}`}>{hCfg.label}</span>
-              {!asset.archivedAt && (
+              {writable && !asset.archivedAt && (
                 <button onClick={() => setEditHealth(true)} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
               )}
             </div>
@@ -327,7 +335,7 @@ export default function AssetDetailPage() {
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${asset.status === "OPERATIONAL" ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>
                 {asset.status === "OPERATIONAL" ? "Operational" : "Under Maintenance"}
               </span>
-              {!asset.archivedAt && (
+              {writable && !asset.archivedAt && (
                 <button onClick={() => setEditStatus(true)} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
               )}
             </div>

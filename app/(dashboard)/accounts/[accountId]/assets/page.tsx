@@ -6,6 +6,8 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import AssetImportModal from "@/components/AssetImportModal";
 import EmptyState from "@/components/EmptyState";
+import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 
 type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
 
@@ -34,6 +36,10 @@ const HEALTH_RANK: Record<AssetHealth, number> = { OUT_OF_SERVICE: 0, POOR: 1, F
 export default function AssetsPage() {
   const params = useParams();
   const accountId = params.accountId as string;
+  const { user } = useAuth();
+  // A client sees the register for their own site — the API strips purchase
+  // cost — but adding and importing equipment is ours.
+  const writable = canManage(user?.role);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -96,20 +102,22 @@ export default function AssetsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assets</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowImport(true)}
-            className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
-          >
-            Import CSV
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
-          >
-            + Add Asset
-          </button>
-        </div>
+        {writable && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={() => setShowForm(true)}
+              className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+            >
+              + Add Asset
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Toolbar */}

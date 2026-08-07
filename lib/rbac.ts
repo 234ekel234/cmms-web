@@ -18,22 +18,34 @@ export const ROLE_HOME: Record<Role, string> = {
   CLIENT: "/accounts",
 };
 
-// Account sub-sections a CLIENT may view. Everything else under an account
-// (employees, schedule, assets, checklists, members, …) is staff-only.
-const CLIENT_ACCOUNT_SECTIONS = ["", "work-orders", "portal"];
+// Account sub-sections a CLIENT may NOT view. Everything else under an account
+// — the roster, schedule, attendance, assets, checklists, training, activity
+// and reports — is theirs to read: a client is the site owner, and checking the
+// service they are paying for is the point of the login.
+//
+// Only cost is withheld, which is why `parts` is the single entry here; the API
+// strips cost from the report and the asset register rather than blocking them.
+// backend/helpers/clientVisibility.js is the authority — keep this in step.
+const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts"];
 
 /**
  * Which roles may access a given pathname. Ordered most-specific first.
  * Returns the list of roles permitted on that route.
  */
 function rolesForPath(path: string): Role[] {
-  // Account-scoped pages: /accounts/<id>/<section>/...
-  const scoped = path.match(/^\/accounts\/[^/]+(?:\/([^/]+))?/);
+  // Account-scoped pages: /accounts/<id>/<section>/<sub>...
+  const scoped = path.match(/^\/accounts\/[^/]+(?:\/([^/]+))?(?:\/([^/]+))?/);
   if (scoped) {
     const section = scoped[1] ?? ""; // "" === account overview
+    const sub = scoped[2];
     if (section === "members") return MANAGERS;
-    if (CLIENT_ACCOUNT_SECTIONS.includes(section)) return ALL_ROLES;
-    return STAFF;
+    if (STAFF_ONLY_ACCOUNT_SECTIONS.includes(section)) return STAFF;
+    // Everything under /checklists/ is a write surface — the assign form and
+    // the fill-in form — rather than a view of one. A client sees the checklist
+    // list and its per-period status, and gets the answers themselves from the
+    // Reports section, which carries the aggregated responses.
+    if (section === "checklists" && sub) return STAFF;
+    return ALL_ROLES;
   }
 
   // Global top-level pages.
@@ -62,4 +74,20 @@ export function canAccessRoute(role: Role | undefined, path: string): boolean {
 /** True if `role` is one of `allowed`. Handy for in-page action gating. */
 export function hasRole(role: Role | undefined, allowed: Role[]): boolean {
   return !!role && allowed.includes(role);
+}
+
+/**
+ * True when `role` may act on account data, rather than only read it.
+ *
+ * Clients now reach almost every account section, but they read: their only
+ * writes are raising a work-order request and commenting on one, which the
+ * portal and work-order pages handle explicitly. Every other action affordance
+ * — assign, remove, mark, schedule, edit — is gated on this.
+ *
+ * The API refuses those writes regardless, so this is about not offering a
+ * button that can only fail. backend/helpers/clientVisibility.js is the
+ * authority on the underlying rule.
+ */
+export function canManage(role: Role | undefined): boolean {
+  return hasRole(role, STAFF);
 }
