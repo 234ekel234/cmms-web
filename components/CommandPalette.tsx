@@ -1,12 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
+import { canAccessRoute, type Role } from "@/lib/rbac";
 
 // Global jump-to search (⌘K / Ctrl+K). Indexes navigation pages plus accounts,
 // assets, and work orders (the entities with unambiguous detail routes). Data
 // is loaded lazily on first open and cached for the session.
+//
+// Every item is filtered through canAccessRoute — the same rule the sidebar and
+// the route guard use — so the palette can never offer a destination the role
+// would just be bounced away from. Applied to the whole index rather than to
+// PAGES alone: the per-account entries are built from whatever /accounts
+// returns, so a section closed to the caller must drop out here too.
 
 type Kind = "Page" | "Account" | "Asset" | "Work Order";
 type Item = { id: string; label: string; sub?: string; kind: Kind; href: string };
@@ -27,6 +35,7 @@ const PAGES: Item[] = [
 
 export default function CommandPalette() {
   const router = useRouter();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [items, setItems] = useState<Item[]>(PAGES);
@@ -97,15 +106,20 @@ export default function CommandPalette() {
     };
   }, [openPalette]);
 
+  const reachable = useMemo(
+    () => items.filter((it) => canAccessRoute(user?.role as Role, it.href)),
+    [items, user?.role]
+  );
+
   const q = query.trim().toLowerCase();
   const results = (q
-    ? items.filter(
+    ? reachable.filter(
         (it) =>
           it.label.toLowerCase().includes(q) ||
           it.sub?.toLowerCase().includes(q) ||
           it.kind.toLowerCase().includes(q)
       )
-    : items
+    : reachable
   ).slice(0, 50);
 
   // Clamp during render so the highlight stays valid as results shrink, instead
