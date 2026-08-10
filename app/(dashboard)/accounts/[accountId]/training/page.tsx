@@ -49,9 +49,13 @@ export default function TrainingPage() {
   async function load() {
     setLoading(true);
     try {
+      // The global library is staff-only and feeds the assign picker, which is
+      // itself gated on `writable`. A client viewing their own site's training
+      // record must not request it: the 403 would reject the whole Promise.all
+      // and blank the page they are entitled to see.
       const [empRes, trainRes] = await Promise.all([
         api.get(`/accounts/${accountId}/trainings`),
-        api.get("/trainings"),
+        writable ? api.get("/trainings") : Promise.resolve({ data: [] }),
       ]);
       setEmployees(empRes.data);
       setAllTrainings(trainRes.data);
