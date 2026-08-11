@@ -28,6 +28,7 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
     label: "Maintenance",
     tabs: [
       { label: "Work Orders", path: "work-orders" },
+      { label: "Maintenance Plans", path: "maintenance-plans" },
       { label: "Assets", path: "assets" },
       { label: "Spare Parts", path: "parts" },
       { label: "PM Checklists", path: "checklists" },

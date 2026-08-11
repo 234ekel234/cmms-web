@@ -26,11 +26,29 @@ const PREF_LABELS: Record<string, { label: string; description: string }> = {
   WORK_ORDER_ACCEPTED:    { label: "Order Accepted",    description: "When a work order is accepted/moved to pending" },
   WORK_ORDER_REJECTED:    { label: "Order Rejected",    description: "When a work order is rejected" },
   WORK_ORDER_STARTED:     { label: "Work Started",      description: "When a work order moves to in-progress" },
+  WORK_ORDER_ON_HOLD:     { label: "Work Paused",       description: "When a work order is put on hold" },
   WORK_ORDER_COMPLETED:   { label: "Work Completed",    description: "When a work order is marked complete" },
+  WORK_ORDER_OVERDUE:     { label: "Overdue Work",      description: "Daily sweep of work orders past their due date" },
+  WORK_ORDER_GENERATED:   { label: "Scheduled Work Raised", description: "When a maintenance plan raises this period's work order" },
   CHECKLIST_INCOMPLETE:   { label: "Checklist Incomplete", description: "When a PM checklist is past due without completion" },
+  PM_CHECKLIST_PENDING:   { label: "Checklist Due This Shift", description: "When a shift opens with checklists still to do" },
+  WEEKLY_REPORT_EMAIL:    { label: "Weekly Report",     description: "Monday summary of the week just ended" },
+  GM_DIGEST_EMAIL:        { label: "Daily Summary",     description: "One cross-account list of what needs attention" },
 };
 
-type Pref = { action: string; enabled: boolean };
+// `inApp` is null for events that only ever exist as email, so no bell toggle is
+// offered for them. `emailApplies` is false where the event is in-app only, or
+// where this role is not on its email list — showing a switch that controls
+// nothing is worse than showing none.
+type Pref = {
+  action: string;
+  inApp: boolean | null;
+  email: boolean;
+  emailApplies: boolean;
+  enabled: boolean;
+};
+
+type Channel = "IN_APP" | "EMAIL";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -53,9 +71,14 @@ export default function SettingsPage() {
     }
   }
 
-  function togglePref(action: string) {
+  function togglePref(action: string, channel: Channel) {
     setPrefs((prev) =>
-      prev.map((p) => p.action === action ? { ...p, enabled: !p.enabled } : p)
+      prev.map((p) => {
+        if (p.action !== action) return p;
+        return channel === "EMAIL"
+          ? { ...p, email: !p.email }
+          : { ...p, inApp: !p.inApp, enabled: !p.inApp };
+      })
     );
     setSavedPrefs(false);
   }
@@ -64,7 +87,18 @@ export default function SettingsPage() {
     setSavingPrefs(true);
     setSavedPrefs(false);
     try {
-      const payload = Object.fromEntries(prefs.map((p) => [p.action, p.enabled]));
+      // Per-channel shape. Channels that do not apply are omitted rather than
+      // sent as false, so a muted-by-policy event never gets a stored opt-out
+      // that would linger if the policy later changed.
+      const payload = Object.fromEntries(
+        prefs.map((p) => [
+          p.action,
+          {
+            ...(p.inApp === null ? {} : { IN_APP: p.inApp }),
+            ...(p.emailApplies ? { EMAIL: p.email } : {}),
+          },
+        ])
+      );
       await api.put("/me/notification-preferences", payload);
       setSavedPrefs(true);
       setTimeout(() => setSavedPrefs(false), 2500);
@@ -179,11 +213,22 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <div
+                style={{
+                  display: "flex", justifyContent: "flex-end", gap: 16,
+                  padding: "0 16px 6px", fontSize: 11, fontWeight: 600,
+                  color: "var(--tu-text-subtle)", textTransform: "uppercase", letterSpacing: "0.04em",
+                }}
+              >
+                <span style={{ width: 44, textAlign: "center" }}>In app</span>
+                <span style={{ width: 44, textAlign: "center" }}>Email</span>
+              </div>
+
               {prefs.map((pref) => {
                 const meta = PREF_LABELS[pref.action];
                 if (!meta) return null;
                 return (
-                  <label
+                  <div
                     key={pref.action}
                     style={{
                       display: "flex",
@@ -191,9 +236,8 @@ export default function SettingsPage() {
                       justifyContent: "space-between",
                       padding: "12px 16px",
                       borderRadius: 8,
-                      cursor: "pointer",
                       transition: "background 150ms",
-                      background: pref.enabled ? "var(--tu-bg-brand-soft)" : "transparent",
+                      background: pref.inApp || pref.email ? "var(--tu-bg-brand-soft)" : "transparent",
                     }}
                   >
                     <div>
@@ -204,40 +248,21 @@ export default function SettingsPage() {
                         {meta.description}
                       </p>
                     </div>
-                    <div style={{ position: "relative", display: "inline-block", width: 44, height: 24, flexShrink: 0, marginLeft: 16 }}>
-                      <input
-                        type="checkbox"
-                        checked={pref.enabled}
-                        onChange={() => togglePref(pref.action)}
-                        style={{ opacity: 0, width: 0, height: 0, position: "absolute" }}
+                    <div style={{ display: "flex", gap: 16, flexShrink: 0, marginLeft: 16 }}>
+                      <Switch
+                        on={pref.inApp === true}
+                        hidden={pref.inApp === null}
+                        label={`${meta.label} in app`}
+                        onToggle={() => togglePref(pref.action, "IN_APP")}
                       />
-                      <span
-                        onClick={() => togglePref(pref.action)}
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          borderRadius: 12,
-                          background: pref.enabled ? "var(--tu-text-brand)" : "var(--tu-border)",
-                          transition: "background 200ms",
-                          cursor: "pointer",
-                        }}
-                      />
-                      <span
-                        style={{
-                          position: "absolute",
-                          left: pref.enabled ? 22 : 2,
-                          top: 2,
-                          width: 20,
-                          height: 20,
-                          borderRadius: "50%",
-                          background: "#fff",
-                          transition: "left 200ms",
-                          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
-                          pointerEvents: "none",
-                        }}
+                      <Switch
+                        on={pref.email}
+                        hidden={!pref.emailApplies}
+                        label={`${meta.label} by email`}
+                        onToggle={() => togglePref(pref.action, "EMAIL")}
                       />
                     </div>
-                  </label>
+                  </div>
                 );
               })}
             </div>
@@ -245,5 +270,60 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * One notification toggle.
+ *
+ * `hidden` keeps the slot occupied rather than removing it, so the In app and
+ * Email columns stay aligned down the list even when a row offers only one of
+ * them — otherwise a row with no email switch would slide its bell toggle under
+ * the Email heading.
+ */
+function Switch({
+  on, onToggle, label, hidden = false,
+}: {
+  on: boolean;
+  onToggle: () => void;
+  label: string;
+  hidden?: boolean;
+}) {
+  if (hidden) return <div style={{ width: 44, height: 24 }} aria-hidden="true" />;
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onToggle}
+      style={{
+        position: "relative",
+        width: 44,
+        height: 24,
+        flexShrink: 0,
+        border: "none",
+        padding: 0,
+        borderRadius: 12,
+        background: on ? "var(--tu-text-brand)" : "var(--tu-border)",
+        transition: "background 200ms",
+        cursor: "pointer",
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          left: on ? 22 : 2,
+          top: 2,
+          width: 20,
+          height: 20,
+          borderRadius: "50%",
+          background: "#fff",
+          transition: "left 200ms",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+          pointerEvents: "none",
+        }}
+      />
+    </button>
   );
 }

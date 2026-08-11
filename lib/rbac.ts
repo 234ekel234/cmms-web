@@ -23,10 +23,16 @@ export const ROLE_HOME: Record<Role, string> = {
 // and reports — is theirs to read: a client is the site owner, and checking the
 // service they are paying for is the point of the login.
 //
-// Only cost is withheld, which is why `parts` is the single entry here; the API
-// strips cost from the report and the asset register rather than blocking them.
+// Cost is withheld, which is why `parts` is here; the API strips cost from the
+// report and the asset register rather than blocking them.
+//
+// `maintenance-plans` is here for a different reason: a plan is an internal
+// scheduling decision — how often we intend to service the client's kit — and
+// what the client is entitled to see is the work itself, which reaches them as
+// ordinary work orders on their account.
+//
 // backend/helpers/clientVisibility.js is the authority — keep this in step.
-const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts"];
+const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts", "maintenance-plans"];
 
 /**
  * Which roles may access a given pathname. Ordered most-specific first.
