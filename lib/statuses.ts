@@ -20,6 +20,7 @@ export type WorkOrderStatus =
   | "IN_PROGRESS"
   | "ON_HOLD"
   | "COMPLETED"
+  | "APPROVED"
   | "REJECTED";
 
 export type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -42,10 +43,18 @@ export const WORK_ORDER_STATUS: Record<WorkOrderStatus, StatusMeta> = {
   IN_PROGRESS: { label: "In Progress", badge: "tu-badge tu-badge-brand", color: "var(--tu-status-in-progress)" },
   ON_HOLD: { label: "On Hold", badge: "tu-badge tu-badge-neutral", color: "var(--tu-status-on-hold)" },
   COMPLETED: { label: "Completed", badge: "tu-badge tu-badge-success", color: "var(--tu-status-completed)" },
+  // "Approved" rather than "Signed off": the client sees this word on their own
+  // button, and the two should match.
+  APPROVED: { label: "Approved", badge: "tu-badge tu-badge-success", color: "var(--tu-status-approved)" },
   REJECTED: { label: "Rejected", badge: "tu-badge tu-badge-danger", color: "var(--tu-status-rejected)" },
 };
 
-/** Statuses that count as "open"/active work (not completed or rejected). */
+/**
+ * Statuses that count as "open"/active work — not completed, approved or
+ * rejected. A whitelist on purpose: a status added later is excluded until
+ * somebody decides it belongs, which is the safe default for a filter that
+ * decides what shows up as outstanding.
+ */
 export const OPEN_WORK_ORDER_STATUSES: WorkOrderStatus[] = [
   "REQUESTED",
   "PENDING",

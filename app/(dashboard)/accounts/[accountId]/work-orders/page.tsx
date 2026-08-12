@@ -10,7 +10,7 @@ import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 
-type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type WorkOrder = {
@@ -42,6 +42,7 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
   IN_PROGRESS: { label: "In Progress", cls: "tu-badge tu-badge-warning" },
   ON_HOLD:     { label: "On Hold",     cls: "tu-badge tu-badge-neutral" },
   COMPLETED:   { label: "Completed",   cls: "tu-badge tu-badge-success" },
+  APPROVED:    { label: "Approved",    cls: "tu-badge tu-badge-success" },
   REJECTED:    { label: "Rejected",    cls: "tu-badge tu-badge-danger" },
 };
 
@@ -52,7 +53,7 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
   CRITICAL: { label: "Critical", cls: "tu-badge tu-badge-danger" },
 };
 
-const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "REJECTED"];
+const STATUS_ORDER: WorkOrderStatus[] = ["REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED"];
 
 // Highest first, so Critical rises to the top of a priority-based sort.
 const PRIORITY_RANK: Record<WorkOrderPriority, number> = { CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1 };
@@ -67,15 +68,21 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "TITLE",    label: "Title A–Z"       },
 ];
 
-const isTerminal = (o: WorkOrder) => o.status === "COMPLETED" || o.status === "REJECTED";
+// Includes APPROVED, or signed-off work would read as still outstanding.
+const isTerminal = (o: WorkOrder) =>
+  o.status === "COMPLETED" || o.status === "APPROVED" || o.status === "REJECTED";
 
 // Allowed status transitions a manager/supervisor can apply from each state.
+// Approving and sending back belong to the client and are offered only on the
+// work-order detail page, so both stay empty here — this list drives a staff
+// row menu, and an option the API refuses is worse than no option.
 const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   REQUESTED: ["PENDING", "REJECTED"],
   PENDING: ["IN_PROGRESS", "REJECTED"],
   IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
   ON_HOLD: ["IN_PROGRESS", "REJECTED"],
   COMPLETED: [],
+  APPROVED: [],
   REJECTED: [],
 };
 
@@ -127,7 +134,7 @@ export default function WorkOrdersPage() {
   const [error, setError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "ALL" | "OVERDUE">(() => {
     const raw = searchParams.get("status")?.toUpperCase();
-    const valid = ["OVERDUE", "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "REJECTED"];
+    const valid = ["OVERDUE", "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED"];
     return raw && valid.includes(raw) ? (raw as WorkOrderStatus | "OVERDUE") : "ALL";
   });
   const [view, setView] = useState<"work" | "special">("work");

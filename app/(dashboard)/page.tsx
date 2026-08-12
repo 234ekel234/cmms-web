@@ -44,7 +44,10 @@ type FreqBreakdown = {
 };
 
 type DashboardData = {
-  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; ON_HOLD: number; COMPLETED: number; REJECTED: number };
+  // Derived from the status union rather than spelled out, so adding a status
+  // is a compile error here instead of a silently missing chart segment. That
+  // is how APPROVED was caught: WO_STATUS builds its series from the same map.
+  workOrders: Record<WorkOrderStatus, number>;
   assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
   overdueWorkOrders: number;
   poorHealthAssets: number;

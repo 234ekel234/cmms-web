@@ -1,6 +1,7 @@
 "use client";
 
-export type PipelineStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+export type PipelineStatus =
+  | "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 
 const PROGRESS: Record<PipelineStatus, number> = {
   REQUESTED: 1,
@@ -8,10 +9,22 @@ const PROGRESS: Record<PipelineStatus, number> = {
   IN_PROGRESS: 3,
   ON_HOLD: 3, // paused at the in-progress stage; the badge conveys "On Hold"
   COMPLETED: 4,
+  APPROVED: 5,
   REJECTED: -1,
 };
 
 const DEFAULT_STEPS = ["Submitted", "Accepted", "In Progress", "Completed"];
+
+/**
+ * The lifecycle for work that ends with the client, rather than at COMPLETED.
+ *
+ * Passed by the caller instead of switched on here, because whether an order
+ * needs sign-off is a property of the order — see needsClientApproval in
+ * web/lib/workOrders.ts — and this component only knows a status. Showing the
+ * fifth step to work that will never reach it would leave every internal job
+ * looking permanently unfinished.
+ */
+export const APPROVAL_STEPS = ["Submitted", "Accepted", "In Progress", "Completed", "Approved"];
 
 /**
  * Horizontal progress stepper for a work order's lifecycle. Render the

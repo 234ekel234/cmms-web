@@ -5,14 +5,15 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import StatusPipeline from "@/components/StatusPipeline";
+import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
+import { awaitingClient, needsClientApproval } from "@/lib/workOrders";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
-type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type WorkOrder = {
@@ -26,6 +27,10 @@ type WorkOrder = {
   dueDate: string | null;
   remarks: string | null;
   completedAt: string | null;
+  approvedAt: string | null;
+  /** Null when the daily sweep closed it rather than a person — see the note
+      where this is rendered; the two must not read the same. */
+  approvedByName: string | null;
   isSpecialProject: boolean;
   isBreakdown: boolean;
   estimatedMinutes: number | null;
@@ -72,6 +77,7 @@ const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
   IN_PROGRESS: { label: "In Progress", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   ON_HOLD:     { label: "On Hold",     cls: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]" },
   COMPLETED:   { label: "Completed",   cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  APPROVED:    { label: "Approved",    cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
   REJECTED:    { label: "Rejected",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
@@ -82,12 +88,16 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
   CRITICAL: { label: "Critical", cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
+// Staff transitions only. The two moves out of COMPLETED belong to the client
+// and are offered by their own controls below, not by this table — a manager
+// must not be shown an Approve button the API will refuse.
 const VALID_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   REQUESTED:   ["PENDING", "REJECTED"],
   PENDING:     ["IN_PROGRESS", "REJECTED"],
   IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
   ON_HOLD:     ["IN_PROGRESS", "REJECTED"],
   COMPLETED:   [],
+  APPROVED:    [],
   REJECTED:    [],
 };
 
@@ -135,6 +145,9 @@ export default function WorkOrderDetailPage() {
   const [error, setError] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [showCompleteForm, setShowCompleteForm] = useState(false);
+  // Client review of finished work.
+  const [sendingBack, setSendingBack] = useState(false);
+  const [sendBackReason, setSendBackReason] = useState("");
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -336,20 +349,29 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  async function updateStatus(status: WorkOrderStatus) {
+  async function updateStatus(status: WorkOrderStatus, opts: { reason?: string } = {}) {
     if (!order) return;
     setUpdatingStatus(true);
     try {
-      const body: { status: WorkOrderStatus; remarks?: string } = { status };
+      const body: { status: WorkOrderStatus; remarks?: string; reason?: string } = { status };
       if (status === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
+      // Required by the API when a client sends completed work back.
+      if (opts.reason) body.reason = opts.reason;
       const res = await api.patch(`/work-orders/${order.id}`, body);
       // PATCH responses omit comments (and other relations); merge so we don't
       // drop them and crash the comments/parts sections.
       setOrder((prev) => prev
         ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
         : res.data);
+      // A send-back writes the client's reason as a comment server-side, and
+      // that merge above deliberately keeps the *old* comment list — so without
+      // this the client posts a reason and watches nothing happen, which reads
+      // as a failure. Refetch to pull the new entry into the thread.
+      if (opts.reason) await fetchOrder();
       setShowCompleteForm(false);
       setRemarks("");
+      setSendingBack(false);
+      setSendBackReason("");
     } catch {
       // silent
     } finally {
@@ -531,7 +553,14 @@ export default function WorkOrderDetailPage() {
   const cfg = STATUS_CONFIG[order.status];
   const priorityCfg = PRIORITY_CONFIG[order.priority];
   const nextStatuses = VALID_TRANSITIONS[order.status];
-  const isTerminal = order.status === "COMPLETED" || order.status === "REJECTED";
+  // "Nothing more will happen to this." Work awaiting a client is *not*
+  // terminal — it can still come back for rework — so the edit affordances stay
+  // available until it is actually settled.
+  const isTerminal =
+    order.status === "APPROVED" ||
+    order.status === "REJECTED" ||
+    (order.status === "COMPLETED" && !needsClientApproval(order));
+  const isAwaitingClient = awaitingClient(order);
   const isOverdue = !!order.dueDate && !isTerminal && new Date(order.dueDate) < new Date();
 
   // Special project gate: only managers can approve/reject special projects
@@ -630,7 +659,7 @@ export default function WorkOrderDetailPage() {
                 On hold — work is paused. Resume it to continue.
               </div>
             )}
-            <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+            <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
           </>
         )}
 
@@ -908,13 +937,93 @@ export default function WorkOrderDetailPage() {
         })()}
 
         {/* Completed info */}
-        {order.status === "COMPLETED" && (
+        {(order.status === "COMPLETED" || order.status === "APPROVED") && (
           <div className="bg-[var(--tu-soft-success)] rounded-lg p-3 mb-4">
             {order.remarks && (
               <p className="text-sm text-[var(--tu-text-body)] italic mb-1">&quot;{order.remarks}&quot;</p>
             )}
             {order.completedAt && (
               <p className="text-xs text-[var(--tu-text-subtle)]">Completed {formatDate(order.completedAt)}</p>
+            )}
+            {order.status === "APPROVED" && (
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
+                {/* An auto-approval carries no approver, and must not be dressed
+                    up as one — it records that nobody objected, not that anyone
+                    agreed. See jobs/autoApproveWorkOrders.js. */}
+                {order.approvedByName
+                  ? `Approved by ${order.approvedByName}${order.approvedAt ? ` on ${formatDate(order.approvedAt)}` : ""}`
+                  : `Closed automatically — no client response${order.approvedAt ? ` by ${formatDate(order.approvedAt)}` : ""}`}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Awaiting the client. Shown to everyone: staff need to know the job is
+            not closed yet and why, and the client needs the two buttons. */}
+        {isAwaitingClient && (
+          <div className="bg-[var(--tu-bg-secondary)] border border-[var(--tu-border)] rounded-lg p-3.5 mb-4">
+            <p className="text-sm font-semibold text-[var(--tu-text-heading)]">
+              {isClient ? "Is this job done to your satisfaction?" : "Waiting for the client to sign off"}
+            </p>
+            <p className="text-xs text-[var(--tu-text-subtle)] mt-1">
+              {isClient
+                ? "Approve to close it, or send it back and tell us what still needs doing."
+                : "Only the client can close this. It closes on its own if they don’t respond."}
+            </p>
+
+            {isClient && (
+              <div className="mt-3">
+                {sendingBack ? (
+                  <div>
+                    <label htmlFor="sendback-reason" className="tu-label">What still needs doing?</label>
+                    <textarea
+                      id="sendback-reason"
+                      className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-none"
+                      rows={3}
+                      value={sendBackReason}
+                      onChange={(e) => setSendBackReason(e.target.value)}
+                      placeholder="The leak has stopped but the ceiling stain is still there."
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        className="tu-btn-primary tu-btn-sm"
+                        disabled={updatingStatus || !sendBackReason.trim()}
+                        onClick={() => updateStatus("IN_PROGRESS", { reason: sendBackReason.trim() })}
+                      >
+                        {updatingStatus ? "Sending…" : "Send back"}
+                      </button>
+                      <button
+                        type="button"
+                        className="tu-btn-secondary tu-btn-sm"
+                        onClick={() => { setSendingBack(false); setSendBackReason(""); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      className="tu-btn-primary tu-btn-sm"
+                      disabled={updatingStatus}
+                      onClick={() => updateStatus("APPROVED")}
+                    >
+                      {updatingStatus ? "Saving…" : "Approve"}
+                    </button>
+                    <button
+                      type="button"
+                      className="tu-btn-secondary tu-btn-sm"
+                      disabled={updatingStatus}
+                      onClick={() => setSendingBack(true)}
+                    >
+                      Send back
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}

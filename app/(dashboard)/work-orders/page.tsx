@@ -16,7 +16,7 @@ type WorkOrder = {
   id: string;
   title: string;
   description: string | null;
-  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
   dueDate: string | null;
   category: string | null;
@@ -44,6 +44,7 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "IN_PROGRESS", label: "In Progress" },
   { key: "ON_HOLD",     label: "On Hold"     },
   { key: "COMPLETED",   label: "Completed"   },
+  { key: "APPROVED",    label: "Approved"    },
   { key: "REJECTED",    label: "Rejected"    },
 ];
 
@@ -69,9 +70,12 @@ function parseStatusParam(raw: string | null): StatusFilter {
 }
 
 const isOverdue = (wo: { dueDate: string | null; status: WorkOrder["status"] }) =>
-  !!wo.dueDate && wo.status !== "COMPLETED" && wo.status !== "REJECTED" && new Date(wo.dueDate).getTime() < Date.now();
+  !!wo.dueDate && !isTerminal(wo) && new Date(wo.dueDate).getTime() < Date.now();
 
-const isTerminal = (wo: WorkOrder) => wo.status === "COMPLETED" || wo.status === "REJECTED";
+// Approved work is finished too — without it here, signing a job off would
+// make it reappear as overdue.
+const isTerminal = (wo: { status: WorkOrder["status"] }) =>
+  wo.status === "COMPLETED" || wo.status === "APPROVED" || wo.status === "REJECTED";
 
 // "Smart" triage sort: closed orders sink; among open ones rank by priority
 // (Critical first), then overdue-first, then soonest due, then newest.
@@ -102,6 +106,7 @@ const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> 
   IN_PROGRESS: { cls: "tu-badge tu-badge-brand",   label: "In Progress" },
   ON_HOLD:     { cls: "tu-badge tu-badge-neutral", label: "On Hold"     },
   COMPLETED:   { cls: "tu-badge tu-badge-success", label: "Completed"   },
+  APPROVED:    { cls: "tu-badge tu-badge-success", label: "Approved"    },
   REJECTED:    { cls: "tu-badge tu-badge-danger",  label: "Rejected"    },
 };
 

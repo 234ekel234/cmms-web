@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import Credentials from "@/components/Credentials";
 import EmptyState from "@/components/EmptyState";
 
 type EmployeeCategory = "ELECTRICAL" | "MECHANICAL" | "PLUMBING" | "CIVIL" | "GENERAL";
@@ -278,6 +279,13 @@ export default function EmployeeDetailPage() {
           </div>
         )}
       </div>
+
+      {/* Credentials — staff only. A client reads everything else on their
+          account, but a scanned licence carries a licence number, an address
+          and a birth date, which is not theirs to read. The API returns 404 for
+          them regardless; this keeps the section from rendering as an empty
+          shell that only ever fails. */}
+      {canEdit && <Credentials employeeId={employeeId} canEdit={canEdit} />}
 
       {/* Training */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">

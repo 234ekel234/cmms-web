@@ -7,7 +7,7 @@ import Link from "next/link";
 export type CalendarOrder = {
   id: string;
   title: string;
-  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+  status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
   dueDate: string | null;
 };
 
@@ -27,6 +27,7 @@ const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string;
   IN_PROGRESS: { bg: "var(--tu-soft-brand)",   fg: "var(--tu-on-brand)",   label: "In Progress" },
   ON_HOLD:     { bg: "var(--tu-soft-neutral)", fg: "var(--tu-on-neutral)", label: "On Hold"     },
   COMPLETED:   { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)", label: "Completed"   },
+  APPROVED:    { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)", label: "Approved"    },
   REJECTED:    { bg: "var(--tu-soft-danger)",  fg: "var(--tu-on-danger)",  label: "Rejected"    },
 };
 

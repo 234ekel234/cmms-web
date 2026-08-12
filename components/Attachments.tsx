@@ -1,8 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import api, { API_BASE_URL } from "@/lib/api";
+import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import {
+  ACCEPT,
+  MAX_MB,
+  contentUrl,
+  formatSize,
+  type BaseAttachment,
+} from "@/lib/attachments";
 
 /**
  * Photos and documents on a work order or an asset.
@@ -13,18 +20,10 @@ import EmptyState from "@/components/EmptyState";
  * page's memory, and on S3 the request redirects straight to storage.
  */
 
-type Attachment = {
-  id: string;
-  filename: string;
-  mimeType: string;
-  sizeBytes: number;
-  caption: string | null;
-  uploadedByName: string | null;
-  createdAt: string;
-  isImage: boolean;
-  viewToken: string;
-  viewTokenExpiresIn: number;
-};
+// Employee credentials are a different shape and live in <Credentials>; this
+// component stays the gallery it was. Both draw their limits and their fetch
+// URL from lib/attachments so they cannot drift apart.
+type Attachment = BaseAttachment;
 
 type Props = {
   /** Which kind of parent this list hangs off. */
@@ -35,19 +34,6 @@ type Props = {
   /** Hides the upload control on terminal or read-only records. */
   canUpload?: boolean;
 };
-
-const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
-const MAX_MB = 15;
-
-function formatSize(bytes: number) {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-}
-
-function contentUrl(a: Attachment) {
-  return `${API_BASE_URL}/attachments/${a.id}/content?token=${encodeURIComponent(a.viewToken)}`;
-}
 
 export default function Attachments({ parent, parentId, canDelete = false, canUpload = true }: Props) {
   const [items, setItems] = useState<Attachment[]>([]);
