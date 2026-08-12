@@ -6,9 +6,18 @@ import api from "@/lib/api";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
+import type { WorkOrderStatus } from "@/lib/statuses";
+import { isDone } from "@/lib/workOrders";
 
 // ── Types ────────────────────────────────────────────────
-type Status = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "REJECTED";
+// Imported, not re-declared. A local copy of this union is what crashed this
+// page: `CLIENT_STATUS[order.status]` came back undefined for APPROVED and
+// `cfg.cls` threw, white-screening the client's own portal. TypeScript was
+// happy because the API response is untyped at the boundary, so the narrow
+// union was simply a false statement about runtime data — the compiler cannot
+// catch a lie it has been told. Importing the real union makes the map
+// exhaustive by construction, so the next status added here is a build error.
+type Status = WorkOrderStatus;
 type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type Comment = { id: string; body: string; authorName: string; createdAt: string };
@@ -37,6 +46,9 @@ const CLIENT_STATUS: Record<Status, { label: string; cls: string }> = {
   IN_PROGRESS: { label: "In Progress", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   ON_HOLD:     { label: "On Hold",     cls: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]" },
   COMPLETED:   { label: "Completed",   cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  // Client-facing wording: they pressed a button called Approve, so this says
+  // Approved rather than "Signed off" or "Closed".
+  APPROVED:    { label: "Approved",    cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
   REJECTED:    { label: "Declined",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
@@ -54,7 +66,9 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 
 function filterOrders(orders: WorkOrder[], filter: FilterKey): WorkOrder[] {
   if (filter === "active") return orders.filter((o) => o.status === "REQUESTED" || o.status === "PENDING" || o.status === "IN_PROGRESS" || o.status === "ON_HOLD");
-  if (filter === "completed") return orders.filter((o) => o.status === "COMPLETED");
+  // Both finished states, or a client's own approved request would match no
+  // filter at all and vanish from every tab except All.
+  if (filter === "completed") return orders.filter((o) => isDone(o.status));
   if (filter === "declined") return orders.filter((o) => o.status === "REJECTED");
   return orders;
 }
@@ -85,7 +99,8 @@ function RequestCard({ order, onAddComment }: { order: WorkOrder; onAddComment: 
 
   const cfg = CLIENT_STATUS[order.status];
   const isDeclined = order.status === "REJECTED";
-  const isCompleted = order.status === "COMPLETED";
+  // Finished, whether or not the client has signed it off yet.
+  const isCompleted = isDone(order.status);
   const isTerminal = isDeclined || isCompleted;
 
   async function handleComment() {
@@ -273,7 +288,7 @@ export default function ClientPortalPage() {
   const visible = filterOrders(orders, filter);
   const activeCount = orders.filter((o) => ["REQUESTED", "PENDING", "IN_PROGRESS"].includes(o.status)).length;
   const inProgressCount = orders.filter((o) => o.status === "IN_PROGRESS").length;
-  const completedCount = orders.filter((o) => o.status === "COMPLETED").length;
+  const completedCount = orders.filter((o) => isDone(o.status)).length;
   const stats = [
     { label: "Active", value: activeCount, cls: "text-[var(--tu-text-brand)]" },
     { label: "In Progress", value: inProgressCount, cls: "text-[var(--tu-on-warning)]" },
