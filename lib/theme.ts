@@ -44,6 +44,19 @@ export function applyTheme(theme: ResolvedTheme) {
   document.documentElement.dataset.theme = theme;
 }
 
+/**
+ * Fired on this tab whenever the preference changes.
+ *
+ * There is more than one control now — the segmented picker in Settings and the
+ * icon button in the top bar — and on the Settings page both are mounted at
+ * once. Each keeps its own React state, so without a notification the one that
+ * did not handle the click keeps rendering the old value: change the theme from
+ * the top bar while looking at Settings and the page repaints around a picker
+ * still highlighting the previous option. `storage` does not help here, because
+ * the browser only delivers it to *other* tabs.
+ */
+export const THEME_CHANGE_EVENT = "tu-theme-change";
+
 /** Stores the preference and paints the theme it resolves to. */
 export function setThemePreference(pref: ThemePreference) {
   try {
@@ -52,6 +65,35 @@ export function setThemePreference(pref: ThemePreference) {
     // Preference won't survive a reload, but the current page still themes.
   }
   applyTheme(resolveTheme(pref));
+  window.dispatchEvent(new CustomEvent<ThemePreference>(THEME_CHANGE_EVENT, { detail: pref }));
+}
+
+/**
+ * Subscribes to preference changes from anywhere: another control in this tab
+ * (custom event) or another tab of the same app (storage). Returns an
+ * unsubscribe function.
+ *
+ * The cross-tab case repaints as well as reports — a tab that was open when the
+ * choice was made elsewhere has already-rendered CSS to correct, and nothing
+ * else would call applyTheme for it.
+ */
+export function watchThemePreference(onChange: (pref: ThemePreference) => void) {
+  if (typeof window === "undefined") return () => {};
+
+  const onCustom = (e: Event) => onChange((e as CustomEvent<ThemePreference>).detail);
+  const onStorage = (e: StorageEvent) => {
+    if (e.key !== THEME_STORAGE_KEY) return;
+    const pref = isThemePreference(e.newValue) ? e.newValue : "system";
+    applyTheme(resolveTheme(pref));
+    onChange(pref);
+  };
+
+  window.addEventListener(THEME_CHANGE_EVENT, onCustom);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(THEME_CHANGE_EVENT, onCustom);
+    window.removeEventListener("storage", onStorage);
+  };
 }
 
 /**

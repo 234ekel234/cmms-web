@@ -7,6 +7,7 @@ import {
   resolveTheme,
   setThemePreference,
   watchSystemTheme,
+  watchThemePreference,
   type ThemePreference,
 } from "@/lib/theme";
 
@@ -27,6 +28,11 @@ export default function ThemeToggle() {
     setPref(getThemePreference());
     setReady(true);
   }, []);
+
+  // The top bar carries a light/dark button too, and on this page both are on
+  // screen at once — follow changes made there so this picker cannot sit
+  // highlighting an option that is no longer in effect.
+  useEffect(() => watchThemePreference(setPref), []);
 
   // Only "System" tracks the OS; an explicit choice must survive the OS flipping.
   useEffect(() => {
@@ -74,7 +80,15 @@ export function ThemeHint() {
       setText(p === "system" ? `Following your device, currently ${resolveTheme(p)}.` : null);
     }
     update();
-    return watchSystemTheme(update);
+    // Both sources matter: the OS flipping changes what "System" resolves to,
+    // and the top-bar button changes whether "System" is still the preference
+    // at all — in which case this hint should stop claiming it is.
+    const stopSystem = watchSystemTheme(update);
+    const stopPref = watchThemePreference(update);
+    return () => {
+      stopSystem();
+      stopPref();
+    };
   }, []);
 
   if (!text) return null;

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import ThemeToggleButton from "@/components/ThemeToggleButton";
 
 function IconBell(p: React.SVGProps<SVGSVGElement>) {
   return (
@@ -245,6 +246,8 @@ export default function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
             </div>
           )}
         </div>
+
+        <ThemeToggleButton />
 
         <Link
           href="/notifications"
