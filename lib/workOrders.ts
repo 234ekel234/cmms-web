@@ -58,9 +58,13 @@ export function isSettled(wo: ApprovalShape & { status: WorkOrderStatus }): bool
 /**
  * No longer outstanding work — the counterpart to the server's CLOSED_STATUSES.
  *
- * Includes REJECTED, which `isSettled` does not. A rejected job is not waiting
- * on anyone and must not count as overdue, but its record is still editable.
+ * Status alone, exactly as the server has it. Deriving this from `isSettled`
+ * instead looks equivalent and is not: work sitting COMPLETED awaiting a client
+ * is not settled, but it *is* closed. Built on `isSettled` it read as overdue
+ * on the detail page while the dashboard, the reports and the overdue sweep all
+ * agreed it was not — the job is finished, and a customer being slow to
+ * countersign is not the technician running late.
  */
-export function isClosed(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
-  return wo.status === "REJECTED" || isSettled(wo);
+export function isClosed(wo: { status: WorkOrderStatus }): boolean {
+  return wo.status === "COMPLETED" || wo.status === "APPROVED" || wo.status === "REJECTED";
 }
