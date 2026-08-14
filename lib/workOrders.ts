@@ -33,3 +33,24 @@ export function isDone(status: WorkOrderStatus): boolean {
 export function awaitingClient(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
   return wo.status === "COMPLETED" && needsClientApproval(wo);
 }
+
+/**
+ * Settled — the record is finished and closed to further edits.
+ *
+ * Mirrors `isSettled` on the server, which derives it from an order having no
+ * allowed transitions left. Spelled out here because the client has no
+ * transition table, but the three cases are the same: APPROVED and REJECTED are
+ * terminal, and COMPLETED is terminal for routine internal work.
+ *
+ * The exception is the one that matters. Work awaiting a client is *not*
+ * settled — they may still send it back for rework, so the technician has to be
+ * able to finish the job when it returns. `awaitingClient` above is exactly the
+ * case this must not catch.
+ *
+ * The API returns 409 on any of these, so getting it wrong here costs a control
+ * that fails rather than an edit that shouldn't have happened.
+ */
+export function isSettled(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
+  if (wo.status === "APPROVED" || wo.status === "REJECTED") return true;
+  return wo.status === "COMPLETED" && !needsClientApproval(wo);
+}

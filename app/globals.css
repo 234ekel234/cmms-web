@@ -117,6 +117,20 @@
   --tu-chart-teal: #0891B2;
   --tu-chart-amber: #D97706;
   --tu-chart-pink: #DB2777;
+
+  /* Two-series chart pairs, each validated as a set with the dataviz
+     validator against this surface — not picked to look nice beside the
+     existing tokens. Both pass the lightness band, chroma floor, adjacent CVD
+     separation, the normal-vision floor and 3:1 contrast.
+
+     Estimated/actual is *identity*, not state — over-running an estimate is
+     not "bad" the way overdue is — so it draws from categorical hues rather
+     than the status ramp. Open/overdue is the opposite case: overdue genuinely
+     means bad, so it borrows the rejected red on purpose. */
+  --tu-chart-estimated: #0891B2;  /* vs actual:  ΔE 27.2 normal, 19.0 protan */
+  --tu-chart-actual: #D97706;
+  --tu-chart-open: #2166AC;       /* vs overdue: ΔE 31.8 normal, 16.9 protan */
+  --tu-chart-overdue: #E34948;
 }
 
 @theme inline {
@@ -211,6 +225,17 @@
   --tu-chart-teal: #22D3EE;
   --tu-chart-amber: #FBBF24;
   --tu-chart-pink: #F472B6;
+
+  /* Re-stepped for the dark surface, not brightened from the light values —
+     the same mistake the priority tokens above were corrected for. The light
+     teal/amber sit at L 0.80/0.84 against the 0.48-0.67 dark band, so both
+     were pulled down until they cleared it with chroma and contrast intact.
+     Open/overdue reuse the dark pending and rejected steps, which are already
+     in band, and re-validated as a pair (ΔE 29.0 normal, 19.2 protan). */
+  --tu-chart-estimated: #0EA5C4;  /* vs actual: ΔE 24.8 normal, 20.3 protan */
+  --tu-chart-actual: #C98500;
+  --tu-chart-open: #3987E5;
+  --tu-chart-overdue: #E66767;
 }
 
 body {
@@ -2390,6 +2415,271 @@ button {
 }
 .tu-trendbar:hover .tu-trendbar-fill { filter: brightness(1.08); }
 @media (prefers-reduced-motion: reduce) { .tu-trendbar-fill { transition: none; } }
+
+/* ══ Dashboard charts ═══════════════════════════════════════════════════
+   Marks for components/charts.tsx. Three specs repeat throughout and are the
+   reason for several of the odd-looking values below: a data-end is rounded
+   4px and square at the baseline, touching fills are separated by a 2px gap in
+   the *surface* colour rather than by a border, and gridlines are solid
+   hairlines one step off the surface — dashed rules read as a threshold. */
+
+/* ── Shared: tooltip ──────────────────────────────────────
+   Shown on hover and on keyboard focus alike, so a value is never mouse-only.
+   It enhances and never gates: the same number is in the table twin. */
+.tu-tip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--tu-text-heading);
+  color: var(--tu-bg-surface);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: var(--tu-shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+/* Marks within two of either end open inward — `.tu-card` clips its overflow,
+   so a centred tooltip on the first or last mark is sliced at the card edge. */
+.tu-tip--start { left: 0; transform: none; }
+.tu-tip--end { left: auto; right: 0; transform: none; }
+.tu-tip-k { opacity: 0.75; font-size: 12px; }
+.tu-tip-v { font-variant-numeric: tabular-nums; }
+
+/* ── Shared: legend ───────────────────────────────────────
+   Present for every chart of two or more series. Labels stay in ink; the
+   swatch beside them is what carries identity. */
+.tu-chart-legend {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.tu-chart-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tu-text-body);
+}
+.tu-chart-swatch { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+/* ── Shared: table twin ───────────────────────────────────
+   The WCAG-clean equivalent of every chart, one toggle away. */
+.tu-charttable-toggle {
+  margin-top: 16px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tu-text-subtle);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tu-charttable-toggle:hover { color: var(--tu-text-body); }
+.tu-charttable-toggle:focus-visible { outline: 2px solid var(--tu-text-brand); outline-offset: 2px; border-radius: 4px; }
+.tu-charttable-wrap { margin-top: 12px; overflow-x: auto; }
+.tu-charttable { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tu-charttable th,
+.tu-charttable td { padding: 6px 8px; text-align: left; border-bottom: 1px solid var(--tu-border); }
+.tu-charttable thead th { color: var(--tu-text-subtle); font-weight: 600; }
+.tu-charttable tbody th { color: var(--tu-text-body); font-weight: 500; }
+.tu-charttable td { color: var(--tu-text-heading); }
+.tu-charttable .tu-num { text-align: right; font-variant-numeric: tabular-nums; }
+.tu-charttable tr:last-child th,
+.tu-charttable tr:last-child td { border-bottom: 0; }
+
+/* Coverage caveats and empty states that belong to a chart rather than to the
+   card — the sentence that says what the marks above do and do not speak for. */
+.tu-chart-note {
+  margin: 14px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--tu-text-subtle);
+}
+.tu-chart-empty {
+  margin: 0;
+  padding: 20px 0;
+  text-align: center;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--tu-text-subtle);
+}
+
+/* ── 1. Trend columns ─────────────────────────────────────
+   The container is sized to include the x-axis band. Fixing a height that fits
+   only the plot is what gives a card its own tiny nested scrollbar. */
+.tu-trend { display: flex; gap: 10px; height: 148px; }
+.tu-trend-yaxis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  width: 28px;
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tu-text-subtle);
+  line-height: 1;
+  /* Nudged so each tick sits on its gridline rather than below it. */
+  transform: translateY(-4px);
+}
+.tu-trend-plot { position: relative; flex: 1; min-width: 0; }
+/* Named -rule, not -grid: `.tu-trend-grid` is already the two-column wrapper
+   these cards sit in, further up this file. Reusing the name turned that
+   wrapper into an absolutely-positioned 1px strip — a stray rule across the
+   page under the trends, with the cards spilling out of it. */
+.tu-trend-rule {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--tu-border);
+}
+.tu-trend-cols {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+.tu-trend-col {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  cursor: default;
+}
+.tu-trend-col:focus-visible { outline: 2px solid var(--tu-text-brand); outline-offset: 1px; border-radius: 4px; }
+.tu-trend-bar {
+  width: 100%;
+  /* Capped rather than filling the slot — the band's leftover is air. */
+  max-width: 24px;
+  border-radius: 4px 4px 0 0;
+  transition: height 300ms ease;
+}
+.tu-trend-col.is-active .tu-trend-bar { filter: brightness(1.1); }
+@media (prefers-reduced-motion: reduce) { .tu-trend-bar { transition: none; } }
+.tu-trend-xaxis {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0 0 38px;
+  font-size: 11px;
+  color: var(--tu-text-subtle);
+}
+
+/* ── 2. Stacked composition bar ───────────────────────────
+   `gap` in the surface colour is what separates the segments. */
+/* No `overflow: hidden` here, deliberately. The tooltip is anchored above the
+   bar, so clipping the box clipped the tooltip with it — and the segments that
+   need it most are the narrow ones, which are exactly the ones too small to
+   carry an inline number. A 1-of-24 sliver had no readable value at all.
+   The ends are rounded on the segments themselves instead. */
+.tu-statusbar {
+  display: flex;
+  gap: 2px;
+  height: 28px;
+  background: var(--tu-bg-surface);
+  /* A labelled <ul> — see the component. Reset the list chrome, keep the bar. */
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+/* Values for slices too narrow to hold them, hung under the bar on a short
+   tick so the number still belongs to its segment. Sparse by construction —
+   only the narrow ones come down here, and overlapping pairs are dropped. */
+.tu-statusbar-callouts { position: relative; height: 18px; margin-top: 3px; }
+.tu-statusbar-callout {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--tu-text-body);
+  line-height: 1;
+  white-space: nowrap;
+}
+.tu-statusbar-tick { width: 1px; height: 5px; background: var(--tu-border-strong); }
+
+.tu-statusbar-seg:first-child { border-radius: 6px 0 0 6px; }
+.tu-statusbar-seg:last-child { border-radius: 0 6px 6px 0; }
+.tu-statusbar-seg:only-child { border-radius: 6px; }
+.tu-statusbar-seg {
+  position: relative;
+  min-width: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+}
+.tu-statusbar-seg:focus-visible { outline: 2px solid var(--tu-text-heading); outline-offset: -2px; }
+/* The one place a label sits on a fill. White holds against every status step
+   in the set — all of them clear 3:1 against the surface, which puts them well
+   into the range where white type is the safe choice. */
+.tu-statusbar-val {
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+/* ── 3. Grouped horizontal bars ───────────────────────────  */
+.tu-gbars { display: flex; flex-direction: column; gap: 16px; }
+.tu-gbar-group { display: flex; align-items: center; gap: 12px; }
+.tu-gbar-label {
+  width: 116px;
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--tu-text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tu-gbar-rows { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.tu-gbar-row { display: flex; align-items: center; gap: 8px; }
+.tu-gbar-track { flex: 1; min-width: 0; }
+.tu-gbar-fill {
+  height: 10px;
+  min-width: 2px;
+  /* Square where it meets the baseline, rounded at the data end. */
+  border-radius: 0 4px 4px 0;
+  transition: width 300ms ease;
+}
+@media (prefers-reduced-motion: reduce) { .tu-gbar-fill { transition: none; } }
+.tu-gbar-val {
+  width: 46px;
+  flex-shrink: 0;
+  text-align: right;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tu-text-body);
+}
+
+@media (max-width: 640px) {
+  .tu-gbar-group { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .tu-gbar-label { width: auto; }
+  .tu-gbar-rows { width: 100%; }
+}
 /* Taller variant for a bar that is the focus of its card. */
 .tu-segbar-lg { height: 16px; }
 

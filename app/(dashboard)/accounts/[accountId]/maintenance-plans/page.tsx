@@ -11,6 +11,7 @@ import {
   FREQUENCIES,
   FREQUENCY_LABEL,
   PERIOD_NOUN,
+  PERIOD_UNIT,
   TONE_CLASS,
   fmtDate,
   planState,
@@ -45,6 +46,8 @@ export default function MaintenancePlansPage() {
     assetId: "",
     estHrs: "",
     estMins: "",
+    leadDays: "",
+    dueAfterDays: "",
     startDate: "",
     endDate: "",
   };
@@ -92,6 +95,11 @@ export default function MaintenancePlansPage() {
         priority: form.priority,
         assetId: form.assetId || null,
         estimatedMinutes: minutes || null,
+        // Blank is meaningful on both, and differently: no lead time means the
+        // first day of the period, while no deadline means the end of it. Sent
+        // as 0 and null respectively so the server reads the same intent.
+        generateOffsetDays: form.leadDays === "" ? 0 : Number(form.leadDays),
+        dueAfterDays: form.dueAfterDays === "" ? null : Number(form.dueAfterDays),
         startDate: form.startDate || undefined,
         endDate: form.endDate || null,
         assignees,
@@ -284,6 +292,25 @@ export default function MaintenancePlansPage() {
               </div>
             </div>
             <div>
+              <label className={labelCls}>Raise it</label>
+              <input className={inputCls} type="number" min={0} value={form.leadDays}
+                onChange={(e) => setForm((f) => ({ ...f, leadDays: e.target.value }))}
+                placeholder="0" />
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
+                Days after the {PERIOD_UNIT[form.frequency]} starts. Blank raises it on day one.
+              </p>
+            </div>
+            <div>
+              <label className={labelCls}>Due</label>
+              <input className={inputCls} type="number" min={0} value={form.dueAfterDays}
+                onChange={(e) => setForm((f) => ({ ...f, dueAfterDays: e.target.value }))}
+                placeholder="End of period" />
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
+                Days after it is raised. Blank gives the job the whole {PERIOD_UNIT[form.frequency]}.
+              </p>
+            </div>
+
+            <div>
               <label className={labelCls}>Starts</label>
               <input className={inputCls} type="date" value={form.startDate}
                 onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} />
@@ -450,7 +477,11 @@ export default function MaintenancePlansPage() {
                     </td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)] text-xs">
                       {fmtDate(plan.currentPeriodDue)}
-                      <div className="text-[var(--tu-text-disabled)]">for {PERIOD_NOUN[plan.frequency]}</div>
+                      <div className="text-[var(--tu-text-disabled)]">
+                        {plan.generateOffsetDays > 0
+                          ? `raised ${fmtDate(plan.currentGenerateOn)}`
+                          : `for ${PERIOD_NOUN[plan.frequency]}`}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button

@@ -12,6 +12,7 @@ import {
   FREQUENCIES,
   FREQUENCY_LABEL,
   PERIOD_NOUN,
+  PERIOD_UNIT,
   TONE_CLASS,
   dateInputValue,
   fmtDate,
@@ -45,7 +46,8 @@ export default function MaintenancePlanDetailPage() {
 
   const [form, setForm] = useState({
     title: "", description: "", category: "", frequency: "MONTHLY" as Frequency,
-    priority: "MEDIUM", assetId: "", estHrs: "", estMins: "", startDate: "", endDate: "",
+    priority: "MEDIUM", assetId: "", estHrs: "", estMins: "",
+    leadDays: "", dueAfterDays: "", startDate: "", endDate: "",
   });
   const [assignees, setAssignees] = useState<string[]>([]);
   const [steps, setSteps] = useState<string[]>([]);
@@ -81,6 +83,10 @@ export default function MaintenancePlanDetailPage() {
       assetId: plan.asset?.id ?? "",
       estHrs: plan.estimatedMinutes ? String(Math.floor(plan.estimatedMinutes / 60)) : "",
       estMins: plan.estimatedMinutes ? String(plan.estimatedMinutes % 60) : "",
+      // 0 shows as blank, matching the create form's placeholder: "no lead
+      // time" reads better as an empty box than as a zero the user must clear.
+      leadDays: plan.generateOffsetDays ? String(plan.generateOffsetDays) : "",
+      dueAfterDays: plan.dueAfterDays == null ? "" : String(plan.dueAfterDays),
       startDate: dateInputValue(plan.startDate),
       endDate: dateInputValue(plan.endDate),
     });
@@ -104,6 +110,8 @@ export default function MaintenancePlanDetailPage() {
         priority: form.priority,
         assetId: form.assetId || null,
         estimatedMinutes: minutes || null,
+        generateOffsetDays: form.leadDays === "" ? 0 : Number(form.leadDays),
+        dueAfterDays: form.dueAfterDays === "" ? null : Number(form.dueAfterDays),
         startDate: form.startDate || undefined,
         endDate: form.endDate || null,
         assignees,
@@ -248,6 +256,23 @@ export default function MaintenancePlanDetailPage() {
               </div>
             </div>
             <div>
+              <label className={labelCls}>Raise it</label>
+              <input className={inputCls} type="number" min={0} value={form.leadDays}
+                onChange={(e) => setForm((f) => ({ ...f, leadDays: e.target.value }))} placeholder="0" />
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
+                Days after the {PERIOD_UNIT[form.frequency]} starts. Blank raises it on day one.
+              </p>
+            </div>
+            <div>
+              <label className={labelCls}>Due</label>
+              <input className={inputCls} type="number" min={0} value={form.dueAfterDays}
+                onChange={(e) => setForm((f) => ({ ...f, dueAfterDays: e.target.value }))} placeholder="End of period" />
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
+                Days after it is raised. Blank gives the job the whole {PERIOD_UNIT[form.frequency]}.
+              </p>
+            </div>
+
+            <div>
               <label className={labelCls}>Starts</label>
               <input className={inputCls} type="date" value={form.startDate} onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))} />
             </div>
@@ -330,7 +355,22 @@ export default function MaintenancePlanDetailPage() {
               <Field label="Asset" value={plan.asset?.name ?? "—"} />
               <Field label="Starts" value={fmtDate(plan.startDate)} />
               <Field label="Ends" value={plan.endDate ? fmtDate(plan.endDate) : "Open-ended"} />
-              <Field label={`Due ${PERIOD_NOUN[plan.frequency]}`} value={fmtDate(plan.currentPeriodDue)} />
+              <Field
+                label="Raised on"
+                value={
+                  plan.generateOffsetDays > 0
+                    ? `${fmtDate(plan.currentGenerateOn)} — day ${plan.generateOffsetDays + 1} of the ${PERIOD_UNIT[plan.frequency]}`
+                    : `${fmtDate(plan.currentGenerateOn)} — first day of the ${PERIOD_UNIT[plan.frequency]}`
+                }
+              />
+              <Field
+                label="Due"
+                value={
+                  plan.dueAfterDays == null
+                    ? `${fmtDate(plan.currentPeriodDue)} — end of the ${PERIOD_UNIT[plan.frequency]}`
+                    : `${fmtDate(plan.currentPeriodDue)} — ${plan.dueAfterDays} day${plan.dueAfterDays === 1 ? "" : "s"} after it is raised`
+                }
+              />
               <Field label="Assigned to" value={plan.assignees.length ? plan.assignees.map((a) => a.employee.name).join(", ") : "Nobody yet"} />
             </dl>
           </div>

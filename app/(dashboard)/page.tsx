@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { TrendChart, StackedBar, GroupedBars } from "@/components/charts";
 
 type AccountSummary = {
   id: string;
@@ -49,6 +50,14 @@ type DashboardData = {
   // is how APPROVED was caught: WO_STATUS builds its series from the same map.
   workOrders: Record<WorkOrderStatus, number>;
   assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
+  manHours: {
+    estimatedMinutes: number;
+    actualMinutes: number;
+    /** Finished jobs carrying both an estimate and recorded time. */
+    jobsCompared: number;
+    /** Everything finished in the window, compared or not. */
+    jobsFinished: number;
+  };
   overdueWorkOrders: number;
   poorHealthAssets: number;
   attendance: { present: number; absent: number };
@@ -121,9 +130,14 @@ function timeAgo(dateStr: string) {
   return `${Math.floor(h / 24)}d ago`;
 }
 
-function fmtDay(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+/**
+ * Minutes as hours, with a decimal only while one still tells you something.
+ * A morning's work is "9.5h"; a quarter's is "412h" and the fraction is noise.
+ */
+function fmtHours(minutes: number) {
+  const h = minutes / 60;
+  if (h < 10) return `${Math.round(h * 10) / 10}h`;
+  return `${Math.round(h).toLocaleString()}h`;
 }
 
 // ── Inline icons ─────────────────────────────────────────
@@ -165,29 +179,9 @@ function IconArrowRight() {
 }
 
 // ── Chart primitives ─────────────────────────────────────
-
-function BarChart({ data, color }: { data: TrendPoint[]; color: string }) {
-  const max = Math.max(1, ...data.map((d) => d.count));
-  return (
-    <div className="tu-trendbars" role="img" aria-label={`Daily trend, ${data.length} days, peak ${max}`}>
-      {data.map((d) => (
-        <div
-          key={d.date}
-          className="tu-trendbar"
-          title={`${fmtDay(d.date)}: ${d.count}`}
-        >
-          <div
-            className="tu-trendbar-fill"
-            style={{
-              height: `${Math.max((d.count / max) * 100, 3)}%`,
-              background: d.count > 0 ? color : "var(--tu-bg-tertiary)",
-            }}
-          />
-        </div>
-      ))}
-    </div>
-  );
-}
+// The charts themselves live in components/charts.tsx — they are shared, and
+// each carries a legend, a keyboard-reachable tooltip and a table twin that
+// would be noise repeated inline here.
 
 function SkeletonRows({ count, cols }: { count: number; cols: number }) {
   return (
@@ -327,6 +321,24 @@ export default function DashboardPage() {
   const clTrend = data?.trends.checklistCompletions ?? [];
   const woTrendTotal = woTrend.reduce((s, d) => s + d.count, 0);
   const clTrendTotal = clTrend.reduce((s, d) => s + d.count, 0);
+
+  const manHours = data?.manHours ?? { estimatedMinutes: 0, actualMinutes: 0, jobsCompared: 0, jobsFinished: 0 };
+  // Signed, so the sentence beside it can say "over" or "under" rather than
+  // leaving the reader to work out which direction a bare ratio points.
+  const variancePct =
+    manHours.estimatedMinutes > 0
+      ? Math.round(((manHours.actualMinutes - manHours.estimatedMinutes) / manHours.estimatedMinutes) * 100)
+      : null;
+
+  // Busiest first: the account a manager needs to look at is the one with the
+  // most outstanding work, and it should not be hunted for down the list.
+  const accountLoad = [...(data?.accounts ?? [])]
+    .sort((a, b) => b.openWorkOrders - a.openWorkOrders || b.overdueWorkOrders - a.overdueWorkOrders)
+    .map((a) => ({
+      id: a.id,
+      label: a.name,
+      values: { open: a.openWorkOrders, overdue: a.overdueWorkOrders },
+    }));
 
   // Deep-link targets are account-aware: when a single account is selected the
   // cards jump straight into that account's pages, otherwise the global ones.
@@ -556,9 +568,9 @@ export default function DashboardPage() {
               <span className="tu-chart-cap">last {trendDays} days</span>
             </div>
             {loading ? (
-              <div className="tu-skeleton" style={{ height: 72, borderRadius: 6 }} aria-hidden="true" />
+              <div className="tu-skeleton" style={{ height: 148, borderRadius: 6 }} aria-hidden="true" />
             ) : (
-              <BarChart data={woTrend} color="var(--tu-status-completed)" />
+              <TrendChart points={woTrend} color="var(--tu-status-completed)" unit="completed" />
             )}
           </div>
         </div>
@@ -573,9 +585,9 @@ export default function DashboardPage() {
               <span className="tu-chart-cap">last {trendDays} days</span>
             </div>
             {loading ? (
-              <div className="tu-skeleton" style={{ height: 72, borderRadius: 6 }} aria-hidden="true" />
+              <div className="tu-skeleton" style={{ height: 148, borderRadius: 6 }} aria-hidden="true" />
             ) : (
-              <BarChart data={clTrend} color="var(--tu-text-brand)" />
+              <TrendChart points={clTrend} color="var(--tu-text-brand)" unit="completions" />
             )}
           </div>
         </div>
@@ -590,14 +602,15 @@ export default function DashboardPage() {
             <span className="tu-chart-cap">{loading ? "" : `${totalWOs} total`}</span>
           </div>
           <div className="tu-card-body">
-            <div className="tu-segbar" role="img" aria-label="Work order status distribution">
-              {!loading && totalWOs > 0 &&
-                WO_STATUS.map((s) => {
-                  const v = wo?.[s.key] ?? 0;
-                  if (v === 0) return null;
-                  return <span key={s.key} style={{ width: `${(v / totalWOs) * 100}%`, background: s.color }} title={`${s.label}: ${v}`} />;
-                })}
-            </div>
+            {!loading && totalWOs > 0 && (
+              <StackedBar
+                ariaLabel="Work order status distribution"
+                segments={WO_STATUS.map((s) => ({
+                  key: s.key, label: s.label, value: wo?.[s.key] ?? 0, color: s.color,
+                }))}
+              />
+            )}
+            {loading && <div className="tu-skeleton" style={{ height: 28, borderRadius: 6 }} aria-hidden="true" />}
             <ul className="tu-legend">
               {WO_STATUS.map((s) => (
                 <li key={s.key}>
@@ -722,6 +735,91 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Man-hours: what the work was quoted at against what it took.
+          Kept out of the three-card grid above because it answers a different
+          kind of question — those describe the current state of the estate,
+          this one is about whether the estimates the business quotes on are
+          holding up. */}
+      <div className="tu-card" style={{ marginBottom: 24 }}>
+        <div className="tu-card-header">
+          <h2 className="tu-card-title">Man-hours: Estimated vs Actual</h2>
+          <span className="tu-chart-cap">{periodCaption}</span>
+        </div>
+        <div className="tu-card-body">
+          {loading ? (
+            <div className="tu-skeleton" style={{ height: 96, borderRadius: 6 }} aria-hidden="true" />
+          ) : manHours.jobsCompared === 0 ? (
+            <p className="tu-chart-empty">
+              No finished job in this period carried both an estimate and recorded time.
+              {manHours.jobsFinished > 0 && ` ${manHours.jobsFinished} job${manHours.jobsFinished === 1 ? "" : "s"} finished without one or the other.`}
+            </p>
+          ) : (
+            <>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 16 }}>
+                <span className="tu-chart-total">{variancePct === null ? "—" : `${variancePct > 0 ? "+" : ""}${variancePct}%`}</span>
+                <span className="tu-chart-cap">
+                  {variancePct === null ? "no estimate to compare" : variancePct > 0 ? "over estimate" : variancePct < 0 ? "under estimate" : "on estimate"}
+                </span>
+              </div>
+              {/* Minutes go in, hours come out as text. Rounding the values
+                  themselves would let the bars disagree with the percentage
+                  above them on small totals. */}
+              <GroupedBars
+                unit="hours"
+                headLabel="Measure"
+                format={fmtHours}
+                series={[
+                  { key: "estimated", label: "Estimated", color: "var(--tu-chart-estimated)" },
+                  { key: "actual", label: "Actual", color: "var(--tu-chart-actual)" },
+                ]}
+                groups={[{
+                  id: "all",
+                  label: "All finished work",
+                  values: {
+                    estimated: manHours.estimatedMinutes,
+                    actual: manHours.actualMinutes,
+                  },
+                }]}
+              />
+              {/* States what the comparison actually speaks for. A ratio drawn
+                  from a third of the work is a different claim from one drawn
+                  from all of it, and the chart should not hide which it is. */}
+              {/* The "rest" clause only when there is a rest. At 5 of 5 it
+                  contradicted the numbers standing right beside it. */}
+              <p className="tu-chart-note">
+                Based on {manHours.jobsCompared} of {manHours.jobsFinished} finished job{manHours.jobsFinished === 1 ? "" : "s"}
+                {manHours.jobsCompared < manHours.jobsFinished
+                  ? " — the rest were closed without an estimate or without the timer run."
+                  : ", all of which carried an estimate and recorded time."}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Per-account load. Only earns its place when there is more than one
+          account to compare — with a single account the bars restate the KPI
+          tiles above, and a one-row comparison is not a comparison. */}
+      {(data?.accounts.length ?? 0) > 1 && (
+        <div className="tu-card" style={{ marginBottom: 24 }}>
+          <div className="tu-card-header">
+            <h2 className="tu-card-title">Open Work by Account</h2>
+            <span className="tu-chart-cap">outstanding now</span>
+          </div>
+          <div className="tu-card-body">
+            <GroupedBars
+              unit="work orders"
+              headLabel="Account"
+              series={[
+                { key: "open", label: "Open", color: "var(--tu-chart-open)" },
+                { key: "overdue", label: "Overdue", color: "var(--tu-chart-overdue)" },
+              ]}
+              groups={accountLoad}
+            />
+          </div>
+        </div>
+      )}
 
       {/* PM checklist completion by frequency */}
       {(loading || (data?.checklistBreakdown.length ?? 0) > 0) && (

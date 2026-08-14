@@ -6,7 +6,7 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { awaitingClient, needsClientApproval } from "@/lib/workOrders";
+import { awaitingClient, isSettled, needsClientApproval } from "@/lib/workOrders";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
@@ -46,8 +46,23 @@ type WorkOrder = {
     attachments?: ProgressAttachment[];
   }[];
   assignments: { id: string; employeeId: string; employee: { id: string; name: string; position: string | null } }[];
+  // The steps for this job — typed here, or copied from a maintenance plan's
+  // steps when it raised the order. Clients see them; only staff may tick one.
+  checklistItems: ChecklistItem[];
+  /** Set when a maintenance plan raised this order. */
+  planId: string | null;
+  // Omitted by the API for CLIENT users, along with `parts` — a client sees the
+  // work, not the rota behind it.
+  plan?: { id: string; title: string; frequency: string } | null;
   // Omitted by the API for CLIENT users — parts carry cost, which clients don't see yet.
   parts?: WorkOrderPart[];
+};
+
+type ChecklistItem = {
+  id: string;
+  description: string;
+  isDone: boolean;
+  order: number;
 };
 
 type WorkOrderPart = {
@@ -156,6 +171,16 @@ export default function WorkOrderDetailPage() {
   const [staged, setStaged] = useState<File[]>([]);
   const [progressError, setProgressError] = useState("");
   const progressFileRef = useRef<HTMLInputElement>(null);
+
+  // Steps (checklist items)
+  const [newStep, setNewStep] = useState("");
+  const [addingStep, setAddingStep] = useState(false);
+  // A set, not a single id: steps are independent rows and a technician works
+  // down the list faster than a slow connection answers. Blocking on "any step
+  // is saving" silently dropped every tick made while an earlier one was in
+  // flight — the box flipped back on re-render with no error shown.
+  const [savingSteps, setSavingSteps] = useState<ReadonlySet<string>>(new Set());
+  const [stepError, setStepError] = useState("");
 
   // Assignment picker
   const [accountEmployees, setAccountEmployees] = useState<AccountEmployee[]>([]);
@@ -313,7 +338,13 @@ export default function WorkOrderDetailPage() {
       // PATCH responses omit comments (and other relations); merge so we don't
       // drop them and crash the comments/parts sections.
       setOrder((prev) => prev
-        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        ? {
+            ...prev,
+            ...res.data,
+            comments: res.data.comments ?? prev.comments,
+            parts: res.data.parts ?? prev.parts,
+            checklistItems: res.data.checklistItems ?? prev.checklistItems,
+          }
         : res.data);
       setEditing(false);
     } catch {
@@ -340,7 +371,13 @@ export default function WorkOrderDetailPage() {
       // PATCH responses omit comments (and other relations); merge so we don't
       // drop them and crash the comments/parts sections.
       setOrder((prev) => prev
-        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        ? {
+            ...prev,
+            ...res.data,
+            comments: res.data.comments ?? prev.comments,
+            parts: res.data.parts ?? prev.parts,
+            checklistItems: res.data.checklistItems ?? prev.checklistItems,
+          }
         : res.data);
     } catch {
       // silent
@@ -361,7 +398,13 @@ export default function WorkOrderDetailPage() {
       // PATCH responses omit comments (and other relations); merge so we don't
       // drop them and crash the comments/parts sections.
       setOrder((prev) => prev
-        ? { ...prev, ...res.data, comments: res.data.comments ?? prev.comments, parts: res.data.parts ?? prev.parts }
+        ? {
+            ...prev,
+            ...res.data,
+            comments: res.data.comments ?? prev.comments,
+            parts: res.data.parts ?? prev.parts,
+            checklistItems: res.data.checklistItems ?? prev.checklistItems,
+          }
         : res.data);
       // A send-back writes the client's reason as a comment server-side, and
       // that merge above deliberately keeps the *old* comment list — so without
@@ -487,6 +530,70 @@ export default function WorkOrderDetailPage() {
     }
   }
 
+  async function toggleStep(item: ChecklistItem) {
+    // Only this step being in flight blocks it — a double-click on the same
+    // box, not a tick on a different one.
+    if (!order || savingSteps.has(item.id)) return;
+    setSavingSteps((prev) => new Set(prev).add(item.id));
+    setStepError("");
+    // Optimistic: ticking a step is the most repeated action on this page and
+    // a technician works down the list. Reverted below if the write fails, so
+    // the box never stays ticked against a step the server did not record.
+    const next = !item.isDone;
+    setOrder((prev) => prev ? {
+      ...prev,
+      checklistItems: prev.checklistItems.map((i) => i.id === item.id ? { ...i, isDone: next } : i),
+    } : prev);
+    try {
+      await api.patch(`/work-orders/${order.id}/checklist-items/${item.id}`, { isDone: next });
+    } catch (err: unknown) {
+      setOrder((prev) => prev ? {
+        ...prev,
+        checklistItems: prev.checklistItems.map((i) => i.id === item.id ? { ...i, isDone: item.isDone } : i),
+      } : prev);
+      const e = err as { response?: { data?: { error?: string } } };
+      setStepError(e?.response?.data?.error ?? "Could not save that step.");
+    } finally {
+      setSavingSteps((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
+  }
+
+  async function addStep() {
+    const description = newStep.trim();
+    if (!description || addingStep || !order) return;
+    setAddingStep(true);
+    setStepError("");
+    try {
+      const res = await api.post(`/work-orders/${order.id}/checklist-items`, { description });
+      setOrder((prev) => prev ? { ...prev, checklistItems: [...prev.checklistItems, res.data] } : prev);
+      setNewStep("");
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setStepError(e?.response?.data?.error ?? "Could not add that step.");
+    } finally {
+      setAddingStep(false);
+    }
+  }
+
+  async function removeStep(item: ChecklistItem) {
+    if (!order) return;
+    setStepError("");
+    try {
+      await api.delete(`/work-orders/${order.id}/checklist-items/${item.id}`);
+      setOrder((prev) => prev ? {
+        ...prev,
+        checklistItems: prev.checklistItems.filter((i) => i.id !== item.id),
+      } : prev);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setStepError(e?.response?.data?.error ?? "Could not remove that step.");
+    }
+  }
+
   async function addComment() {
     const text = commentText.trim();
     // Either alone is a valid update: a set of photos needs no caption, and a
@@ -554,17 +661,20 @@ export default function WorkOrderDetailPage() {
   const priorityCfg = PRIORITY_CONFIG[order.priority];
   const nextStatuses = VALID_TRANSITIONS[order.status];
   // "Nothing more will happen to this." Work awaiting a client is *not*
-  // terminal — it can still come back for rework — so the edit affordances stay
-  // available until it is actually settled.
-  const isTerminal =
-    order.status === "APPROVED" ||
-    order.status === "REJECTED" ||
-    (order.status === "COMPLETED" && !needsClientApproval(order));
+  // settled — it can still come back for rework — so the edit affordances stay
+  // available until it actually is.
+  //
+  // Shared with lib/workOrders rather than spelled out here: the API now
+  // refuses these edits with a 409, so this decides what to *offer* and the
+  // two must agree. An inline copy is how they would stop agreeing.
+  const isTerminal = isSettled(order);
   const isAwaitingClient = awaitingClient(order);
   const isOverdue = !!order.dueDate && !isTerminal && new Date(order.dueDate) < new Date();
 
   // Special project gate: only managers can approve/reject special projects
   const canActOnStatus = !isClient && canManage && (!order.isSpecialProject || isManager);
+
+  const stepsDone = order.checklistItems.filter((i) => i.isDone).length;
 
   // Parts used. Lines with no unit cost are counted but left out of the total,
   // and flagged so the figure isn't mistaken for a complete cost.
@@ -765,6 +875,23 @@ export default function WorkOrderDetailPage() {
           </p>
         )}
 
+        {/* Raised by a maintenance plan. Staff only — the API withholds `plan`
+            from clients, who see the work but not the rota behind it. */}
+        {order.plan && (
+          <p className="text-sm mb-4">
+            <span className="text-[var(--tu-text-subtle)]">Raised by: </span>
+            <Link
+              href={`/accounts/${accountId}/maintenance-plans/${order.plan.id}`}
+              className="text-[var(--tu-text-brand)] hover:underline"
+            >
+              {order.plan.title}
+            </Link>
+            <span className="text-[var(--tu-text-subtle)]">
+              {" "}— {order.plan.frequency.toLowerCase().replace("_", "-")} maintenance plan
+            </span>
+          </p>
+        )}
+
         {/* Assignees */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
@@ -883,7 +1010,7 @@ export default function WorkOrderDetailPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-[var(--tu-text-heading)]">{estMin != null ? formatHM(estMin) : "Not set"}</span>
-                    {canManage && (
+                    {canManage && !isTerminal && (
                       <button
                         onClick={() => { setEstHrs(estMin != null ? String(Math.floor(estMin / 60)) : ""); setEstMins(estMin != null ? String(estMin % 60) : ""); setEditingEst(true); }}
                         className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
@@ -1101,6 +1228,89 @@ export default function WorkOrderDetailPage() {
         )}
       </div>
 
+      {/* Steps — the procedure for this job. Shown to clients read-only: it is
+          what was done, not what it cost. Hidden entirely when there are none
+          and the viewer cannot add any, rather than showing an empty card. */}
+      {(order.checklistItems.length > 0 || canManage) && (
+        <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-sm font-semibold text-[var(--tu-text-body)]">
+                Steps{" "}
+                {order.checklistItems.length > 0 && (
+                  <span className="tu-figure text-[var(--tu-text-subtle)]">
+                    {stepsDone}/{order.checklistItems.length}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
+                {order.plan
+                  ? "Copied from the maintenance plan that raised this job."
+                  : "The procedure for this job. Tick each step as it is done."}
+              </p>
+            </div>
+          </div>
+
+          {order.checklistItems.length === 0 ? (
+            <p className="text-xs text-[var(--tu-text-subtle)] mb-3">No steps yet.</p>
+          ) : (
+            <ul className="space-y-1 mb-3">
+              {order.checklistItems.map((item) => (
+                <li key={item.id} className="flex items-center gap-3 group py-1">
+                  <input
+                    type="checkbox"
+                    checked={item.isDone}
+                    disabled={!canManage || isTerminal || savingSteps.has(item.id)}
+                    onChange={() => toggleStep(item)}
+                    className="w-4 h-4 shrink-0 accent-[var(--tu-text-brand)] cursor-pointer disabled:cursor-default"
+                  />
+                  <span
+                    className={`text-sm flex-1 ${
+                      item.isDone
+                        ? "line-through text-[var(--tu-text-disabled)]"
+                        : "text-[var(--tu-text-body)]"
+                    }`}
+                  >
+                    {item.description}
+                  </span>
+                  {canManage && !isTerminal && (
+                    <button
+                      onClick={() => removeStep(item)}
+                      className="text-xs text-[var(--tu-text-subtle)] opacity-0 group-hover:opacity-100 hover:text-[var(--tu-on-danger)] cursor-pointer transition-opacity"
+                      aria-label={`Remove step: ${item.description}`}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {canManage && !isTerminal && (
+            <div className="flex gap-2">
+              <input
+                value={newStep}
+                onChange={(e) => setNewStep(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") addStep(); }}
+                placeholder="Add a step…"
+                className="flex-1 px-3 py-2 text-sm bg-[var(--tu-bg-input)] border border-[var(--tu-border)] rounded-lg text-[var(--tu-text-body)] placeholder:text-[var(--tu-text-disabled)] focus:outline-none focus:border-[var(--tu-text-brand)]"
+              />
+              <button
+                onClick={addStep}
+                disabled={!newStep.trim() || addingStep}
+                className="px-3 py-2 text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-soft-brand)] cursor-pointer disabled:opacity-50 disabled:cursor-default"
+              >
+                {addingStep ? "Adding…" : "Add"}
+              </button>
+            </div>
+          )}
+          {!!stepError && (
+            <p className="text-xs text-[var(--tu-on-danger)] mt-2">{stepError}</p>
+          )}
+        </div>
+      )}
+
       {/* Parts used — staff only; clients don't see parts cost yet */}
       {canManage && (
         <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
@@ -1113,7 +1323,7 @@ export default function WorkOrderDetailPage() {
                 Recorded for job costing. Lines picked from stock also draw down the spare-parts count.
               </p>
             </div>
-            {!showPartForm && (
+            {!showPartForm && !isTerminal && (
               <button
                 onClick={() => openPartForm()}
                 className="px-3 py-1.5 text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-soft-brand)] cursor-pointer"
@@ -1124,7 +1334,15 @@ export default function WorkOrderDetailPage() {
           </div>
 
           {parts.length === 0 && !showPartForm ? (
-            <EmptyState compact icon="part" title="No parts recorded" hint="Log the spare parts consumed so stock levels stay accurate." />
+            <EmptyState
+              compact
+              icon="part"
+              title="No parts recorded"
+              // Don't prompt for something the API will now refuse.
+              hint={isTerminal
+                ? "This work order is closed; its parts can no longer be changed."
+                : "Log the spare parts consumed so stock levels stay accurate."}
+            />
           ) : parts.length > 0 && (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1161,6 +1379,8 @@ export default function WorkOrderDetailPage() {
                         {p.unitCost != null ? formatPeso(p.unitCost * p.quantity) : <span className="text-[var(--tu-text-disabled)]">—</span>}
                       </td>
                       <td className="py-2 pl-2 text-right whitespace-nowrap">
+                        {!isTerminal && (
+                        <>
                         <button
                           onClick={() => openPartForm(p)}
                           className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-brand)] cursor-pointer"
@@ -1174,6 +1394,8 @@ export default function WorkOrderDetailPage() {
                         >
                           {removingPartId === p.id ? "..." : "Remove"}
                         </button>
+                        </>
+                        )}
                       </td>
                     </tr>
                   ))}

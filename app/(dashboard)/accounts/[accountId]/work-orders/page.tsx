@@ -29,6 +29,7 @@ type WorkOrder = {
   createdAt: string;
   asset: { id: string; name: string } | null;
   assignments: { employeeId: string; employee: { id: string; name: string } }[];
+  checklistItems: { id: string; isDone: boolean }[];
 };
 
 type AccountEmployee = { id: string; name: string; position: string | null };
@@ -260,7 +261,10 @@ export default function WorkOrdersPage() {
         isSpecialProject: form.isSpecialProject,
         isBreakdown: form.isBreakdown,
       });
-      setOrders((prev) => [res.data, ...prev]);
+      // The create response includes `asset` only, so the relations the card
+      // renders have to be defaulted rather than left undefined — a brand new
+      // order genuinely has neither, but the card still reads `.length`.
+      setOrders((prev) => [{ checklistItems: [], assignments: [], ...res.data }, ...prev]);
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
     } catch (err: unknown) {
@@ -274,7 +278,11 @@ export default function WorkOrdersPage() {
   async function updateStatus(id: string, status: WorkOrderStatus) {
     try {
       const res = await api.patch(`/work-orders/${id}`, { status });
-      setOrders((prev) => prev.map((o) => (o.id === id ? res.data : o)));
+      // Merged, not replaced. PATCH returns the row with `asset` and
+      // `assignments` only — no `checklistItems` — so assigning the response
+      // wholesale dropped the array the card's "3/6" counter reads, and the
+      // next render threw on `.length`. Changing a status blanked the page.
+      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...res.data } : o)));
     } catch {
       // silent
     }
@@ -711,6 +719,14 @@ export default function WorkOrdersPage() {
                       </button>
                     )}
                   </span>
+                  {order.checklistItems.length > 0 && (
+                    <span className="shrink-0">
+                      <span className="tu-figure">
+                        {order.checklistItems.filter((i) => i.isDone).length}/{order.checklistItems.length}
+                      </span>{" "}
+                      steps
+                    </span>
+                  )}
                   <span className="shrink-0">Created {formatDate(order.createdAt)}</span>
                 </div>
 

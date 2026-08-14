@@ -24,6 +24,11 @@ export const FREQUENCY_LABEL: Record<Frequency, string> = {
 };
 
 /** What one period is called when pointing at the current one. */
+/**
+ * The current period, as something you can drop straight into a sentence:
+ * "raise one for **this month**". Already demonstrative — never prefix it with
+ * "the", which is what produced "day 3 of the this month".
+ */
 export const PERIOD_NOUN: Record<Frequency, string> = {
   DAILY: "today",
   WEEKLY: "this week",
@@ -31,6 +36,19 @@ export const PERIOD_NOUN: Record<Frequency, string> = {
   QUARTERLY: "this quarter",
   SEMI_ANNUALLY: "this half-year",
   ANNUALLY: "this year",
+};
+
+/**
+ * The bare unit, for sentences that supply their own article: "day 3 of the
+ * **month**", "Days after the **month** starts", "the whole **day**".
+ */
+export const PERIOD_UNIT: Record<Frequency, string> = {
+  DAILY: "day",
+  WEEKLY: "week",
+  MONTHLY: "month",
+  QUARTERLY: "quarter",
+  SEMI_ANNUALLY: "half-year",
+  ANNUALLY: "year",
 };
 
 export type PlanOccurrence = {
@@ -62,9 +80,14 @@ export type MaintenancePlan = {
   account?: { id: string; name: string };
   assignees: { id: string; employeeId: string; employee: { id: string; name: string; position: string | null } }[];
   steps: { id: string; description: string; order: number }[];
-  // Derived server-side from `frequency` rather than stored, so it cannot drift
-  // out of step with the schedule.
+  /** Days after the period starts before the occurrence is raised. 0 = day one. */
+  generateOffsetDays: number;
+  /** Deadline in days after it is raised. Null = the end of the period. */
+  dueAfterDays: number | null;
+  // Derived server-side from the schedule rather than stored, so it cannot drift
+  // out of step with what the generator will actually do.
   currentPeriodStart: string;
+  currentGenerateOn: string;
   currentPeriodDue: string;
   currentOccurrence: PlanOccurrence | null;
 };
@@ -84,6 +107,24 @@ export function fmtDate(iso: string | null | undefined): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "—";
   return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/**
+ * The calendar day a schedule *label* names, as `YYYY-MM-DD`.
+ *
+ * `currentPeriodStart` / `currentGenerateOn` are UTC midnights standing for a
+ * local calendar day, not for an instant — so the day is read in UTC. Reading
+ * local components here would shift it a day for any viewer west of UTC.
+ */
+function labelDay(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+/** Today on the business clock those labels were built from. */
+function todayKey(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
 /**
@@ -109,13 +150,35 @@ export function planState(plan: MaintenancePlan): PlanState {
   }
   const occ = plan.currentOccurrence;
   if (!occ) {
+    // A plan with a lead offset is deliberately silent for the early part of
+    // every period, so "nothing here yet" has two quite different meanings and
+    // only one of them is worth a second glance. Naming the date is what
+    // separates "waiting for its day" from "the generator did not run".
+    // Compared as calendar days, not as instants. `currentGenerateOn` is a
+    // UTC-midnight *label* for a local calendar day (see calendarDay in
+    // backend/helpers/planSchedule.js), so under Asia/Manila it reads as 08:00
+    // local on the day it names. Treated as an instant, every plan still looked
+    // "Scheduled" between midnight and 08:00 on its own raise day — hiding a
+    // failed 06:00 generator run during exactly the window after it should have
+    // run, which is the distinction this branch exists to draw.
+    if (plan.currentGenerateOn && labelDay(plan.currentGenerateOn) > todayKey()) {
+      return {
+        label: "Scheduled",
+        tone: "neutral",
+        hint: `Due to be raised on ${fmtDate(plan.currentGenerateOn)}.`,
+      };
+    }
     return {
       label: "Not raised yet",
       tone: "info",
       hint: `No work order exists for ${PERIOD_NOUN[plan.frequency]} yet. The generator runs each morning.`,
     };
   }
-  if (occ.status === "COMPLETED") {
+  // APPROVED counts as done for the same reason DONE_STATUSES exists on the
+  // server: a plan set to EXTERNAL produces work the client signs off, and
+  // treating only COMPLETED as finished would show signed-off work as
+  // outstanding.
+  if (occ.status === "COMPLETED" || occ.status === "APPROVED") {
     return { label: "Done", tone: "success", hint: `Completed for ${PERIOD_NOUN[plan.frequency]}.` };
   }
   const overdue = occ.dueDate ? new Date(occ.dueDate) < new Date() : false;
@@ -123,7 +186,7 @@ export function planState(plan: MaintenancePlan): PlanState {
     return {
       label: "Overdue",
       tone: "danger",
-      hint: `The period this was due in has elapsed and the work order is still ${occ.status.toLowerCase().replace("_", " ")}.`,
+      hint: `The deadline passed on ${fmtDate(occ.dueDate)} and the work order is still ${occ.status.toLowerCase().replace("_", " ")}.`,
     };
   }
   return {
