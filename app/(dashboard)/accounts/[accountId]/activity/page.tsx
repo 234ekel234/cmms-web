@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
@@ -86,21 +86,32 @@ export default function ActivityPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterKey>("all");
 
-  useEffect(() => { loadInitial(); }, [accountId]);
-
-  async function loadInitial() {
-    setLoading(true);
+  // No `setLoading(true)` here: `loading` already starts true, and setting it
+  // synchronously is what the effect below would be doing on mount. On a manual
+  // refresh its absence means the list updates in place instead of flashing a
+  // skeleton, which is the better behaviour anyway.
+  const loadInitial = useCallback(async (isCancelled: () => boolean = () => false) => {
     try {
       const res = await api.get(`/accounts/${accountId}/audit-logs?limit=30`);
+      if (isCancelled()) return;
       setLogs(res.data);
       setHasMore(res.data.length === 30);
       setCursor(res.data[res.data.length - 1]?.id ?? null);
     } catch {
       // silent
     } finally {
-      setLoading(false);
+      if (!isCancelled()) setLoading(false);
     }
-  }
+  }, [accountId]);
+
+  // Guarded like the other twelve fetches in this change set — this one was
+  // missed. Switching accounts re-runs it, and a slow first response landing
+  // after the second would overwrite the list with the previous account's trail.
+  useEffect(() => {
+    let cancelled = false;
+    loadInitial(() => cancelled);
+    return () => { cancelled = true; };
+  }, [loadInitial]);
 
   async function loadMore() {
     if (!cursor || loadingMore) return;

@@ -85,19 +85,25 @@ export default function ChecklistsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
 
-  useEffect(() => { fetchAssignments(); }, [accountId]);
-
-  async function fetchAssignments() {
-    setLoading(true);
-    try {
-      const res = await api.get(`/accounts/${accountId}/pm-checklists`);
-      setAssignments(res.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      try {
+        const res = await api.get(`/accounts/${accountId}/pm-checklists`);
+        if (!cancelled) setAssignments(res.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId]);
 
   async function handleRemove(assignmentId: string) {
     try {

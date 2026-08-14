@@ -68,29 +68,35 @@ export default function EmployeeDetailPage() {
   const [isReliever, setIsReliever] = useState(false);
   const [categories, setCategories] = useState<EmployeeCategory[]>([]);
 
-  useEffect(() => { fetchData(); }, [employeeId]);
-
-  async function fetchData() {
-    setLoading(true);
-    try {
-      const [empRes, trainRes] = await Promise.all([
-        api.get(`/accounts/${accountId}/employees`),
-        api.get(`/employees/${employeeId}/trainings`),
-      ]);
-      const found: Employee | undefined = empRes.data.find((e: Employee) => e.id === employeeId);
-      if (!found) { router.push(`/accounts/${accountId}/employees`); return; }
-      setEmployee(found);
-      setName(found.name);
-      setPosition(found.position ?? "");
-      setIsReliever(found.isReliever);
-      setCategories(found.categories ?? []);
-      setTrainings(trainRes.data);
-    } catch {
-      setError("Failed to load employee.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      try {
+        const [empRes, trainRes] = await Promise.all([
+          api.get(`/accounts/${accountId}/employees`),
+          api.get(`/employees/${employeeId}/trainings`),
+        ]);
+        const found: Employee | undefined = empRes.data.find((e: Employee) => e.id === employeeId);
+        if (!found) { router.push(`/accounts/${accountId}/employees`); return; }
+        if (!cancelled) setEmployee(found);
+        if (!cancelled) setName(found.name);
+        if (!cancelled) setPosition(found.position ?? "");
+        if (!cancelled) setIsReliever(found.isReliever);
+        if (!cancelled) setCategories(found.categories ?? []);
+        if (!cancelled) setTrainings(trainRes.data);
+      } catch {
+        if (!cancelled) setError("Failed to load employee.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [employeeId]);
 
   function toggleCategory(cat: EmployeeCategory) {
     setCategories((prev) =>

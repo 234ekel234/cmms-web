@@ -45,19 +45,20 @@ export default function TrainingsPage() {
 
   const canEdit = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  useEffect(() => { fetchTrainings(); }, []);
-
-  async function fetchTrainings() {
-    setLoading(true);
-    try {
-      const res = await api.get("/trainings");
-      setTrainings(res.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get("/trainings");
+        if (!cancelled) setTrainings(res.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditId(null);

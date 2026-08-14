@@ -108,29 +108,35 @@ export default function AccountOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [now] = useState(() => Date.now());
 
-  useEffect(() => { fetchAll(); }, [accountId]);
-
-  async function fetchAll() {
-    setLoading(true);
-    try {
-      const [acc, wo, as, emp, pmc, act] = await Promise.all([
-        api.get(`${base}`).catch(() => ({ data: null })),
-        api.get(`${base}/work-orders`).catch(() => ({ data: [] })),
-        api.get(`${base}/assets`).catch(() => ({ data: [] })),
-        api.get(`${base}/employees`).catch(() => ({ data: [] })),
-        api.get(`${base}/pm-checklists`).catch(() => ({ data: [] })),
-        api.get(`${base}/audit-logs`).catch(() => ({ data: [] })),
-      ]);
-      setAccount(acc.data);
-      setWorkOrders(wo.data);
-      setAssets(as.data);
-      setEmployees(emp.data);
-      setPm(pmc.data);
-      setActivity(act.data);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      try {
+        const [acc, wo, as, emp, pmc, act] = await Promise.all([
+          api.get(`${base}`).catch(() => ({ data: null })),
+          api.get(`${base}/work-orders`).catch(() => ({ data: [] })),
+          api.get(`${base}/assets`).catch(() => ({ data: [] })),
+          api.get(`${base}/employees`).catch(() => ({ data: [] })),
+          api.get(`${base}/pm-checklists`).catch(() => ({ data: [] })),
+          api.get(`${base}/audit-logs`).catch(() => ({ data: [] })),
+        ]);
+        if (!cancelled) setAccount(acc.data);
+        if (!cancelled) setWorkOrders(wo.data);
+        if (!cancelled) setAssets(as.data);
+        if (!cancelled) setEmployees(emp.data);
+        if (!cancelled) setPm(pmc.data);
+        if (!cancelled) setActivity(act.data);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId]);
 
   if (loading) {
     return (

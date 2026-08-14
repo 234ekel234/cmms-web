@@ -48,19 +48,20 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { fetchNotifications(); }, []);
-
-  async function fetchNotifications() {
-    setLoading(true);
-    try {
-      const res = await api.get("/notifications");
-      setNotifications(res.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get("/notifications");
+        if (!cancelled) setNotifications(res.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function markRead(id: string) {
     try {

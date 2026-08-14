@@ -56,20 +56,26 @@ export default function EmployeesPage() {
   const [typeFilter, setTypeFilter] = useState<"ALL" | "REGULAR" | "RELIEVER">("ALL");
   const [availFilter, setAvailFilter] = useState<"ALL" | "AVAILABLE" | "OCCUPIED">("ALL");
 
-  useEffect(() => { fetchEmployees(); }, [accountId]);
-
-  async function fetchEmployees() {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await api.get(`/accounts/${accountId}/employees`);
-      setEmployees(res.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      if (!cancelled) setError(false);
+      try {
+        const res = await api.get(`/accounts/${accountId}/employees`);
+        if (!cancelled) setEmployees(res.data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId]);
 
   async function openAssignModal() {
     setShowAssign(true);

@@ -68,20 +68,21 @@ export default function EmployeesPage() {
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  useEffect(() => { fetchEmployees(); }, []);
-
-  async function fetchEmployees() {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await api.get("/employees");
-      setEmployees(res.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!cancelled) setError(false);
+      try {
+        const res = await api.get("/employees");
+        if (!cancelled) setEmployees(res.data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   function openCreate() {
     setEditId(null);

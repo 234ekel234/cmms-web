@@ -51,22 +51,27 @@ export default function AssetsPage() {
   const [formError, setFormError] = useState("");
   const [showImport, setShowImport] = useState(false);
 
-  useEffect(() => { fetchAssets(); }, [accountId, showArchived]);
-
-  async function fetchAssets() {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await api.get(`/accounts/${accountId}/assets`, {
-        params: showArchived ? { includeArchived: "true" } : {},
-      });
-      setAssets(res.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly, not left to the initial state: this effect also re-runs
+      // on the "Show archived" toggle, where `loading` is already false and the
+      // previous, wrong list would otherwise sit there with no affordance until
+      // the request returned.
+      if (!cancelled) { setError(false); setLoading(true); }
+      try {
+        const res = await api.get(`/accounts/${accountId}/assets`, {
+          params: showArchived ? { includeArchived: "true" } : {},
+        });
+        if (!cancelled) setAssets(res.data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId, showArchived]);
 
   async function addAsset() {
     if (!form.name.trim()) { setFormError("Name is required."); return; }

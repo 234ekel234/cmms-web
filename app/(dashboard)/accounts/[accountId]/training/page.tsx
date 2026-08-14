@@ -44,27 +44,33 @@ export default function TrainingPage() {
 
   const [search, setSearch] = useState("");
 
-  useEffect(() => { load(); }, [accountId]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      // The global library is staff-only and feeds the assign picker, which is
-      // itself gated on `writable`. A client viewing their own site's training
-      // record must not request it: the 403 would reject the whole Promise.all
-      // and blank the page they are entitled to see.
-      const [empRes, trainRes] = await Promise.all([
-        api.get(`/accounts/${accountId}/trainings`),
-        writable ? api.get("/trainings") : Promise.resolve({ data: [] }),
-      ]);
-      setEmployees(empRes.data);
-      setAllTrainings(trainRes.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      try {
+        // The global library is staff-only and feeds the assign picker, which is
+        // itself gated on `writable`. A client viewing their own site's training
+        // record must not request it: the 403 would reject the whole Promise.all
+        // and blank the page they are entitled to see.
+        const [empRes, trainRes] = await Promise.all([
+          api.get(`/accounts/${accountId}/trainings`),
+          writable ? api.get("/trainings") : Promise.resolve({ data: [] }),
+        ]);
+        if (!cancelled) setEmployees(empRes.data);
+        if (!cancelled) setAllTrainings(trainRes.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [accountId]);
 
   async function handleAssign(employeeId: string, trainingId: string) {
     setAssigning(true);

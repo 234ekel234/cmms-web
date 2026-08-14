@@ -42,24 +42,30 @@ export default function TrainingDetailPage() {
 
   const canManage = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER" || user?.role === "SUPERVISOR";
 
-  useEffect(() => { load(); }, [trainingId]);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const [trainRes, rosterRes] = await Promise.all([
-        api.get("/trainings"),
-        api.get(`/trainings/${trainingId}/employees`),
-      ]);
-      const found = (trainRes.data as Training[]).find((t) => t.id === trainingId);
-      setTraining(found ?? null);
-      setAssignments(rosterRes.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      // Set explicitly rather than relying on the initial state: this effect
+      // re-runs in place when the route param changes, where `loading` is
+      // already false and the previous record's data would otherwise sit
+      // there with no affordance until the new request returned.
+      if (!cancelled) setLoading(true);
+      try {
+        const [trainRes, rosterRes] = await Promise.all([
+          api.get("/trainings"),
+          api.get(`/trainings/${trainingId}/employees`),
+        ]);
+        const found = (trainRes.data as Training[]).find((t) => t.id === trainingId);
+        if (!cancelled) setTraining(found ?? null);
+        if (!cancelled) setAssignments(rosterRes.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [trainingId]);
 
   async function markComplete(employeeId: string) {
     setCompletingId(employeeId);

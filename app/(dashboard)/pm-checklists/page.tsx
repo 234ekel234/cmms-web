@@ -34,19 +34,20 @@ export default function PMChecklistsPage() {
 
   const canCreate = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  useEffect(() => { fetchChecklists(); }, []);
-
-  async function fetchChecklists() {
-    setLoading(true);
-    try {
-      const res = await api.get("/pm-checklists");
-      setChecklists(res.data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get("/pm-checklists");
+        if (!cancelled) setChecklists(res.data);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   async function createChecklist() {
     if (!form.name.trim()) { setFormError("Name is required."); return; }

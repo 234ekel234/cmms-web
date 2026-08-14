@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { isClosed } from "@/lib/workOrders";
+import type { WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -33,7 +35,9 @@ type Asset = {
 type WorkOrder = {
   id: string;
   title: string;
-  status: string;
+  // The union, not `string`: it is what the shared status predicates take, and
+  // it makes adding a status a compile error here rather than a silent gap.
+  status: WorkOrderStatus;
   priority: string;
   createdAt: string;
   completedAt: string | null;
@@ -103,9 +107,13 @@ const fmtCost = (n: number) =>
 // One work-order row: title + priority, status, dates, and assignees.
 function WorkOrderRow({ wo }: { wo: WorkOrder }) {
   const pr = PRIORITY_CONFIG[wo.priority] ?? { label: wo.priority, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
-  const isClosed = ["COMPLETED", "REJECTED"].includes(wo.status);
+  // The shared predicate. The local list this replaces omitted APPROVED, so a
+  // signed-off job in an asset's history showed "Opened <createdAt>" instead of
+  // when it was actually finished — and it shadowed the shared name with
+  // different semantics, which is worse than either mistake alone.
+  const closed = isClosed(wo);
   const dateLabel =
-    isClosed && wo.completedAt ? `Completed ${fmtDate(wo.completedAt)}` : `Opened ${fmtDate(wo.createdAt)}`;
+    closed && wo.completedAt ? `Completed ${fmtDate(wo.completedAt)}` : `Opened ${fmtDate(wo.createdAt)}`;
   const assignees = (wo.assignments ?? []).map((a) => a.employee.name);
   return (
     <Link
@@ -156,29 +164,35 @@ export default function AssetDetailPage() {
   const [saving, setSaving] = useState(false);
   // Captured once at mount so warranty/age math stays pure across re-renders.
   const [now] = useState(() => Date.now());
+  // Bumped by the "Try again" button. A counter in the deps re-runs the effect
+  // below rather than calling a bare fetch function, so a retry keeps the same
+  // cancellation guard as the mount fetch.
+  const [reloadKey, setReloadKey] = useState(0);
 
-  useEffect(() => { fetchAsset(); }, [assetId]);
-
-  async function fetchAsset() {
-    setLoading(true);
-    setError(false);
-    try {
-      const [assetRes, woRes, pmRes, partsRes] = await Promise.all([
-        api.get(`/assets/${assetId}`),
-        api.get(`/assets/${assetId}/work-orders`).catch(() => ({ data: [] })),
-        api.get(`/assets/${assetId}/pm-checklists`).catch(() => ({ data: [] })),
-        api.get(`/assets/${assetId}/parts`).catch(() => ({ data: [] })),
-      ]);
-      setAsset(assetRes.data);
-      setWorkOrders(woRes.data);
-      setPmChecklists(pmRes.data);
-      setSpareParts(partsRes.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!cancelled) setLoading(true);
+      if (!cancelled) setError(false);
+      try {
+        const [assetRes, woRes, pmRes, partsRes] = await Promise.all([
+          api.get(`/assets/${assetId}`),
+          api.get(`/assets/${assetId}/work-orders`).catch(() => ({ data: [] })),
+          api.get(`/assets/${assetId}/pm-checklists`).catch(() => ({ data: [] })),
+          api.get(`/assets/${assetId}/parts`).catch(() => ({ data: [] })),
+        ]);
+        if (!cancelled) setAsset(assetRes.data);
+        if (!cancelled) setWorkOrders(woRes.data);
+        if (!cancelled) setPmChecklists(pmRes.data);
+        if (!cancelled) setSpareParts(partsRes.data);
+      } catch {
+        if (!cancelled) setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [assetId, reloadKey]);
 
   async function updateAsset(updates: Partial<Asset>) {
     if (!asset) return;
@@ -223,7 +237,7 @@ export default function AssetDetailPage() {
       <div className="p-8">
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load asset.{" "}
-          <button onClick={fetchAsset} className="underline cursor-pointer">Try again</button>
+          <button onClick={() => setReloadKey((k) => k + 1)} className="underline cursor-pointer">Try again</button>
         </div>
       </div>
     );
