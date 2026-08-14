@@ -5,6 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { TrendChart, StackedBar, GroupedBars } from "@/components/charts";
+import { isClosed } from "@/lib/workOrders";
 
 type AccountSummary = {
   id: string;
@@ -75,7 +76,7 @@ type Period = "today" | "week" | "month" | "custom";
 type OpenOrder = {
   id: string;
   title: string;
-  status: string;
+  status: WorkOrderStatus;
   priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
   dueDate: string | null;
   createdAt: string;
@@ -254,8 +255,13 @@ export default function DashboardPage() {
             rows
               .filter(
                 (w) =>
-                  w.status !== "COMPLETED" &&
-                  w.status !== "REJECTED" &&
+                  // Not a hand-written list: APPROVED was missing from it, so
+                  // signed-off work counted as open — feeding the unassigned
+                  // tile, the priority mix and the stalled list, while the new
+                  // "Open Work by Account" chart beside them takes its figure
+                  // from the server, which excludes it. Two open counts for the
+                  // same account on one screen.
+                  !isClosed(w) &&
                   (!accountFilter || w.accountId === accountFilter),
               )
               .map((w) => ({

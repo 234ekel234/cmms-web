@@ -9,6 +9,7 @@ import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
+import { isClosed } from "@/lib/workOrders";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -69,9 +70,9 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "TITLE",    label: "Title A–Z"       },
 ];
 
-// Includes APPROVED, or signed-off work would read as still outstanding.
-const isTerminal = (o: WorkOrder) =>
-  o.status === "COMPLETED" || o.status === "APPROVED" || o.status === "REJECTED";
+// The shared mirror, not a local copy. The copy this replaces was correct; the
+// overdue check beside it was not, and having two of them is how that happened.
+const isTerminal = (o: WorkOrder) => isClosed(o);
 
 // Allowed status transitions a manager/supervisor can apply from each state.
 // Approving and sending back belong to the client and are offered only on the
@@ -304,7 +305,11 @@ export default function WorkOrdersPage() {
 
   const inView = orders.filter((o) => view === "special" ? o.isSpecialProject : !o.isSpecialProject);
   const now = new Date();
-  const isOverdue = (o: WorkOrder) => !!o.dueDate && o.status !== "COMPLETED" && o.status !== "REJECTED" && new Date(o.dueDate) < now;
+  // APPROVED was missing from the hand-written list here, so work a client had
+  // signed off still counted as overdue, showed the red badge and appeared under
+  // the OVERDUE filter — signed-off work reading as outstanding, which is the
+  // thing the approval status exists to prevent.
+  const isOverdue = (o: WorkOrder) => !!o.dueDate && !isClosed(o) && new Date(o.dueDate) < now;
   const overdueCount = inView.filter(isOverdue).length;
   const filtered =
     statusFilter === "ALL"

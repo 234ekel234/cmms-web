@@ -2426,9 +2426,16 @@ button {
 /* ── Shared: tooltip ──────────────────────────────────────
    Shown on hover and on keyboard focus alike, so a value is never mouse-only.
    It enhances and never gates: the same number is in the table twin. */
+/* Opens downward. Upward is the conventional direction and does not work here:
+   `.tu-card` carries `overflow: hidden` for its corner radius, and a chart sits
+   near the top of its card, so a tooltip above the mark had its top sliced off
+   by the card edge. Removing `overflow` from the bar itself did not help — the
+   clipping ancestor was always the card. Below the mark there is the legend,
+   the axis or the table toggle, all of which this may overlay: it is transient
+   and `pointer-events: none`. */
 .tu-tip {
   position: absolute;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;

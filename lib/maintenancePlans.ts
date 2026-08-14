@@ -50,6 +50,30 @@ export const PERIOD_UNIT: Record<Frequency, string> = {
   ANNUALLY: "year",
 };
 
+/**
+ * The largest lead offset the API will accept, per frequency.
+ *
+ * Mirrors `maxGenerateOffset` / `SHORTEST_PERIOD_DAYS` in
+ * backend/helpers/planSchedule.js, which validates against the *shortest*
+ * possible period so a plan cannot be configured into silence — 30 days into a
+ * monthly period does not exist in February, and the resulting silence looks
+ * exactly like a broken cron.
+ *
+ * Zero for DAILY: a one-day period leaves no day to wait for.
+ */
+const SHORTEST_PERIOD_DAYS: Record<Frequency, number> = {
+  DAILY: 1,
+  WEEKLY: 7,
+  MONTHLY: 28,
+  QUARTERLY: 90,
+  SEMI_ANNUALLY: 181,
+  ANNUALLY: 365,
+};
+
+export function maxLeadDays(frequency: Frequency): number {
+  return SHORTEST_PERIOD_DAYS[frequency] - 1;
+}
+
 export type PlanOccurrence = {
   id: string;
   title: string;

@@ -13,6 +13,7 @@ import {
   FREQUENCY_LABEL,
   PERIOD_NOUN,
   PERIOD_UNIT,
+  maxLeadDays,
   TONE_CLASS,
   dateInputValue,
   fmtDate,
@@ -257,10 +258,16 @@ export default function MaintenancePlanDetailPage() {
             </div>
             <div>
               <label className={labelCls}>Raise it</label>
-              <input className={inputCls} type="number" min={0} value={form.leadDays}
+              {/* Bounded by what the API will accept. Unbounded, a daily plan
+                  offered a field whose every non-zero value is a 400 on submit. */}
+              <input className={inputCls} type="number" min={0} max={maxLeadDays(form.frequency)}
+                disabled={maxLeadDays(form.frequency) === 0}
+                value={form.leadDays}
                 onChange={(e) => setForm((f) => ({ ...f, leadDays: e.target.value }))} placeholder="0" />
               <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
-                Days after the {PERIOD_UNIT[form.frequency]} starts. Blank raises it on day one.
+                {maxLeadDays(form.frequency) === 0
+                  ? `A daily plan is always raised on its own day.`
+                  : `Days after the ${PERIOD_UNIT[form.frequency]} starts, up to ${maxLeadDays(form.frequency)}. Blank raises it on day one.`}
               </p>
             </div>
             <div>

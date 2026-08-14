@@ -12,6 +12,7 @@ import {
   FREQUENCY_LABEL,
   PERIOD_NOUN,
   PERIOD_UNIT,
+  maxLeadDays,
   TONE_CLASS,
   fmtDate,
   planState,
@@ -293,11 +294,17 @@ export default function MaintenancePlansPage() {
             </div>
             <div>
               <label className={labelCls}>Raise it</label>
-              <input className={inputCls} type="number" min={0} value={form.leadDays}
+              {/* Bounded by what the API will accept. Unbounded, a daily plan
+                  offered a field whose every non-zero value is a 400 on submit. */}
+              <input className={inputCls} type="number" min={0} max={maxLeadDays(form.frequency)}
+                disabled={maxLeadDays(form.frequency) === 0}
+                value={form.leadDays}
                 onChange={(e) => setForm((f) => ({ ...f, leadDays: e.target.value }))}
                 placeholder="0" />
               <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
-                Days after the {PERIOD_UNIT[form.frequency]} starts. Blank raises it on day one.
+                {maxLeadDays(form.frequency) === 0
+                  ? `A daily plan is always raised on its own day.`
+                  : `Days after the ${PERIOD_UNIT[form.frequency]} starts, up to ${maxLeadDays(form.frequency)}. Blank raises it on day one.`}
               </p>
             </div>
             <div>
@@ -478,9 +485,14 @@ export default function MaintenancePlansPage() {
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)] text-xs">
                       {fmtDate(plan.currentPeriodDue)}
                       <div className="text-[var(--tu-text-disabled)]">
-                        {plan.generateOffsetDays > 0
-                          ? `raised ${fmtDate(plan.currentGenerateOn)}`
-                          : `for ${PERIOD_NOUN[plan.frequency]}`}
+                        {/* Null once the plan has ended — `fmtDate` would
+                            render an em dash and the row would read
+                            "Ended / raised —". */}
+                        {plan.currentGenerateOn == null
+                          ? "no further occurrences"
+                          : plan.generateOffsetDays > 0
+                            ? `raised ${fmtDate(plan.currentGenerateOn)}`
+                            : `for ${PERIOD_NOUN[plan.frequency]}`}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">

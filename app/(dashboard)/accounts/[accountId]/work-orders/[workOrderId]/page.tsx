@@ -580,7 +580,11 @@ export default function WorkOrderDetailPage() {
   }
 
   async function removeStep(item: ChecklistItem) {
-    if (!order) return;
+    // Guarded like addStep and toggleStep. Without it a double-click fires two
+    // DELETEs and the second 404s, painting "Checklist item not found" under a
+    // list from which the step was in fact removed perfectly well.
+    if (!order || savingSteps.has(item.id)) return;
+    setSavingSteps((prev) => new Set(prev).add(item.id));
     setStepError("");
     try {
       await api.delete(`/work-orders/${order.id}/checklist-items/${item.id}`);
@@ -591,6 +595,14 @@ export default function WorkOrderDetailPage() {
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setStepError(e?.response?.data?.error ?? "Could not remove that step.");
+    } finally {
+      // Released even on success: without this a failed delete could never be
+      // retried, because the id would stay latched in the in-flight set.
+      setSavingSteps((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   }
 
@@ -899,7 +911,9 @@ export default function WorkOrderDetailPage() {
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
             <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Assigned To</p>
-            {canManage && !isTerminal && (
+            {/* Assignments stay editable after sign-off on purpose — a wrong
+                name on a finished job must still be correctable. */}
+            {canManage && (
               <button
                 onClick={openAssignPicker}
                 className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
@@ -916,7 +930,9 @@ export default function WorkOrderDetailPage() {
                     {a.employee.name}
                   </Link>
                   {a.employee.position && <span className="text-[var(--tu-text-subtle)]">· {a.employee.position}</span>}
-                  {canManage && !isTerminal && (
+                  {/* Assignments stay editable after sign-off on purpose — a wrong
+                      name on a finished job must still be correctable. */}
+                  {canManage && (
                     <button
                       onClick={() => removeAssignment(a.employeeId)}
                       disabled={removingId === a.employeeId}
@@ -983,7 +999,12 @@ export default function WorkOrderDetailPage() {
         </div>
 
         {/* Time tracking (man-hours) */}
-        {["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED"].includes(order.status) && (() => {
+        {/* APPROVED included: the estimate and the recorded time are what the
+            job cost, and signing it off is no reason for them to disappear from
+            the page — the dashboard's man-hours panel is built on exactly these
+            two numbers for finished work. Only REQUESTED and REJECTED are left
+            out, where there is nothing to show. */}
+        {["PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED"].includes(order.status) && (() => {
           const liveSeconds = order.actualSeconds + (timerRunning && order.timerStartedAt
             ? Math.floor((nowTick + getServerClockOffset() - new Date(order.timerStartedAt).getTime()) / 1000)
             : 0);
