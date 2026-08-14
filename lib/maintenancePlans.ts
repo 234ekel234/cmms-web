@@ -23,7 +23,6 @@ export const FREQUENCY_LABEL: Record<Frequency, string> = {
   ANNUALLY: "Annually",
 };
 
-/** What one period is called when pointing at the current one. */
 /**
  * The current period, as something you can drop straight into a sentence:
  * "raise one for **this month**". Already demonstrative — never prefix it with
@@ -87,7 +86,8 @@ export type MaintenancePlan = {
   // Derived server-side from the schedule rather than stored, so it cannot drift
   // out of step with what the generator will actually do.
   currentPeriodStart: string;
-  currentGenerateOn: string;
+  /** Null once the plan is past its end date — there is no next occurrence. */
+  currentGenerateOn: string | null;
   currentPeriodDue: string;
   currentOccurrence: PlanOccurrence | null;
 };
@@ -150,6 +150,16 @@ export function planState(plan: MaintenancePlan): PlanState {
   }
   const occ = plan.currentOccurrence;
   if (!occ) {
+    // Past its end date: the server sends a null raise day precisely so this
+    // does not fall through to "the generator runs each morning", which reads
+    // as a fault when in fact nothing further is meant to happen.
+    if (plan.endDate && plan.currentGenerateOn == null) {
+      return {
+        label: "Ended",
+        tone: "neutral",
+        hint: `This plan ended on ${fmtDate(plan.endDate)}. No further work orders will be generated.`,
+      };
+    }
     // A plan with a lead offset is deliberately silent for the early part of
     // every period, so "nothing here yet" has two quite different meanings and
     // only one of them is worth a second glance. Naming the date is what

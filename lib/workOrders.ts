@@ -35,22 +35,32 @@ export function awaitingClient(wo: ApprovalShape & { status: WorkOrderStatus }):
 }
 
 /**
- * Settled — the record is finished and closed to further edits.
+ * Settled — work was delivered and accepted, so the record is now evidence.
  *
- * Mirrors `isSettled` on the server, which derives it from an order having no
- * allowed transitions left. Spelled out here because the client has no
- * transition table, but the three cases are the same: APPROVED and REJECTED are
- * terminal, and COMPLETED is terminal for routine internal work.
+ * Mirrors `isSettled` on the server, and the API answers 409 on anything this
+ * covers, so getting it wrong here costs a control that fails rather than an
+ * edit that should not have happened.
  *
- * The exception is the one that matters. Work awaiting a client is *not*
- * settled — they may still send it back for rework, so the technician has to be
- * able to finish the job when it returns. `awaitingClient` above is exactly the
- * case this must not catch.
+ * Two exceptions, both deliberate. Work *awaiting* a client is not settled —
+ * they may still send it back for rework, so the technician has to be able to
+ * finish the job when it returns. And REJECTED is not settled either: nothing
+ * was delivered and nobody accepted anything, so there is no record to protect,
+ * while the parts issued against it are real stock that has to be returnable.
  *
- * The API returns 409 on any of these, so getting it wrong here costs a control
- * that fails rather than an edit that shouldn't have happened.
+ * Use `isClosed` instead for "is this still outstanding" — overdue flags,
+ * queue counts. The two differ only on REJECTED, which is exactly where it matters.
  */
 export function isSettled(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
-  if (wo.status === "APPROVED" || wo.status === "REJECTED") return true;
+  if (wo.status === "APPROVED") return true;
   return wo.status === "COMPLETED" && !needsClientApproval(wo);
+}
+
+/**
+ * No longer outstanding work — the counterpart to the server's CLOSED_STATUSES.
+ *
+ * Includes REJECTED, which `isSettled` does not. A rejected job is not waiting
+ * on anyone and must not count as overdue, but its record is still editable.
+ */
+export function isClosed(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
+  return wo.status === "REJECTED" || isSettled(wo);
 }

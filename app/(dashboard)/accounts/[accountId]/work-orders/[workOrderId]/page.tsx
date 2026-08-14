@@ -6,7 +6,7 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { awaitingClient, isSettled, needsClientApproval } from "@/lib/workOrders";
+import { awaitingClient, isClosed, isSettled, needsClientApproval } from "@/lib/workOrders";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
@@ -669,7 +669,10 @@ export default function WorkOrderDetailPage() {
   // two must agree. An inline copy is how they would stop agreeing.
   const isTerminal = isSettled(order);
   const isAwaitingClient = awaitingClient(order);
-  const isOverdue = !!order.dueDate && !isTerminal && new Date(order.dueDate) < new Date();
+  // `isClosed`, not `isTerminal`: a rejected job is not outstanding and must not
+  // read as overdue, but its record stays editable so issued parts can go back
+  // to stock. The two predicates differ only there, which is why both exist.
+  const isOverdue = !!order.dueDate && !isClosed(order) && new Date(order.dueDate) < new Date();
 
   // Special project gate: only managers can approve/reject special projects
   const canActOnStatus = !isClient && canManage && (!order.isSpecialProject || isManager);

@@ -358,9 +358,13 @@ export default function MaintenancePlanDetailPage() {
               <Field
                 label="Raised on"
                 value={
-                  plan.generateOffsetDays > 0
-                    ? `${fmtDate(plan.currentGenerateOn)} — day ${plan.generateOffsetDays + 1} of the ${PERIOD_UNIT[plan.frequency]}`
-                    : `${fmtDate(plan.currentGenerateOn)} — first day of the ${PERIOD_UNIT[plan.frequency]}`
+                  // Null once the plan has passed its end date. Naming a day
+                  // here would promise an occurrence that will never come.
+                  plan.currentGenerateOn == null
+                    ? "No further occurrences — the plan has ended"
+                    : plan.generateOffsetDays > 0
+                      ? `${fmtDate(plan.currentGenerateOn)} — day ${plan.generateOffsetDays + 1} of the ${PERIOD_UNIT[plan.frequency]}`
+                      : `${fmtDate(plan.currentGenerateOn)} — first day of the ${PERIOD_UNIT[plan.frequency]}`
                 }
               />
               <Field
