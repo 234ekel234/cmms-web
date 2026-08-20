@@ -28,11 +28,9 @@ const WO_STATUS: { key: string; label: string; cls: string }[] = [
 ];
 
 const HEALTH: { key: string; label: string; cls: string }[] = [
-  { key: "NEW",            label: "New",            cls: "bg-[var(--tu-priority-medium)]" },
-  { key: "GOOD",           label: "Good",           cls: "bg-[var(--tu-status-completed)]" },
-  { key: "FAIR",           label: "Fair",           cls: "bg-[var(--tu-priority-high)]" },
-  { key: "POOR",           label: "Poor",           cls: "bg-[var(--tu-health-poor)]" },
-  { key: "OUT_OF_SERVICE", label: "Out of Service", cls: "bg-[var(--tu-priority-critical)]" },
+  { key: "FUNCTIONAL",               label: "Functional",     cls: "bg-[var(--tu-status-completed)]" },
+  { key: "FUNCTIONAL_WITH_FINDINGS", label: "With Findings",  cls: "bg-[var(--tu-priority-high)]" },
+  { key: "BREAKDOWN",                label: "Breakdown",      cls: "bg-[var(--tu-priority-critical)]" },
 ];
 
 function getPeriodStart(frequency: string, now: number): number {
@@ -155,7 +153,9 @@ export default function AccountOverviewPage() {
 
   // Assets
   const activeAssets = assets.filter((a) => !a.archivedAt);
-  const underMaint = activeAssets.filter((a) => a.status === "UNDER_MAINTENANCE").length;
+  // Counted from health, not status: status is free text, so "how many are
+  // down" can only be answered by the field that still has a fixed meaning.
+  const downNow = activeAssets.filter((a) => a.health === "BREAKDOWN").length;
   const healthSegments = HEALTH.map((h) => ({ label: h.label, count: activeAssets.filter((a) => a.health === h.key).length, cls: h.cls }));
 
   // Employees
@@ -171,7 +171,7 @@ export default function AccountOverviewPage() {
       {/* Stat tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile label="Open Work Orders" value={String(openWO.length)} sub={overdue.length > 0 ? `${overdue.length} overdue` : "none overdue"} href={`${base}/work-orders`} accent={openWO.length > 0 ? "text-[var(--tu-text-brand)]" : undefined} />
-        <StatTile label="Assets" value={String(activeAssets.length)} sub={underMaint > 0 ? `${underMaint} under maintenance` : "all operational"} href={`${base}/assets`} />
+        <StatTile label="Assets" value={String(activeAssets.length)} sub={downNow > 0 ? `${downNow} in breakdown` : "none in breakdown"} href={`${base}/assets`} />
         <StatTile label="Employees" value={String(employees.length)} sub={occupied > 0 ? `${occupied} occupied` : "all available"} href={`${base}/employees`} />
         <StatTile label="PM This Period" value={`${pmPct}%`} sub={`${pmCounts.done}/${pm.length} completed`} href={`${base}/checklists`} accent={pmPct >= 90 ? "text-[var(--tu-on-success)]" : pmPct >= 50 ? "text-[var(--tu-on-warning)]" : "text-[var(--tu-on-danger)]"} />
       </div>

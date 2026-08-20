@@ -3,14 +3,19 @@
 import { useRef, useState } from "react";
 import api from "@/lib/api";
 
-type Health = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
-type Status = "OPERATIONAL" | "UNDER_MAINTENANCE";
+type Health = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
-type ImportedAsset = { id: string; name: string; category: string; status: Status; health: Health };
+type ImportedAsset = {
+  id: string; name: string; category: string; status: string; health: Health;
+  assetCode: string | null; brand: string | null; model: string | null;
+};
 
 type Row = {
   name: string;
   category: string;
+  assetCode: string;
+  brand: string;
+  model: string;
   status: string;
   health: string;
   serialNumber: string;
@@ -23,12 +28,14 @@ type Row = {
 };
 
 const COLUMNS = [
-  "name", "category", "status", "health", "serialNumber",
+  "name", "category", "assetCode", "brand", "model", "status", "health", "serialNumber",
   "location", "purchaseDate", "purchaseCost", "warrantyExpiry", "manufacturedDate",
 ] as const;
 
-const STATUS_VALUES: Status[] = ["OPERATIONAL", "UNDER_MAINTENANCE"];
-const HEALTH_VALUES: Health[] = ["NEW", "GOOD", "FAIR", "POOR", "OUT_OF_SERVICE"];
+// Only health is checked against a list. `status` is free text in the database
+// now, so there is no valid set to reject a row against — whatever the sheet
+// says is what the asset is.
+const HEALTH_VALUES: Health[] = ["FUNCTIONAL", "FUNCTIONAL_WITH_FINDINGS", "BREAKDOWN"];
 
 // Minimal RFC4180-ish parser: handles quoted fields, embedded commas, "" escapes,
 // and both \n and \r\n line endings. Good enough for spreadsheet-exported CSVs.
@@ -71,8 +78,12 @@ function toRows(text: string): Row[] {
     const row: Row = {
       name: get("name"),
       category: get("category"),
-      status: get("status").toUpperCase(),
-      health: get("health").toUpperCase(),
+      assetCode: get("assetCode"),
+      brand: get("brand"),
+      model: get("model"),
+      // Kept as typed: this is the value that gets stored and shown.
+      status: get("status"),
+      health: get("health").toUpperCase().replace(/[ -]/g, "_"),
       serialNumber: get("serialNumber"),
       location: get("location"),
       purchaseDate: get("purchaseDate"),
@@ -82,7 +93,6 @@ function toRows(text: string): Row[] {
     };
     if (!row.name) row.error = "Name is required";
     else if (!row.category) row.error = "Category is required";
-    else if (row.status && !STATUS_VALUES.includes(row.status as Status)) row.error = `Invalid status "${row.status}"`;
     else if (row.health && !HEALTH_VALUES.includes(row.health as Health)) row.error = `Invalid health "${row.health}"`;
     return row;
   });
@@ -90,7 +100,7 @@ function toRows(text: string): Row[] {
 
 function downloadTemplate() {
   const header = COLUMNS.join(",");
-  const example = ["Generator A", "Electrical", "OPERATIONAL", "GOOD", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01"].join(",");
+  const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01"].join(",");
   const blob = new Blob([`${header}\n${example}\n`], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -213,8 +223,8 @@ export default function AssetImportModal({
                           <tr key={i} className={r.error ? "bg-[var(--tu-soft-danger)]" : ""}>
                             <td className="px-3 py-2 text-[var(--tu-text-body)]">{r.name || "—"}</td>
                             <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.category || "—"}</td>
-                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.status || "OPERATIONAL"}</td>
-                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.health || "GOOD"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.status || "Operational"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.health || "FUNCTIONAL"}</td>
                             <td className="px-3 py-2 text-[var(--tu-on-danger)]">{r.error ?? ""}</td>
                           </tr>
                         ))}

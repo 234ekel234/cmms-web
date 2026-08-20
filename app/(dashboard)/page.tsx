@@ -50,7 +50,7 @@ type DashboardData = {
   // is a compile error here instead of a silently missing chart segment. That
   // is how APPROVED was caught: WO_STATUS builds its series from the same map.
   workOrders: Record<WorkOrderStatus, number>;
-  assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
+  assets: { FUNCTIONAL: number; FUNCTIONAL_WITH_FINDINGS: number; BREAKDOWN: number };
   manHours: {
     estimatedMinutes: number;
     actualMinutes: number;
@@ -116,8 +116,11 @@ const WO_STATUS = (Object.keys(WORK_ORDER_STATUS) as WorkOrderStatus[]).map((key
   color: WORK_ORDER_STATUS[key].color,
 }));
 
-const COLOR_OPERATIONAL = "var(--tu-asset-operational)";
-const COLOR_MAINTENANCE = "var(--tu-asset-maintenance)";
+// Asset condition, three ways. Reuses the validated health palette rather than
+// the retired two-value asset colours.
+const COLOR_FUNCTIONAL = "var(--tu-health-good)";
+const COLOR_FINDINGS = "var(--tu-health-fair)";
+const COLOR_BREAKDOWN = "var(--tu-health-out)";
 const COLOR_PRESENT = "var(--tu-health-good)";
 const COLOR_ABSENT = "var(--tu-health-out)";
 
@@ -312,7 +315,10 @@ export default function DashboardPage() {
   const wo = data?.workOrders;
   const openWOs = (wo?.REQUESTED ?? 0) + (wo?.PENDING ?? 0) + (wo?.IN_PROGRESS ?? 0) + (wo?.ON_HOLD ?? 0);
   const totalWOs = WO_STATUS.reduce((s, x) => s + (wo?.[x.key] ?? 0), 0);
-  const totalAssets = (data?.assets.OPERATIONAL ?? 0) + (data?.assets.UNDER_MAINTENANCE ?? 0);
+  const totalAssets =
+    (data?.assets.FUNCTIONAL ?? 0) +
+    (data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0) +
+    (data?.assets.BREAKDOWN ?? 0);
   const overdue = data?.overdueWorkOrders ?? 0;
   const present = data?.attendance.present ?? 0;
   const absent = data?.attendance.absent ?? 0;
@@ -677,30 +683,31 @@ export default function DashboardPage() {
               <span className="tu-chart-total">{loading ? "—" : totalAssets}</span>
               <span className="tu-chart-cap">total assets</span>
             </div>
-            <div className="tu-segbar" role="img" aria-label={`Assets: ${data?.assets.OPERATIONAL ?? 0} operational, ${data?.assets.UNDER_MAINTENANCE ?? 0} under maintenance`}>
+            <div className="tu-segbar" role="img" aria-label={`Assets: ${data?.assets.FUNCTIONAL ?? 0} functional, ${data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0} functional with findings, ${data?.assets.BREAKDOWN ?? 0} in breakdown`}>
               {!loading && totalAssets > 0 && (
                 <>
-                  <span style={{ width: `${((data?.assets.OPERATIONAL ?? 0) / totalAssets) * 100}%`, background: COLOR_OPERATIONAL }} title={`Operational: ${data?.assets.OPERATIONAL ?? 0}`} />
-                  <span style={{ width: `${((data?.assets.UNDER_MAINTENANCE ?? 0) / totalAssets) * 100}%`, background: COLOR_MAINTENANCE }} title={`Under Maintenance: ${data?.assets.UNDER_MAINTENANCE ?? 0}`} />
+                  <span style={{ width: `${((data?.assets.FUNCTIONAL ?? 0) / totalAssets) * 100}%`, background: COLOR_FUNCTIONAL }} title={`Functional: ${data?.assets.FUNCTIONAL ?? 0}`} />
+                  <span style={{ width: `${((data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0) / totalAssets) * 100}%`, background: COLOR_FINDINGS }} title={`Functional with Findings: ${data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0}`} />
+                  <span style={{ width: `${((data?.assets.BREAKDOWN ?? 0) / totalAssets) * 100}%`, background: COLOR_BREAKDOWN }} title={`Breakdown: ${data?.assets.BREAKDOWN ?? 0}`} />
                 </>
               )}
             </div>
             <div>
               <ul className="tu-legend">
                 <li>
-                  <span className="tu-dot" style={{ background: COLOR_OPERATIONAL }} />
-                  Operational
-                  <span className="tu-legend-val">{loading ? "—" : data?.assets.OPERATIONAL ?? 0}</span>
+                  <span className="tu-dot" style={{ background: COLOR_FUNCTIONAL }} />
+                  Functional
+                  <span className="tu-legend-val">{loading ? "—" : data?.assets.FUNCTIONAL ?? 0}</span>
                 </li>
                 <li>
-                  <span className="tu-dot" style={{ background: COLOR_MAINTENANCE }} />
-                  Under Maintenance
-                  <span className="tu-legend-val">{loading ? "—" : data?.assets.UNDER_MAINTENANCE ?? 0}</span>
+                  <span className="tu-dot" style={{ background: COLOR_FINDINGS }} />
+                  With Findings
+                  <span className="tu-legend-val">{loading ? "—" : data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0}</span>
                 </li>
                 <li>
-                  <span className="tu-dot" style={{ background: "var(--tu-health-out)" }} />
-                  Poor / Out of Service
-                  <span className="tu-legend-val">{loading ? "—" : data?.poorHealthAssets ?? 0}</span>
+                  <span className="tu-dot" style={{ background: COLOR_BREAKDOWN }} />
+                  Breakdown
+                  <span className="tu-legend-val">{loading ? "—" : data?.assets.BREAKDOWN ?? 0}</span>
                 </li>
               </ul>
             </div>

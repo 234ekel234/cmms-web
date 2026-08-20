@@ -12,8 +12,11 @@ type Asset = {
   id: string;
   name: string;
   category: string;
-  status: "OPERATIONAL" | "UNDER_MAINTENANCE";
-  health: "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+  status: string;
+  health: "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
+  assetCode: string | null;
+  brand: string | null;
+  model: string | null;
   serialNumber: string | null;
   location: string | null;
   openWorkOrders: number;
@@ -28,25 +31,16 @@ type StatusFilter = "ALL" | Asset["status"];
 type SortKey = "NAME" | "ACCOUNT" | "HEALTH" | "OPEN_WOS" | "LAST_MAINT";
 
 const HEALTH_BADGE: Record<Asset["health"], { cls: string; label: string }> = {
-  NEW:             { cls: "tu-badge tu-badge-brand",    label: "New"            },
-  GOOD:            { cls: "tu-badge tu-badge-success",  label: "Good"           },
-  FAIR:            { cls: "tu-badge tu-badge-warning",  label: "Fair"           },
-  POOR:            { cls: "tu-badge tu-badge-danger",   label: "Poor"           },
-  OUT_OF_SERVICE:  { cls: "tu-badge tu-badge-neutral",  label: "Out of Service" },
-};
-
-const STATUS_BADGE: Record<Asset["status"], { cls: string; label: string }> = {
-  OPERATIONAL:       { cls: "tu-badge tu-badge-success", label: "Operational"       },
-  UNDER_MAINTENANCE: { cls: "tu-badge tu-badge-warning", label: "Under Maintenance" },
+  FUNCTIONAL:               { cls: "tu-badge tu-badge-success", label: "Functional"      },
+  FUNCTIONAL_WITH_FINDINGS: { cls: "tu-badge tu-badge-warning", label: "With Findings"   },
+  BREAKDOWN:                { cls: "tu-badge tu-badge-danger",  label: "Breakdown"       },
 };
 
 const HEALTH_TABS: { key: HealthFilter; label: string }[] = [
-  { key: "ALL",            label: "All"            },
-  { key: "NEW",            label: "New"            },
-  { key: "GOOD",           label: "Good"           },
-  { key: "FAIR",           label: "Fair"           },
-  { key: "POOR",           label: "Poor"           },
-  { key: "OUT_OF_SERVICE", label: "Out of Service" },
+  { key: "ALL",                      label: "All"                      },
+  { key: "FUNCTIONAL",               label: "Functional"               },
+  { key: "FUNCTIONAL_WITH_FINDINGS", label: "Functional with Findings" },
+  { key: "BREAKDOWN",                label: "Breakdown"                },
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -59,7 +53,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 // Worst first, so a descending sort surfaces failing equipment at the top.
 const HEALTH_RANK: Record<Asset["health"], number> = {
-  OUT_OF_SERVICE: 5, POOR: 4, FAIR: 3, GOOD: 2, NEW: 1,
+  BREAKDOWN: 3, FUNCTIONAL_WITH_FINDINGS: 2, FUNCTIONAL: 1,
 };
 
 function formatDate(iso: string) {
@@ -116,7 +110,10 @@ export default function AssetsPage() {
         a.category.toLowerCase().includes(q) ||
         a.account.name.toLowerCase().includes(q) ||
         !!a.location?.toLowerCase().includes(q) ||
-        !!a.serialNumber?.toLowerCase().includes(q);
+        !!a.serialNumber?.toLowerCase().includes(q) ||
+        !!a.assetCode?.toLowerCase().includes(q) ||
+        !!a.brand?.toLowerCase().includes(q) ||
+        !!a.model?.toLowerCase().includes(q);
       return matchAccount && matchStatus && matchSearch;
     });
   }, [assets, selectedAccounts, statusFilter, search]);
@@ -152,8 +149,16 @@ export default function AssetsPage() {
     return rows;
   }, [preHealth, healthFilter, sortKey]);
 
-  const poorCount = assets.filter((a) => a.health === "POOR" || a.health === "OUT_OF_SERVICE").length;
-  const underMaintenanceCount = assets.filter((a) => a.status === "UNDER_MAINTENANCE").length;
+  const poorCount = assets.filter((a) => a.health !== "FUNCTIONAL").length;
+  const underMaintenanceCount = assets.filter((a) => a.health === "BREAKDOWN").length;
+
+  // The status filter is built from what is actually stored, because status is
+  // free text — there is no fixed list to offer. Anything an account has
+  // written is selectable; anything nobody uses never clutters the menu.
+  const statusOptions = useMemo(
+    () => Array.from(new Set(assets.map((a) => a.status).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [assets]
+  );
 
   const activeFilterCount =
     (selectedAccounts.size > 0 ? 1 : 0) +
@@ -259,8 +264,9 @@ export default function AssetsPage() {
             aria-label="Filter by status"
           >
             <option value="ALL">All statuses</option>
-            <option value="OPERATIONAL">Operational</option>
-            <option value="UNDER_MAINTENANCE">Under Maintenance</option>
+            {statusOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
           </select>
 
           <select
@@ -338,7 +344,6 @@ export default function AssetsPage() {
               ) : (
                 sorted.map((asset) => {
                   const health = HEALTH_BADGE[asset.health];
-                  const status = STATUS_BADGE[asset.status];
                   return (
                     <tr key={asset.id} style={asset.archivedAt ? { opacity: 0.5 } : undefined}>
                       <td className="tu-strong">
@@ -360,7 +365,7 @@ export default function AssetsPage() {
                       </td>
                       <td style={{ color: "var(--tu-text-body)" }}>{asset.category}</td>
                       <td><span className={health.cls}>{health.label}</span></td>
-                      <td><span className={status.cls}>{status.label}</span></td>
+                      <td><span className="tu-badge tu-badge-neutral">{asset.status || "—"}</span></td>
                       <td style={{ color: "var(--tu-text-body)" }}>
                         {asset.location ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                       </td>

@@ -13,15 +13,17 @@ import { fmtQty, type Part } from "@/lib/parts";
 import EmptyState from "@/components/EmptyState";
 import Attachments from "@/components/Attachments";
 
-type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
-type AssetStatus = "OPERATIONAL" | "UNDER_MAINTENANCE";
+type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
 type Asset = {
   id: string;
   name: string;
   category: string;
-  status: AssetStatus;
+  status: string;
   health: AssetHealth;
+  assetCode: string | null;
+  brand: string | null;
+  model: string | null;
   serialNumber: string | null;
   location: string | null;
   purchaseDate: string | null;
@@ -60,12 +62,10 @@ type PMChecklistAssignment = {
   logs: PMLogLite[];
 };
 
-const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
-  NEW:            { label: "New",            cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  GOOD:           { label: "Good",           cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-  FAIR:           { label: "Fair",           cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  POOR:           { label: "Poor",           cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]" },
-  OUT_OF_SERVICE: { label: "Out of Service", cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
+const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string; hint: string }> = {
+  FUNCTIONAL:               { label: "Functional",               cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]", hint: "Working as it should" },
+  FUNCTIONAL_WITH_FINDINGS: { label: "Functional with Findings", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]", hint: "Still running, but something was found" },
+  BREAKDOWN:                { label: "Breakdown",                cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]",  hint: "Down — starts counting downtime" },
 };
 
 const WO_STATUS_CLS: Record<string, string> = {
@@ -161,6 +161,8 @@ export default function AssetDetailPage() {
   const [error, setError] = useState(false);
   const [editHealth, setEditHealth] = useState(false);
   const [editStatus, setEditStatus] = useState(false);
+  const [statusDraft, setStatusDraft] = useState("");
+  const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   // Captured once at mount so warranty/age math stays pure across re-renders.
   const [now] = useState(() => Date.now());
@@ -194,16 +196,22 @@ export default function AssetDetailPage() {
     return () => { cancelled = true; };
   }, [assetId, reloadKey]);
 
+  // PUT on the account-scoped path, which is the only asset write the API
+  // exposes. This used to PATCH /assets/:id — a route that does not exist — so
+  // every edit from this page 404'd into the silent catch and the UI simply
+  // snapped back to the old value with no error shown.
   async function updateAsset(updates: Partial<Asset>) {
     if (!asset) return;
     setSaving(true);
+    setSaveError("");
     try {
-      const res = await api.patch(`/assets/${assetId}`, updates);
+      const res = await api.put(`/accounts/${accountId}/assets/${assetId}`, updates);
       setAsset(res.data);
       setEditHealth(false);
       setEditStatus(false);
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setSaveError(e?.response?.data?.error ?? "Could not save that change.");
     } finally {
       setSaving(false);
     }
@@ -314,6 +322,9 @@ export default function AssetDetailPage() {
                 </button>
               ))}
               <button onClick={() => setEditHealth(false)} className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer">Cancel</button>
+              <p className="w-full text-[11px] text-[var(--tu-text-subtle)] mt-1">
+                {HEALTH_CONFIG[asset.health].hint}. Marking an asset as a breakdown starts its downtime clock; moving it off stops it.
+              </p>
             </div>
           ) : (
             <div className="flex items-center gap-2">
@@ -329,38 +340,55 @@ export default function AssetDetailPage() {
         <div className="mb-4">
           <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-1">Status</p>
           {editStatus ? (
-            <div className="flex gap-2">
-              {(["OPERATIONAL", "UNDER_MAINTENANCE"] as AssetStatus[]).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => updateAsset({ status: s })}
-                  disabled={saving}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                    asset.status === s ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
-                  }`}
-                >
-                  {s === "OPERATIONAL" ? "Operational" : "Under Maintenance"}
-                </button>
-              ))}
-              <button onClick={() => setEditStatus(false)} className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer">Cancel</button>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                className="flex-1 min-w-[200px] border border-[var(--tu-border)] rounded-lg px-3 py-1.5 text-xs text-[var(--tu-text-body)] bg-[var(--tu-bg-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                value={statusDraft}
+                onChange={(e) => setStatusDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === "Enter") updateAsset({ status: statusDraft }); }}
+                placeholder="e.g. Awaiting spare parts"
+                maxLength={80}
+                autoFocus
+              />
+              <button
+                onClick={() => updateAsset({ status: statusDraft })}
+                disabled={saving}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+              >
+                {saving ? "Saving…" : "Save"}
+              </button>
+              <button onClick={() => { setEditStatus(false); setSaveError(""); }} className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer">Cancel</button>
+              <p className="w-full text-[11px] text-[var(--tu-text-subtle)]">
+                Describe what the asset is doing, in your own words. Condition is recorded under Health.
+              </p>
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${asset.status === "OPERATIONAL" ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>
-                {asset.status === "OPERATIONAL" ? "Operational" : "Under Maintenance"}
+              <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-bg-secondary)] text-[var(--tu-text-body)]">
+                {asset.status || "—"}
               </span>
               {writable && !asset.archivedAt && (
-                <button onClick={() => setEditStatus(true)} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
+                <button onClick={() => { setStatusDraft(asset.status ?? ""); setEditStatus(true); }} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
               )}
             </div>
           )}
         </div>
+
+        {/* A failed save used to be invisible — the value simply snapped back.
+            Say so instead, since the one error a user can actually cause here
+            is a duplicate asset code. */}
+        {saveError && (
+          <p className="text-xs font-semibold text-[var(--tu-on-danger)] mb-4">{saveError}</p>
+        )}
 
         {/* Details */}
         <div className="pt-4 border-t border-[var(--tu-border)]">
           <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Details</p>
           <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
             {[
+              { label: "Asset Code", value: asset.assetCode },
+              { label: "Brand", value: asset.brand },
+              { label: "Model", value: asset.model },
               { label: "Serial No.", value: asset.serialNumber },
               { label: "Location", value: asset.location },
               { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },

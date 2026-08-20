@@ -24,8 +24,13 @@ export type WorkOrderStatus =
   | "REJECTED";
 
 export type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
-export type AssetStatus = "OPERATIONAL" | "UNDER_MAINTENANCE";
-export type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+/**
+ * Free text, mirroring the column. There is no union to check against any more:
+ * a site writes whatever describes the asset ("Standby", "Awaiting spare
+ * parts"), and the API stores it verbatim.
+ */
+export type AssetStatus = string;
+export type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
 export type StatusMeta = {
   label: string;
@@ -71,18 +76,31 @@ export const WORK_ORDER_PRIORITY: Record<WorkOrderPriority, StatusMeta> = {
 };
 
 // ── Asset status ─────────────────────────────────────────
-export const ASSET_STATUS: Record<AssetStatus, StatusMeta> = {
-  OPERATIONAL: { label: "Operational", badge: "tu-badge tu-badge-success", color: "var(--tu-asset-operational)" },
-  UNDER_MAINTENANCE: { label: "Under Maintenance", badge: "tu-badge tu-badge-warning", color: "var(--tu-asset-maintenance)" },
-};
+/**
+ * Status is a neutral chip, deliberately — it carries no colour signal at all.
+ *
+ * It used to be two values and green/amber said which. Now that anyone can type
+ * anything, colouring it would mean string-matching free text to decide what is
+ * "good", which is exactly the guesswork that made it unfit to drive the
+ * downtime ledger. Health is the field that carries meaning, and it is the one
+ * that gets a colour; status is shown as written.
+ */
+export function assetStatusMeta(status: string | null | undefined): StatusMeta {
+  return {
+    label: status?.trim() || "—",
+    badge: "tu-badge tu-badge-neutral",
+    color: "var(--tu-text-subtle)",
+  };
+}
 
 // ── Asset health ─────────────────────────────────────────
+// Three values, worst last. Colours reuse the existing validated palette
+// entries rather than introducing new ones: good → functional, fair → findings,
+// out → breakdown.
 export const ASSET_HEALTH: Record<AssetHealth, StatusMeta> = {
-  NEW: { label: "New", badge: "tu-badge tu-badge-brand", color: "var(--tu-health-new)" },
-  GOOD: { label: "Good", badge: "tu-badge tu-badge-success", color: "var(--tu-health-good)" },
-  FAIR: { label: "Fair", badge: "tu-badge tu-badge-warning", color: "var(--tu-health-fair)" },
-  POOR: { label: "Poor", badge: "tu-badge tu-badge-danger", color: "var(--tu-health-poor)" },
-  OUT_OF_SERVICE: { label: "Out of Service", badge: "tu-badge tu-badge-danger", color: "var(--tu-health-out)" },
+  FUNCTIONAL: { label: "Functional", badge: "tu-badge tu-badge-success", color: "var(--tu-health-good)" },
+  FUNCTIONAL_WITH_FINDINGS: { label: "Functional with Findings", badge: "tu-badge tu-badge-warning", color: "var(--tu-health-fair)" },
+  BREAKDOWN: { label: "Breakdown", badge: "tu-badge tu-badge-danger", color: "var(--tu-health-out)" },
 };
 
 // ── Lookup helpers (safe for unknown/legacy values) ──────
@@ -97,5 +115,6 @@ function metaOf<T extends string>(
 
 export const workOrderStatusMeta = (s: string | null | undefined) => metaOf(WORK_ORDER_STATUS, s);
 export const workOrderPriorityMeta = (p: string | null | undefined) => metaOf(WORK_ORDER_PRIORITY, p, "—");
-export const assetStatusMeta = (s: string | null | undefined) => metaOf(ASSET_STATUS, s);
+// assetStatusMeta is defined above with the asset section — it takes free text
+// rather than looking a key up in a map, so it is not a metaOf() wrapper.
 export const assetHealthMeta = (h: string | null | undefined) => metaOf(ASSET_HEALTH, h);

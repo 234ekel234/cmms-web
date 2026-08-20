@@ -9,29 +9,30 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 
-type AssetHealth = "NEW" | "GOOD" | "FAIR" | "POOR" | "OUT_OF_SERVICE";
+type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
 type Asset = {
   id: string;
   name: string;
   category: string;
-  status: "OPERATIONAL" | "UNDER_MAINTENANCE";
+  status: string;
   health: AssetHealth;
+  assetCode: string | null;
+  brand: string | null;
+  model: string | null;
   openWorkOrders: number;
   lastCompletedAt: string | null;
   archivedAt: string | null;
 };
 
 const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
-  NEW:            { label: "New",            cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  GOOD:           { label: "Good",           cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-  FAIR:           { label: "Fair",           cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  POOR:           { label: "Poor",           cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]" },
-  OUT_OF_SERVICE: { label: "Out of Service", cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
+  FUNCTIONAL:               { label: "Functional",               cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
+  FUNCTIONAL_WITH_FINDINGS: { label: "Functional with Findings", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
+  BREAKDOWN:                { label: "Breakdown",                cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 // Ascending — the health sort puts the worst-off assets first.
-const HEALTH_RANK: Record<AssetHealth, number> = { OUT_OF_SERVICE: 0, POOR: 1, FAIR: 2, GOOD: 3, NEW: 4 };
+const HEALTH_RANK: Record<AssetHealth, number> = { BREAKDOWN: 0, FUNCTIONAL_WITH_FINDINGS: 1, FUNCTIONAL: 2 };
 
 export default function AssetsPage() {
   const params = useParams();
@@ -46,7 +47,7 @@ export default function AssetsPage() {
   const [showArchived, setShowArchived] = useState(false);
   const [sortKey, setSortKey] = useState<"name" | "condition">("name");
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", category: "", health: "GOOD" as AssetHealth });
+  const [form, setForm] = useState({ name: "", category: "", assetCode: "", brand: "", model: "", status: "", health: "FUNCTIONAL" as AssetHealth });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -82,12 +83,16 @@ export default function AssetsPage() {
       const res = await api.post(`/accounts/${accountId}/assets`, {
         name: form.name.trim(),
         category: form.category.trim(),
+        assetCode: form.assetCode.trim(),
+        brand: form.brand.trim(),
+        model: form.model.trim(),
+        // Left blank the API applies its own default rather than storing "".
+        status: form.status.trim(),
         health: form.health,
-        status: "OPERATIONAL",
       });
       setAssets((prev) => [...prev, res.data]);
       setShowForm(false);
-      setForm({ name: "", category: "", health: "GOOD" });
+      setForm({ name: "", category: "", assetCode: "", brand: "", model: "", status: "", health: "FUNCTIONAL" });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to add asset.");
@@ -171,6 +176,42 @@ export default function AssetsPage() {
                 value={form.category}
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                 placeholder="e.g. HVAC, Electrical"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Asset Code</label>
+              <input
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                value={form.assetCode}
+                onChange={(e) => setForm((f) => ({ ...f, assetCode: e.target.value }))}
+                placeholder="e.g. MKT-HV-001"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Status</label>
+              <input
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                value={form.status}
+                onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
+                placeholder="Operational"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Brand</label>
+              <input
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                value={form.brand}
+                onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}
+                placeholder="e.g. Carrier"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Model</label>
+              <input
+                className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                value={form.model}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                placeholder="e.g. 39CQ"
               />
             </div>
             <div className="col-span-2">
@@ -259,8 +300,8 @@ export default function AssetsPage() {
                     </td>
                     <td className="px-6 py-4">
                       {!isArchived && (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${asset.status === "OPERATIONAL" ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>
-                          {asset.status === "OPERATIONAL" ? "Operational" : "Under Maintenance"}
+                        <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-bg-secondary)] text-[var(--tu-text-body)]">
+                          {asset.status || "—"}
                         </span>
                       )}
                     </td>

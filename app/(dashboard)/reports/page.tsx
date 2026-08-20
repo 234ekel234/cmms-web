@@ -23,7 +23,7 @@ type AccountSummary = {
 
 type DashboardData = {
   workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; ON_HOLD: number; COMPLETED: number; REJECTED: number };
-  assets: { OPERATIONAL: number; UNDER_MAINTENANCE: number };
+  assets: { FUNCTIONAL: number; FUNCTIONAL_WITH_FINDINGS: number; BREAKDOWN: number };
   overdueWorkOrders: number;
   poorHealthAssets: number;
   attendance: { present: number; absent: number };
@@ -194,7 +194,10 @@ export default function ReportsPage() {
   const wo = data?.workOrders;
   const totalWOs = wo ? Object.values(wo).reduce((a, b) => a + b, 0) : 0;
   const completedWOs = wo?.COMPLETED ?? 0;
-  const totalAssets = (data?.assets.OPERATIONAL ?? 0) + (data?.assets.UNDER_MAINTENANCE ?? 0);
+  const totalAssets =
+    (data?.assets.FUNCTIONAL ?? 0) +
+    (data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0) +
+    (data?.assets.BREAKDOWN ?? 0);
 
   return (
     <div className="tu-page">
