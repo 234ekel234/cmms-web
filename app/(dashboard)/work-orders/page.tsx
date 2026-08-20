@@ -9,6 +9,7 @@ import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
 import RowMenu from "@/components/RowMenu";
 import { EmptyRow } from "@/components/EmptyState";
+import { awaitingClient, triageRank } from "@/lib/workOrders";
 
 type Account = { id: string; name: string };
 
@@ -21,6 +22,7 @@ type WorkOrder = {
   dueDate: string | null;
   category: string | null;
   isSpecialProject: boolean;
+  type: "INTERNAL" | "EXTERNAL";
   estimatedMinutes: number | null;
   actualSeconds: number;
   timerStartedAt: string | null;
@@ -31,7 +33,9 @@ type WorkOrder = {
   createdAt: string;
 };
 
-type StatusFilter = "ALL" | "OVERDUE" | WorkOrder["status"];
+// "AWAITING" is a question about the order, not a status the API knows — see
+// the note on the account list's own StatusFilter.
+type StatusFilter = "ALL" | "OVERDUE" | "AWAITING" | WorkOrder["status"];
 type PriorityFilter = "ALL" | NonNullable<WorkOrder["priority"]>;
 type SortKey = "SMART" | "NEWEST" | "OLDEST" | "DUE_SOON" | "PRIORITY" | "TITLE" | "ACCOUNT";
 type View = "list" | "calendar";
@@ -39,6 +43,7 @@ type View = "list" | "calendar";
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "ALL",         label: "All"         },
   { key: "OVERDUE",     label: "Overdue"     },
+  { key: "AWAITING",    label: "Awaiting sign-off" },
   { key: "REQUESTED",   label: "Requested"   },
   { key: "PENDING",     label: "Accepted"    },
   { key: "IN_PROGRESS", label: "In Progress" },
@@ -78,9 +83,12 @@ const isTerminal = (wo: { status: WorkOrder["status"] }) =>
   wo.status === "COMPLETED" || wo.status === "APPROVED" || wo.status === "REJECTED";
 
 // "Smart" triage sort: closed orders sink; among open ones rank by priority
-// (Critical first), then overdue-first, then soonest due, then newest.
+// (Critical first), then overdue-first, then soonest due, then newest. Work
+// waiting on a client sorts between the two — it is not active, but it is not
+// over either, and ranking it as plain "closed" buried it under signed-off and
+// rejected jobs where no manager would ever scroll to find it.
 function smartCompare(a: WorkOrder, b: WorkOrder) {
-  const term = (isTerminal(a) ? 1 : 0) - (isTerminal(b) ? 1 : 0);
+  const term = triageRank(a) - triageRank(b);
   if (term !== 0) return term;
 
   const prio = (b.priority ? PRIORITY_RANK[b.priority] : 0) - (a.priority ? PRIORITY_RANK[a.priority] : 0);
@@ -193,7 +201,13 @@ export default function WorkOrdersPage() {
   }, []);
 
   const matchesStatus = (wo: WorkOrder, key: StatusFilter) =>
-    key === "ALL" ? true : key === "OVERDUE" ? isOverdue(wo) : wo.status === key;
+    key === "ALL"
+      ? true
+      : key === "OVERDUE"
+      ? isOverdue(wo)
+      : key === "AWAITING"
+      ? awaitingClient(wo)
+      : wo.status === key;
 
   // Everything except the status filter — the tab counts are computed against
   // this set so each tab shows how many rows it would reveal.
@@ -491,7 +505,17 @@ export default function WorkOrdersPage() {
                         <td style={{ color: "var(--tu-text-body)" }}>
                           {wo.asset?.name ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                         </td>
-                        <td><span className={st.cls}>{st.label}</span></td>
+                        <td>
+                          <span className={st.cls}>{st.label}</span>
+                          {awaitingClient(wo) && (
+                            <div
+                              className="tu-badge tu-badge-info"
+                              style={{ marginTop: 4, fontSize: 10, padding: "1px 6px", whiteSpace: "nowrap" }}
+                            >
+                              ⏳ Awaiting client
+                            </div>
+                          )}
+                        </td>
                         <td>
                           {pri ? <span className={pri.cls}>{wo.priority}</span> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                         </td>

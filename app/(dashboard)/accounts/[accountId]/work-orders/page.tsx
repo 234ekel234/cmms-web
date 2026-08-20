@@ -9,10 +9,16 @@ import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
-import { isClosed } from "@/lib/workOrders";
+import { awaitingClient, isClosed, signOffCue, triageRank } from "@/lib/workOrders";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+
+// "AWAITING" is not a status the API knows — it is COMPLETED work that still
+// needs the client, which is a question about the order and not about its
+// status alone. It lives in the filter union rather than beside the real
+// statuses so nothing can mistake it for one and send it to the API.
+type StatusFilter = WorkOrderStatus | "ALL" | "OVERDUE" | "AWAITING";
 
 type WorkOrder = {
   id: string;
@@ -134,10 +140,10 @@ export default function WorkOrdersPage() {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "ALL" | "OVERDUE">(() => {
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
     const raw = searchParams.get("status")?.toUpperCase();
-    const valid = ["OVERDUE", "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED"];
-    return raw && valid.includes(raw) ? (raw as WorkOrderStatus | "OVERDUE") : "ALL";
+    const valid = ["OVERDUE", "AWAITING", "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED"];
+    return raw && valid.includes(raw) ? (raw as StatusFilter) : "ALL";
   });
   const [view, setView] = useState<"work" | "special">("work");
   const [sortKey, setSortKey] = useState<SortKey>("SMART");
@@ -311,11 +317,17 @@ export default function WorkOrdersPage() {
   // thing the approval status exists to prevent.
   const isOverdue = (o: WorkOrder) => !!o.dueDate && !isClosed(o) && new Date(o.dueDate) < now;
   const overdueCount = inView.filter(isOverdue).length;
+  // Its own filter rather than a slice of COMPLETED: the whole point is that
+  // this work is *not* the same as the completed work sitting beside it, and a
+  // client scanning "Completed (8)" has no way to tell which one is theirs.
+  const awaitingCount = inView.filter(awaitingClient).length;
   const filtered =
     statusFilter === "ALL"
       ? inView
       : statusFilter === "OVERDUE"
       ? inView.filter(isOverdue)
+      : statusFilter === "AWAITING"
+      ? inView.filter(awaitingClient)
       : inView.filter((o) => o.status === statusFilter);
   const sorted = [...filtered].sort((a, b) => {
     switch (sortKey) {
@@ -335,8 +347,10 @@ export default function WorkOrdersPage() {
       case "SMART":
       default: {
         // Closed orders sink; among open ones: priority, then overdue-first,
-        // then soonest due, then newest.
-        const term = (isTerminal(a) ? 1 : 0) - (isTerminal(b) ? 1 : 0);
+        // then soonest due, then newest. Work parked with the client ranks
+        // between the two — see triageRank; sorting it as plain "closed" buried
+        // the one row somebody still has to act on beneath every finished job.
+        const term = triageRank(a) - triageRank(b);
         if (term !== 0) return term;
         const prio = PRIORITY_RANK[b.priority] - PRIORITY_RANK[a.priority];
         if (prio !== 0) return prio;
@@ -406,18 +420,24 @@ export default function WorkOrdersPage() {
       {mode === "list" && !loading && (
         <div className="tu-toolbar">
           {([
-            { key: "ALL" as const, label: `All (${inView.length})` },
+            { key: "ALL" as StatusFilter, label: `All (${inView.length})` },
             ...(overdueCount > 0
-              ? [{ key: "OVERDUE" as WorkOrderStatus | "ALL" | "OVERDUE", label: `Overdue (${overdueCount})` }]
+              ? [{ key: "OVERDUE" as StatusFilter, label: `Overdue (${overdueCount})` }]
+              : []),
+            ...(awaitingCount > 0
+              ? [{
+                  key: "AWAITING" as StatusFilter,
+                  label: `${isClient ? "Awaiting you" : "Awaiting sign-off"} (${awaitingCount})`,
+                }]
               : []),
             ...STATUS_ORDER.filter((s) => inView.some((o) => o.status === s)).map((s) => ({
-              key: s as WorkOrderStatus | "ALL" | "OVERDUE",
+              key: s as StatusFilter,
               label: `${STATUS_CONFIG[s].label} (${inView.filter((o) => o.status === s).length})`,
             })),
           ]).map((f) => (
             <button
               key={f.key}
-              onClick={() => setStatusFilter(f.key as WorkOrderStatus | "ALL" | "OVERDUE")}
+              onClick={() => setStatusFilter(f.key as StatusFilter)}
               className={`tu-filter-pill${statusFilter === f.key ? " tu-active" : ""}`}
             >
               {f.label}
@@ -622,6 +642,7 @@ export default function WorkOrdersPage() {
             const priorityCfg = PRIORITY_CONFIG[order.priority];
             const statusCfg = STATUS_CONFIG[order.status];
             const isRejected = order.status === "REJECTED";
+            const signOff = signOffCue(order, isClient);
             const nextStatuses = TRANSITIONS[order.status];
 
             return (
@@ -640,6 +661,7 @@ export default function WorkOrdersPage() {
 
                 {/* Meta row */}
                 <div className="flex flex-wrap items-center gap-1.5 mb-2.5">
+                  {signOff && <span className="tu-badge tu-badge-info">⏳ {signOff}</span>}
                   {order.isSpecialProject && (
                     <span className="tu-badge tu-badge-warning">★ Special Project</span>
                   )}

@@ -68,3 +68,42 @@ export function isSettled(wo: ApprovalShape & { status: WorkOrderStatus }): bool
 export function isClosed(wo: { status: WorkOrderStatus }): boolean {
   return wo.status === "COMPLETED" || wo.status === "APPROVED" || wo.status === "REJECTED";
 }
+
+/**
+ * The cue that work is parked with the client, or null when it is not.
+ *
+ * The wording differs by who is reading — "your" for the client whose decision
+ * it is, "client" for the staff who must not sit waiting on themselves — but
+ * the *condition* must not, which is why both come from `awaitingClient` here
+ * rather than from a status check written out at each call site. COMPLETED
+ * alone is the wrong test everywhere this appears: routine internal work is
+ * also COMPLETED and is waiting for nobody.
+ *
+ * Used by the account work-order list and the portal card. The cross-account
+ * table asks `awaitingClient` directly and labels it "Awaiting client" — the
+ * column is too narrow for the full phrase — and the detail page states it as a
+ * heading rather than a badge. Both are wording, not condition; the condition
+ * is the part that must stay in one place.
+ */
+export function signOffCue(
+  wo: ApprovalShape & { status: WorkOrderStatus },
+  isClient: boolean,
+): string | null {
+  if (!awaitingClient(wo)) return null;
+  return isClient ? "Awaiting your sign-off" : "Awaiting client sign-off";
+}
+
+/**
+ * Triage rank for the "smart" sorts: 0 still being worked, 1 parked with the
+ * client, 2 finished for good.
+ *
+ * Both lists used to sort on `isClosed` alone, which put work awaiting a client
+ * in the same bucket as work that is genuinely over — so the one row somebody
+ * still has to act on sank to the bottom of the page, under every signed-off
+ * and rejected job. It is not active work, so it does not belong above the open
+ * queue either; it belongs exactly between the two.
+ */
+export function triageRank(wo: ApprovalShape & { status: WorkOrderStatus }): number {
+  if (!isClosed(wo)) return 0;
+  return awaitingClient(wo) ? 1 : 2;
+}
