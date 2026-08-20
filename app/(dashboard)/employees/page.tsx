@@ -12,9 +12,15 @@ type Employee = {
   position: string | null;
   categories: string[];
   isReliever: boolean;
+  /** Always sent by the API — see the registry shape in employeeRoutes.js.
+   *  Read through `accountsOf` anyway: this list is built from create and
+   *  edit responses as well as the initial fetch, and one missing array used
+   *  to take the whole page down. */
   accounts: { id: string; name: string }[];
   createdAt: string;
 };
+
+const accountsOf = (e: Partial<Employee>) => e.accounts ?? [];
 
 // An employee's classification is derived from isReliever: relievers can cover
 // multiple accounts, regulars belong to a single account.
@@ -162,7 +168,7 @@ export default function EmployeesPage() {
   // Companies (accounts) that actually have employees assigned, so the filter
   // only offers accounts you'll find someone under.
   const allCompanies = Array.from(
-    new Map(employees.flatMap((e) => e.accounts).map((a) => [a.id, a])).values()
+    new Map(employees.flatMap(accountsOf).map((a) => [a.id, a])).values()
   ).sort((a, b) => a.name.localeCompare(b.name));
 
   const filtersActive =
@@ -186,8 +192,8 @@ export default function EmployeesPage() {
       const matchCompany =
         companyFilter === "ALL" ||
         (companyFilter === "UNASSIGNED"
-          ? e.accounts.length === 0
-          : e.accounts.some((a) => a.id === companyFilter));
+          ? accountsOf(e).length === 0
+          : accountsOf(e).some((a) => a.id === companyFilter));
       // Match any selected skill (OR) — "show me electricians or plumbers".
       const matchCategory =
         categoryFilter.length === 0 ||
@@ -499,13 +505,13 @@ export default function EmployeesPage() {
                         )}
                       </td>
                       <td>
-                        {emp.accounts.length === 0 ? (
+                        {accountsOf(emp).length === 0 ? (
                           <span style={{ fontSize: 11, padding: "1px 8px", borderRadius: 9999, background: "var(--tu-bg-secondary)", color: "var(--tu-text-subtle)", fontWeight: 600 }}>
                             Unassigned
                           </span>
                         ) : (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {emp.accounts.map((a) => (
+                            {accountsOf(emp).map((a) => (
                               <span
                                 key={a.id}
                                 style={{ fontSize: 11, padding: "1px 8px", borderRadius: 9999, background: "var(--tu-bg-brand-soft)", color: "var(--tu-text-brand)", fontWeight: 600 }}
