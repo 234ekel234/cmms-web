@@ -26,6 +26,7 @@ const ACTION_DOT: Record<string, string> = {
   WORK_ORDER_ON_HOLD:   "bg-[var(--tu-priority-medium)]",
   WORK_ORDER_COMPLETED: "bg-[var(--tu-status-completed)]",
   WORK_ORDER_APPROVED:  "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_COMMENTED: "bg-[var(--tu-priority-medium)]",
   WORK_ORDER_REWORK:    "bg-[var(--tu-priority-critical)]",
   WORK_ORDER_OVERDUE:   "bg-[var(--tu-priority-critical)]",
   WORK_ORDER_GENERATED: "bg-[var(--tu-status-pending)]",
@@ -40,7 +41,7 @@ const ACTION_DOT: Record<string, string> = {
 const WORK_ORDER_ACTIONS = new Set([
   "WORK_ORDER_REQUESTED", "WORK_ORDER_ACCEPTED", "WORK_ORDER_REJECTED",
   "WORK_ORDER_STARTED", "WORK_ORDER_ON_HOLD", "WORK_ORDER_COMPLETED",
-  "WORK_ORDER_APPROVED", "WORK_ORDER_REWORK", "WORK_ORDER_OVERDUE",
+  "WORK_ORDER_APPROVED", "WORK_ORDER_REWORK", "WORK_ORDER_COMMENTED", "WORK_ORDER_OVERDUE",
   "WORK_ORDER_GENERATED",
 ]);
 
