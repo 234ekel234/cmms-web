@@ -21,27 +21,15 @@ const ROLE_CLS: Record<Role, string> = {
   CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
 };
 
-const PREF_LABELS: Record<string, { label: string; description: string }> = {
-  WORK_ORDER_REQUESTED:   { label: "New Request",       description: "When a client submits a new work order" },
-  WORK_ORDER_ACCEPTED:    { label: "Order Accepted",    description: "When a work order is accepted/moved to pending" },
-  WORK_ORDER_REJECTED:    { label: "Order Rejected",    description: "When a work order is rejected" },
-  WORK_ORDER_STARTED:     { label: "Work Started",      description: "When a work order moves to in-progress" },
-  WORK_ORDER_ON_HOLD:     { label: "Work Paused",       description: "When a work order is put on hold" },
-  WORK_ORDER_COMPLETED:   { label: "Work Completed",    description: "When a work order is marked complete" },
-  WORK_ORDER_OVERDUE:     { label: "Overdue Work",      description: "Daily sweep of work orders past their due date" },
-  WORK_ORDER_GENERATED:   { label: "Scheduled Work Raised", description: "When a maintenance plan raises this period's work order" },
-  CHECKLIST_INCOMPLETE:   { label: "Checklist Incomplete", description: "When a PM checklist is past due without completion" },
-  PM_CHECKLIST_PENDING:   { label: "Checklist Due This Shift", description: "When a shift opens with checklists still to do" },
-  WEEKLY_REPORT_EMAIL:    { label: "Weekly Report",     description: "Monday summary of the week just ended" },
-  GM_DIGEST_EMAIL:        { label: "Daily Summary",     description: "One cross-account list of what needs attention" },
-};
-
 // `inApp` is null for events that only ever exist as email, so no bell toggle is
 // offered for them. `emailApplies` is false where the event is in-app only, or
 // where this role is not on its email list — showing a switch that controls
 // nothing is worse than showing none.
 type Pref = {
   action: string;
+  label: string;
+  description: string;
+  group: string;
   inApp: boolean | null;
   email: boolean;
   emailApplies: boolean;
@@ -224,53 +212,82 @@ export default function SettingsPage() {
                 <span style={{ width: 44, textAlign: "center" }}>Email</span>
               </div>
 
-              {prefs.map((pref) => {
-                const meta = PREF_LABELS[pref.action];
-                if (!meta) return null;
-                return (
-                  <div
-                    key={pref.action}
+              {groupPrefs(prefs).map(([group, rows]) => (
+                <div key={group}>
+                  <p
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "12px 16px",
-                      borderRadius: 8,
-                      transition: "background 150ms",
-                      background: pref.inApp || pref.email ? "var(--tu-bg-brand-soft)" : "transparent",
+                      fontSize: 11, fontWeight: 700, letterSpacing: "0.04em",
+                      textTransform: "uppercase", color: "var(--tu-text-subtle)",
+                      padding: "14px 16px 6px",
                     }}
                   >
-                    <div>
-                      <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tu-text-heading)" }}>
-                        {meta.label}
-                      </p>
-                      <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", marginTop: 2 }}>
-                        {meta.description}
-                      </p>
+                    {group}
+                  </p>
+                  {rows.map((pref) => (
+                    <div
+                      key={pref.action}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        padding: "12px 16px",
+                        borderRadius: 8,
+                        transition: "background 150ms",
+                        background: pref.inApp || pref.email ? "var(--tu-bg-brand-soft)" : "transparent",
+                      }}
+                    >
+                      <div>
+                        <p style={{ fontSize: 14, fontWeight: 600, color: "var(--tu-text-heading)" }}>
+                          {pref.label}
+                        </p>
+                        <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", marginTop: 2 }}>
+                          {pref.description}
+                        </p>
+                      </div>
+                      <div style={{ display: "flex", gap: 16, flexShrink: 0, marginLeft: 16 }}>
+                        <Switch
+                          on={pref.inApp === true}
+                          hidden={pref.inApp === null}
+                          label={`${pref.label} in app`}
+                          onToggle={() => togglePref(pref.action, "IN_APP")}
+                        />
+                        <Switch
+                          on={pref.email}
+                          hidden={!pref.emailApplies}
+                          label={`${pref.label} by email`}
+                          onToggle={() => togglePref(pref.action, "EMAIL")}
+                        />
+                      </div>
                     </div>
-                    <div style={{ display: "flex", gap: 16, flexShrink: 0, marginLeft: 16 }}>
-                      <Switch
-                        on={pref.inApp === true}
-                        hidden={pref.inApp === null}
-                        label={`${meta.label} in app`}
-                        onToggle={() => togglePref(pref.action, "IN_APP")}
-                      />
-                      <Switch
-                        on={pref.email}
-                        hidden={!pref.emailApplies}
-                        label={`${meta.label} by email`}
-                        onToggle={() => togglePref(pref.action, "EMAIL")}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+                  ))}
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+/**
+ * Groups the rows under their headings while keeping the server's order — both
+ * of the groups and of the rows inside each. Fifteen switches in one column
+ * reads as a wall; the headings are the only thing that makes it scannable.
+ *
+ * A Map preserves insertion order, so the first time a group is seen fixes
+ * where it sits. No sort: the catalogue is already in a deliberate order, and
+ * sorting alphabetically would put Inventory above Work orders.
+ */
+function groupPrefs(prefs: Pref[]): [string, Pref[]][] {
+  const byGroup = new Map<string, Pref[]>();
+  for (const pref of prefs) {
+    const key = pref.group ?? "Other";
+    const rows = byGroup.get(key);
+    if (rows) rows.push(pref);
+    else byGroup.set(key, [pref]);
+  }
+  return [...byGroup.entries()];
 }
 
 /**

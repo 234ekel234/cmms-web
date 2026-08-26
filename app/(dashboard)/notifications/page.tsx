@@ -5,6 +5,8 @@ import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 
+const PAGE_SIZE = 25;
+
 type Notification = {
   id: string;
   title: string;
@@ -21,15 +23,25 @@ const ACTION_DOT: Record<string, string> = {
   WORK_ORDER_ACCEPTED:  "bg-[var(--tu-status-completed)]",
   WORK_ORDER_REJECTED:  "bg-[var(--tu-priority-critical)]",
   WORK_ORDER_STARTED:   "bg-[var(--tu-priority-high)]",
+  WORK_ORDER_ON_HOLD:   "bg-[var(--tu-priority-medium)]",
   WORK_ORDER_COMPLETED: "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_APPROVED:  "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_REWORK:    "bg-[var(--tu-priority-critical)]",
   WORK_ORDER_OVERDUE:   "bg-[var(--tu-priority-critical)]",
+  WORK_ORDER_GENERATED: "bg-[var(--tu-status-pending)]",
   CHECKLIST_INCOMPLETE: "bg-[var(--tu-priority-high)]",
+  PM_CHECKLIST_PENDING: "bg-[var(--tu-status-pending)]",
   PART_LOW_STOCK:       "bg-[var(--tu-health-poor)]",
 };
 
+// Every action whose `entityId` is a work order, and so can be opened from the
+// row. Sign-off and send-back were missing here: both carry a work-order id and
+// both are the ones a reader most wants to jump straight into.
 const WORK_ORDER_ACTIONS = new Set([
   "WORK_ORDER_REQUESTED", "WORK_ORDER_ACCEPTED", "WORK_ORDER_REJECTED",
-  "WORK_ORDER_STARTED", "WORK_ORDER_COMPLETED", "WORK_ORDER_OVERDUE",
+  "WORK_ORDER_STARTED", "WORK_ORDER_ON_HOLD", "WORK_ORDER_COMPLETED",
+  "WORK_ORDER_APPROVED", "WORK_ORDER_REWORK", "WORK_ORDER_OVERDUE",
+  "WORK_ORDER_GENERATED",
 ]);
 
 function timeAgo(iso: string) {
@@ -47,13 +59,27 @@ function timeAgo(iso: string) {
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // From the server, not from `notifications`: the list is now a page at a
+  // time, so counting the rows in hand would report the unread total of
+  // whatever happens to be loaded rather than of the account.
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await api.get("/notifications");
-        if (!cancelled) setNotifications(res.data);
+        // Sending `limit` is what asks for the paginated envelope; without it
+        // the endpoint answers with a bare array for the mobile client.
+        const [list, count] = await Promise.all([
+          api.get("/notifications", { params: { limit: PAGE_SIZE } }),
+          api.get("/notifications/unread-count"),
+        ]);
+        if (cancelled) return;
+        setNotifications(list.data.items);
+        setCursor(list.data.nextCursor);
+        setUnreadCount(count.data.count ?? 0);
       } catch {
         // silent
       } finally {
@@ -63,10 +89,25 @@ export default function NotificationsPage() {
     return () => { cancelled = true; };
   }, []);
 
+  async function loadMore() {
+    if (!cursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await api.get("/notifications", { params: { limit: PAGE_SIZE, cursor } });
+      setNotifications((prev) => [...prev, ...res.data.items]);
+      setCursor(res.data.nextCursor);
+    } catch {
+      // silent
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
   async function markRead(id: string) {
     try {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      setUnreadCount((c) => Math.max(0, c - 1));
     } catch {
       // silent
     }
@@ -76,12 +117,12 @@ export default function NotificationsPage() {
     try {
       await api.patch("/notifications/read-all");
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      // read-all is server-wide, so it clears the unread beyond this page too.
+      setUnreadCount(0);
     } catch {
       // silent
     }
   }
-
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
@@ -158,6 +199,16 @@ export default function NotificationsPage() {
 
             return <div key={n.id}>{content}</div>;
           })}
+
+          {cursor && (
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              className="w-full text-sm text-[var(--tu-text-subtle)] bg-[var(--tu-bg-secondary-strong)] hover:bg-[var(--tu-bg-tertiary)] px-3 py-2.5 rounded-lg cursor-pointer transition-colors disabled:opacity-50 mt-2"
+            >
+              {loadingMore ? "Loading…" : "Load older"}
+            </button>
+          )}
         </div>
       )}
     </div>

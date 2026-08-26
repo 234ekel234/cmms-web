@@ -118,13 +118,18 @@ export default function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
   const helpRef = useRef<HTMLDivElement>(null);
 
   // Single source for the unread count now that the sidebar no longer shows it.
+  //
+  // A dedicated count endpoint rather than the list: this polls every minute in
+  // every open tab, and it used to pull fifty whole notification rows to do a
+  // client-side filter on one boolean. It also capped the badge at 50, so a
+  // user far enough behind saw a number that had stopped moving.
   useEffect(() => {
     let cancelled = false;
     function load() {
       api
-        .get("/notifications")
+        .get("/notifications/unread-count")
         .then((r) => {
-          if (!cancelled) setUnread(r.data.filter((n: { isRead: boolean }) => !n.isRead).length);
+          if (!cancelled) setUnread(r.data.count ?? 0);
         })
         .catch(() => {});
     }
