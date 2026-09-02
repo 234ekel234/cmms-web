@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyRow } from "@/components/EmptyState";
 
-type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
+type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
 type User = {
   id: string;
@@ -18,6 +18,7 @@ const ROLE_CONFIG: Record<Role, { label: string; cls: string }> = {
   GENERAL_MANAGER: { label: "General Manager", cls: "bg-violet-50 text-violet-700" },
   MANAGER:         { label: "Manager",          cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]"    },
   SUPERVISOR:      { label: "Supervisor",       cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"  },
+  TECHNICIAN:      { label: "Technician",       cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]"    },
   CLIENT:          { label: "Client",           cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"  },
 };
 
@@ -55,6 +56,12 @@ export default function UsersPage() {
   // Only a General Manager can create privileged (Manager / GM) accounts;
   // managers are limited to front-line staff (Supervisor / Client), which the
   // API enforces independently of the options offered here.
+  //
+  // TECHNICIAN is deliberately not offered: creating one requires naming the
+  // employee it belongs to (POST /api/users takes an employeeId and refuses a
+  // technician without one), and this form has no employee picker. Listing it
+  // here would be a dropdown entry whose only outcome is a 400. Existing
+  // technicians still display, filter and count normally below.
   const isGM = me?.role === "GENERAL_MANAGER";
   const ROLE_OPTIONS: { value: Role; label: string }[] = isGM
     ? [
@@ -67,6 +74,20 @@ export default function UsersPage() {
         { value: "SUPERVISOR", label: "Supervisor" },
         { value: "CLIENT", label: "Client" },
       ];
+
+  // Editing an existing technician is the one case the list above cannot serve.
+  // Their role is not in it, so the controlled select rendered with nothing
+  // chosen — and a GM here to fix a typo, seeing a blank required-looking
+  // field, could pick anything. The PATCH then clears employeeId, cutting the
+  // login from the roster row for good: User.employeeId is unique, so the
+  // employees page offers "Give login" again and the second attempt collides.
+  //
+  // So the role is shown, and frozen. Changing it is a deliberate act that
+  // belongs somewhere that can also re-point the employee link.
+  const editingTechnician = editingId !== null && form.role === "TECHNICIAN";
+  const roleOptions = editingTechnician
+    ? [{ value: "TECHNICIAN" as Role, label: "Technician" }]
+    : ROLE_OPTIONS;
 
   useEffect(() => { fetchUsers(); }, []);
 
@@ -151,7 +172,7 @@ export default function UsersPage() {
   });
 
   const roleCounts = Object.fromEntries(
-    (["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "CLIENT"] as Role[]).map((r) => [
+    (["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "TECHNICIAN", "CLIENT"] as Role[]).map((r) => [
       r,
       users.filter((u) => u.role === r).length,
     ])
@@ -228,15 +249,17 @@ export default function UsersPage() {
                 style={{ width: "100%" }}
                 value={form.role}
                 onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
-                disabled={editingId === me?.id}
+                disabled={editingId === me?.id || editingTechnician}
               >
-                {ROLE_OPTIONS.map((o) => (
+                {roleOptions.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
               <p style={{ fontSize: 11, color: "var(--tu-text-subtle)", marginTop: 4 }}>
                 {editingId === me?.id
                   ? "You can't change your own role."
+                  : editingTechnician
+                  ? "A technician's role is tied to their employee record. Change it from the Employees page."
                   : isGM
                   ? "Managers and General Managers have full administrative access."
                   : "Manager-level accounts are provisioned by an admin."}
@@ -288,7 +311,7 @@ export default function UsersPage() {
           >
             All ({users.length})
           </button>
-          {(["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "CLIENT"] as Role[]).filter((r) => (roleCounts[r] ?? 0) > 0).map((r) => (
+          {(["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "TECHNICIAN", "CLIENT"] as Role[]).filter((r) => (roleCounts[r] ?? 0) > 0).map((r) => (
             <button
               key={r}
               type="button"

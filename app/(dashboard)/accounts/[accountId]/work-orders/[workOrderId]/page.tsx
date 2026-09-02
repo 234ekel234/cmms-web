@@ -10,6 +10,7 @@ import { awaitingClient, isClosed, isSettled, needsClientApproval } from "@/lib/
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
+import { canManage as canAdministerAccount } from "@/lib/rbac";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -251,7 +252,12 @@ export default function WorkOrderDetailPage() {
   }
 
   const isClient = user?.role === "CLIENT";
+  // "May act on this job" — true for a technician, whose own work this is.
   const canManage = user?.role !== "CLIENT";
+  // "May decide what the job is, and who does it" — not a technician's call.
+  // The API refuses both regardless; this is about not drawing a control whose
+  // only outcome is a 403.
+  const canAdmin = canAdministerAccount(user?.role);
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
   useEffect(() => { fetchOrder(); }, [workOrderId]);
@@ -754,7 +760,7 @@ export default function WorkOrderDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {canManage && !isTerminal && (
+            {canAdmin && !isTerminal && (
               <button
                 onClick={openEdit}
                 className="text-xs text-[var(--tu-text-subtle)] border border-[var(--tu-border)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
@@ -913,7 +919,7 @@ export default function WorkOrderDetailPage() {
             <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Assigned To</p>
             {/* Assignments stay editable after sign-off on purpose — a wrong
                 name on a finished job must still be correctable. */}
-            {canManage && (
+            {canAdmin && (
               <button
                 onClick={openAssignPicker}
                 className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
@@ -932,7 +938,7 @@ export default function WorkOrderDetailPage() {
                   {a.employee.position && <span className="text-[var(--tu-text-subtle)]">· {a.employee.position}</span>}
                   {/* Assignments stay editable after sign-off on purpose — a wrong
                       name on a finished job must still be correctable. */}
-                  {canManage && (
+                  {canAdmin && (
                     <button
                       onClick={() => removeAssignment(a.employeeId)}
                       disabled={removingId === a.employeeId}
@@ -1034,7 +1040,7 @@ export default function WorkOrderDetailPage() {
                 ) : (
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-[var(--tu-text-heading)]">{estMin != null ? formatHM(estMin) : "Not set"}</span>
-                    {canManage && !isTerminal && (
+                    {canAdmin && !isTerminal && (
                       <button
                         onClick={() => { setEstHrs(estMin != null ? String(Math.floor(estMin / 60)) : ""); setEstMins(estMin != null ? String(estMin % 60) : ""); setEditingEst(true); }}
                         className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"

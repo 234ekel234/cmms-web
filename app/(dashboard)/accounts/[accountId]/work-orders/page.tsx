@@ -10,6 +10,7 @@ import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 import { awaitingClient, isClosed, signOffCue, triageRank } from "@/lib/workOrders";
+import { canManage, canWorkOnJob } from "@/lib/rbac";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -169,7 +170,13 @@ export default function WorkOrdersPage() {
   const [nowTick, setNowTick] = useState(() => Date.now());
 
   const isClient = user?.role === "CLIENT";
-  const canManage = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER" || user?.role === "SUPERVISOR";
+  // Two questions, not one. `canManage` is "may act on this job at all" — a
+  // technician may, on the ones they were given, which is the whole queue they
+  // can see. `canAssign` is "may decide who does it", which stays with the
+  // people who staff the site. Rolling them together is what would put an
+  // "+ Assign" button in front of a technician that only ever answers 403.
+  const canAct = canWorkOnJob(user?.role);
+  const canAssign = canManage(user?.role);
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
   useEffect(() => { fetchOrders(); }, [accountId]);
@@ -709,7 +716,7 @@ export default function WorkOrdersPage() {
                       </span>
                     );
                   })()}
-                  {order.status === "IN_PROGRESS" && !isClient && canManage && (
+                  {order.status === "IN_PROGRESS" && !isClient && canAct && (
                     <button
                       onClick={() => toggleTimer(order)}
                       disabled={timerBusyId === order.id}
@@ -740,7 +747,7 @@ export default function WorkOrdersPage() {
                     <span className="truncate">
                       {order.assignments.length > 0 ? order.assignments.map((a) => a.employee.name).join(", ") : "Unassigned"}
                     </span>
-                    {!isClient && canManage && !isTerminal(order) && (
+                    {!isClient && canAssign && !isTerminal(order) && (
                       <button onClick={() => openAssignModal(order)} className="tu-link shrink-0">
                         {order.assignments.length > 0 ? "Edit" : "+ Assign"}
                       </button>
@@ -758,7 +765,7 @@ export default function WorkOrdersPage() {
                 </div>
 
                 {/* Action buttons */}
-                {!isClient && canManage && nextStatuses.length > 0 && (
+                {!isClient && canAct && nextStatuses.length > 0 && (
                   <div className="tu-wo-actions">
                     {nextStatuses.map((ns) => (
                       <button

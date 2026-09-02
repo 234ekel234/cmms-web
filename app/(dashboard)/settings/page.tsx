@@ -5,12 +5,13 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle, { ThemeHint } from "@/components/ThemeToggle";
 
-type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
+type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
 const ROLE_LABELS: Record<Role, string> = {
   GENERAL_MANAGER: "General Manager",
   MANAGER:         "Manager",
   SUPERVISOR:      "Supervisor",
+  TECHNICIAN:      "Technician",
   CLIENT:          "Client",
 };
 
@@ -18,6 +19,7 @@ const ROLE_CLS: Record<Role, string> = {
   GENERAL_MANAGER: "bg-violet-50 text-violet-700",
   MANAGER:         "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
   SUPERVISOR:      "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+  TECHNICIAN:      "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
   CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
 };
 

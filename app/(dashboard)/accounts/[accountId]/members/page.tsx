@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 
-type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
+type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
 type Member = {
   id: string;
@@ -28,6 +28,7 @@ const ROLE_LABELS: Record<Role, string> = {
   GENERAL_MANAGER: "General Manager",
   MANAGER: "Manager",
   SUPERVISOR: "Supervisor",
+  TECHNICIAN: "Technician",
   CLIENT: "Client",
 };
 
@@ -35,6 +36,7 @@ const ROLE_CLS: Record<Role, string> = {
   GENERAL_MANAGER: "bg-violet-50 text-violet-700",
   MANAGER:         "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
   SUPERVISOR:      "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+  TECHNICIAN:      "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
   CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
 };
 
@@ -152,7 +154,7 @@ export default function MembersPage() {
             <div className="mb-4">
               <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-2">Assign as</label>
               <div className="flex gap-2 flex-wrap">
-                {(["SUPERVISOR", "CLIENT", "MANAGER"] as Role[]).map((r) => (
+                {(["SUPERVISOR", "TECHNICIAN", "CLIENT", "MANAGER"] as Role[]).map((r) => (
                   <button
                     key={r}
                     onClick={() => setAssigningRole(r)}

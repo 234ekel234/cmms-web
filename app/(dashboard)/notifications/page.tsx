@@ -21,6 +21,7 @@ type Notification = {
 const ACTION_DOT: Record<string, string> = {
   WORK_ORDER_REQUESTED: "bg-[var(--tu-status-pending)]",
   WORK_ORDER_ACCEPTED:  "bg-[var(--tu-status-completed)]",
+  WORK_ORDER_ASSIGNED:  "bg-[var(--tu-priority-high)]",
   WORK_ORDER_REJECTED:  "bg-[var(--tu-priority-critical)]",
   WORK_ORDER_STARTED:   "bg-[var(--tu-priority-high)]",
   WORK_ORDER_ON_HOLD:   "bg-[var(--tu-priority-medium)]",
@@ -43,6 +44,10 @@ const WORK_ORDER_ACTIONS = new Set([
   "WORK_ORDER_STARTED", "WORK_ORDER_ON_HOLD", "WORK_ORDER_COMPLETED",
   "WORK_ORDER_APPROVED", "WORK_ORDER_REWORK", "WORK_ORDER_COMMENTED", "WORK_ORDER_OVERDUE",
   "WORK_ORDER_GENERATED",
+  // The technician's whole queue arrives through this one. Missing it meant the
+  // row that most needs opening was the only one that could not be clicked —
+  // and it rendered with the grey fallback dot besides.
+  "WORK_ORDER_ASSIGNED",
 ]);
 
 function timeAgo(iso: string) {

@@ -1,7 +1,7 @@
 export type User = {
   id: string;
   name: string;
-  role: "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "CLIENT";
+  role: "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
   email: string;
 };
 

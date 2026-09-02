@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { EmptyRow } from "@/components/EmptyState";
+import { EMPLOYEE_CATEGORIES, orderSkills, skillLabel } from "@/lib/employeeCategories";
+import GiveLoginModal, { type LoginTarget } from "@/components/GiveLoginModal";
 
 type EmployeeType = "REGULAR" | "RELIEVER";
 
@@ -17,6 +19,10 @@ type Employee = {
    *  edit responses as well as the initial fetch, and one missing array used
    *  to take the whole page down. */
   accounts: { id: string; name: string }[];
+  /** Whether this person already holds a technician login. Sent by every
+   *  employee response — list, create and edit — so a row spliced in from a
+   *  save renders the same as one from the initial fetch. */
+  hasLogin: boolean;
   createdAt: string;
 };
 
@@ -30,11 +36,6 @@ const TYPE_CONFIG: Record<EmployeeType, { label: string; cls: string }> = {
   REGULAR:  { label: "Regular",  cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
   RELIEVER: { label: "Reliever", cls: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" },
 };
-
-const COMMON_CATEGORIES = [
-  "Electrical", "Plumbing", "HVAC", "Mechanical", "Carpentry",
-  "Cleaning", "Security", "Landscaping", "IT", "General",
-];
 
 function SkeletonRows({ count }: { count: number }) {
   return (
@@ -67,12 +68,12 @@ export default function EmployeesPage() {
     name: "",
     position: "",
     categories: [] as string[],
-    catInput: "",
     isReliever: false,
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [loginFor, setLoginFor] = useState<LoginTarget | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,26 +93,28 @@ export default function EmployeesPage() {
 
   function openCreate() {
     setEditId(null);
-    setForm({ name: "", position: "", categories: [], catInput: "", isReliever: false });
+    setForm({ name: "", position: "", categories: [], isReliever: false });
     setFormError("");
     setShowForm(true);
   }
 
   function openEdit(emp: Employee) {
     setEditId(emp.id);
-    setForm({ name: emp.name, position: emp.position ?? "", categories: emp.categories ?? [], catInput: "", isReliever: emp.isReliever });
+    setForm({ name: emp.name, position: emp.position ?? "", categories: emp.categories ?? [], isReliever: emp.isReliever });
     setFormError("");
     setShowForm(true);
   }
 
-  function addCategory(cat: string) {
-    const trimmed = cat.trim();
-    if (!trimmed || form.categories.includes(trimmed)) return;
-    setForm((f) => ({ ...f, categories: [...f.categories, trimmed], catInput: "" }));
-  }
-
-  function removeCategory(cat: string) {
-    setForm((f) => ({ ...f, categories: f.categories.filter((c) => c !== cat) }));
+  // Skills are a fixed vocabulary (see lib/employeeCategories) — picked, never
+  // typed. Free text gave the same trade several spellings and a filter that
+  // offered all of them, and the API rejects anything off the list anyway.
+  function toggleFormCategory(cat: string) {
+    setForm((f) => ({
+      ...f,
+      categories: f.categories.includes(cat)
+        ? f.categories.filter((c) => c !== cat)
+        : orderSkills([...f.categories, cat]),
+    }));
   }
 
   async function save() {
@@ -153,11 +156,12 @@ export default function EmployeesPage() {
     }
   }
 
-  // Skills present across the registry, so the filter only offers categories
-  // that actually exist on someone (not the full COMMON_CATEGORIES wishlist).
-  const allCategories = Array.from(
-    new Set(employees.flatMap((e) => e.categories ?? []))
-  ).sort((a, b) => a.localeCompare(b));
+  // Skills present across the registry, so the filter only offers trades that
+  // are actually on someone rather than the whole vocabulary. Ordered the way
+  // the picker orders them, not alphabetically, so the two lists agree.
+  const allCategories = orderSkills(
+    Array.from(new Set(employees.flatMap((e) => e.categories ?? [])))
+  );
 
   function toggleCategory(cat: string) {
     setCategoryFilter((prev) =>
@@ -187,7 +191,7 @@ export default function EmployeesPage() {
         !search.trim() ||
         e.name.toLowerCase().includes(search.toLowerCase()) ||
         e.position?.toLowerCase().includes(search.toLowerCase()) ||
-        (e.categories ?? []).some((c) => c.toLowerCase().includes(search.toLowerCase()));
+        (e.categories ?? []).some((c) => skillLabel(c).toLowerCase().includes(search.toLowerCase()));
       const matchType = typeFilter === "ALL" || empType(e) === typeFilter;
       const matchCompany =
         companyFilter === "ALL" ||
@@ -275,43 +279,35 @@ export default function EmployeesPage() {
               </select>
             </div>
             <div style={{ gridColumn: "span 2" }}>
-              <label className="tu-label">Skills / Categories</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 }}>
-                {(form.categories).map((cat) => (
-                  <span key={cat} style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "var(--tu-bg-brand-soft)", color: "var(--tu-text-brand)", borderRadius: 9999, padding: "2px 10px", fontSize: 12, fontWeight: 600 }}>
-                    {cat}
+              <label className="tu-label">Skills</label>
+              <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", margin: "0 0 8px" }}>
+                Tap every trade this person works in.
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {EMPLOYEE_CATEGORIES.map((cat) => {
+                  const on = form.categories.includes(cat);
+                  return (
                     <button
+                      key={cat}
                       type="button"
-                      onClick={() => removeCategory(cat)}
-                      style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", lineHeight: 1, padding: 0, fontSize: 14 }}
-                      aria-label={`Remove ${cat}`}
+                      onClick={() => toggleFormCategory(cat)}
+                      aria-pressed={on}
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 600,
+                        padding: "4px 12px",
+                        borderRadius: 9999,
+                        cursor: "pointer",
+                        border: "1px solid",
+                        borderColor: on ? "var(--tu-text-brand)" : "var(--tu-border)",
+                        background: on ? "var(--tu-bg-brand-soft)" : "var(--tu-bg-surface)",
+                        color: on ? "var(--tu-text-brand)" : "var(--tu-text-body)",
+                      }}
                     >
-                      ×
+                      {skillLabel(cat)}
                     </button>
-                  </span>
-                ))}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  className="tu-input"
-                  style={{ flex: 1 }}
-                  value={form.catInput}
-                  onChange={(e) => setForm((f) => ({ ...f, catInput: e.target.value }))}
-                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCategory(form.catInput); } }}
-                  placeholder="Type and press Enter, or pick below"
-                />
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                {COMMON_CATEGORIES.filter((c) => !form.categories.includes(c)).map((cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => addCategory(cat)}
-                    style={{ fontSize: 11, padding: "2px 8px", borderRadius: 9999, border: "1px solid var(--tu-border)", background: "var(--tu-bg-secondary)", color: "var(--tu-text-body)", cursor: "pointer" }}
-                  >
-                    + {cat}
-                  </button>
-                ))}
+                  );
+                })}
               </div>
             </div>
             {formError && (
@@ -416,7 +412,7 @@ export default function EmployeesPage() {
                   color: on ? "var(--tu-text-brand)" : "var(--tu-text-body)",
                 }}
               >
-                {cat}
+                {skillLabel(cat)}
               </button>
             );
           })}
@@ -491,12 +487,12 @@ export default function EmployeesPage() {
                       <td>
                         {(emp.categories ?? []).length > 0 ? (
                           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
-                            {(emp.categories ?? []).map((c) => (
+                            {orderSkills(emp.categories ?? []).map((c) => (
                               <span
                                 key={c}
                                 style={{ fontSize: 11, padding: "1px 7px", borderRadius: 9999, background: "var(--tu-bg-brand-soft)", color: "var(--tu-text-brand)", fontWeight: 600 }}
                               >
-                                {c}
+                                {skillLabel(c)}
                               </span>
                             ))}
                           </div>
@@ -523,7 +519,31 @@ export default function EmployeesPage() {
                         )}
                       </td>
                       <td>
-                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                          {emp.hasLogin ? (
+                            // Stated rather than hidden: "no button" reads as
+                            // "not possible", and the useful fact here is that
+                            // this person can already sign in.
+                            <span
+                              style={{ fontSize: 11, fontWeight: 600, color: "var(--tu-text-subtle)" }}
+                              title="This employee already has a technician login"
+                            >
+                              Has login
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setLoginFor({
+                                id: emp.id,
+                                name: emp.name,
+                                position: emp.position,
+                                accounts: accountsOf(emp),
+                              })}
+                              style={{ fontSize: 12, color: "var(--tu-text-brand)", background: "none", border: "none", cursor: "pointer", fontWeight: 600 }}
+                            >
+                              Give login
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => openEdit(emp)}
@@ -549,6 +569,21 @@ export default function EmployeesPage() {
           </table>
         </div>
       </div>
+
+      {loginFor && (
+        <GiveLoginModal
+          employee={loginFor}
+          onClose={() => setLoginFor(null)}
+          onCreated={(employeeId) =>
+            // Flip the row in place rather than refetching the registry: the
+            // only thing that changed is this one flag, and a reload would lose
+            // the filters and scroll position the user is working in.
+            setEmployees((prev) =>
+              prev.map((e) => (e.id === employeeId ? { ...e, hasLogin: true } : e))
+            )
+          }
+        />
+      )}
     </div>
   );
 }
