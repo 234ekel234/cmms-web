@@ -2,7 +2,8 @@
 
 ## Project Overview
 
-This is the **web frontend** for the CMMS (Computerized Maintenance Management System). It is a Next.js 15 app with Tailwind CSS, targeting managers, supervisors, and clients on desktop browsers. It talks to the shared Express REST API.
+This is the **web frontend** for the CMMS (Computerized Maintenance Management System). It is a Next.js 15 app with Tailwind CSS, targeting managers, supervisors, technicians and
+clients on desktop browsers. It talks to the shared Express REST API.
 
 ## Development Commands
 
@@ -47,6 +48,23 @@ lib/
 components/         # Shared UI components (Sidebar, Topbar, etc.)
 types/              # Shared TypeScript types
 ```
+
+## Roles
+
+`lib/rbac.ts` mirrors `backend/helpers/roles.js` and must be kept in step with it. Two things
+in it are load-bearing:
+
+- **`canManage` means "may administer the account"** — eight pages ask it, and every one of
+  them means the asset register, the schedule, attendance, checklists, training or the roster.
+  A technician needs controls on their *own job*, which is a different question:
+  `canWorkOnJob`. Widening `canManage` instead drew Edit and Archive buttons on all eight,
+  every one of which the API answers 403.
+- **Ordering inside `rolesForPath` matters.** Every STAFF-only case must come *before* the
+  technician narrowing, or it becomes unreachable — which once handed the checklist assign and
+  fill-in forms to CLIENT while adding an unrelated role.
+
+`ROLE_HOME.TECHNICIAN` is `/work-orders`, not `/` — the dashboard is the account at a glance,
+which is exactly what a technician does not get.
 
 ## Auth Flow
 
