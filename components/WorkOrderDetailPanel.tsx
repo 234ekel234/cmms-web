@@ -1,0 +1,544 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import api from "@/lib/api";
+import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
+import ProgressThread, { type ProgressEntry } from "@/components/ProgressThread";
+import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
+import {
+  STAFF_TRANSITIONS,
+  isOverdue,
+  isSettled,
+  needsClientApproval,
+  signOffCue,
+  transitionLabel,
+  transitionTone,
+} from "@/lib/workOrders";
+
+/**
+ * The right half of the split view: one work order, beside the queue.
+ *
+ * This replaces an overlay sheet, and the difference is the point. The sheet sat
+ * *over* the list and dimmed it, so acting on a job still cost you sight of the
+ * queue — half of the original complaint. A permanent pane leaves both live: the
+ * list stays readable and keyboard-navigable while the detail changes beside it.
+ *
+ * It also buys room. At ~420px an overlay could only carry the transition
+ * buttons and a few facts; at full height beside the list there is space for the
+ * comment thread, which is the thing a supervisor actually reaches for while
+ * triaging — "why is this still open?" is usually answered in the last note.
+ *
+ * Parts, attachments and step-by-step editing stay on the full page. Those are a
+ * technician's business on the job itself, not something done while working down
+ * a queue, and the page is one click away.
+ */
+
+export type PanelOrder = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: WorkOrderStatus;
+  // Never null: the column is non-nullable with @default(MEDIUM), and the PATCH
+  // route skips a falsy priority outright — so there is no "no priority" state
+  // to represent, and no "None" option to offer.
+  priority: WorkOrderPriority;
+  dueDate: string | null;
+  category: string | null;
+  type: "INTERNAL" | "EXTERNAL";
+  isSpecialProject: boolean;
+  estimatedMinutes: number | null;
+  actualSeconds: number;
+  timerStartedAt: string | null;
+  accountId: string;
+  account?: { id: string; name: string } | null;
+  asset: { id: string; name: string } | null;
+  assignments: { employeeId?: string; employee: { id: string; name: string; position: string | null } }[];
+  checklistItems?: { id: string; isDone: boolean }[];
+  comments?: ProgressEntry[];
+};
+
+/**
+ * What the panel may hand back to the queue beside it.
+ *
+ * `account` is excluded deliberately: the panel never changes which account a
+ * job belongs to, and the two lists type that field differently — the
+ * cross-account one always has it, the account-scoped one does not carry it.
+ * Leaving it out keeps both callers assignable without either widening a field
+ * it genuinely always has.
+ */
+export type PanelPatch = { id: string } & Partial<Omit<PanelOrder, "account">>;
+
+type Employee = { id: string; name: string; position?: string | null };
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatHM(minutes: number) {
+  const m = Math.max(0, Math.round(minutes));
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  if (h && rem) return `${h}h ${rem}m`;
+  if (h) return `${h}h`;
+  return `${rem}m`;
+}
+
+/** Logged time, counting a running timer up to now. */
+function loggedMinutes(o: PanelOrder) {
+  const running = o.timerStartedAt ? (Date.now() - new Date(o.timerStartedAt).getTime()) / 1000 : 0;
+  return (o.actualSeconds + running) / 60;
+}
+
+export default function WorkOrderDetailPanel({
+  order,
+  onChanged,
+  canManage,
+  canActOnStatus,
+  isClient,
+  onClose,
+}: {
+  /** The row from the list — enough to render immediately, before the fetch. */
+  order: PanelOrder;
+  onChanged: (patch: PanelPatch) => void;
+  /** May change what the job *is* — priority, due date, who is on it. */
+  canManage: boolean;
+  /** May move it along the pipeline. */
+  canActOnStatus: boolean;
+  isClient: boolean;
+  /** Only shown on narrow screens, where the panel covers the queue. */
+  onClose?: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [remarks, setRemarks] = useState("");
+  const [confirmComplete, setConfirmComplete] = useState(false);
+  const [sendBackReason, setSendBackReason] = useState("");
+  const [sendingBack, setSendingBack] = useState(false);
+
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [showPicker, setShowPicker] = useState(false);
+
+  // The thread is not on the list row — it arrives with the fetch below.
+  const [comments, setComments] = useState<ProgressEntry[]>(order.comments ?? []);
+  const [commentText, setCommentText] = useState("");
+  const [staged, setStaged] = useState<File[]>([]);
+  const [posting, setPosting] = useState(false);
+  const [threadError, setThreadError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Pull the full order for the thread.
+   *
+   * `GET /work-orders/:id` exists for exactly this. Before it, the only way to
+   * read one order was to fetch the whole account's list and search it — which
+   * the detail page did, and which would have re-read every work order on the
+   * site on every arrow key here.
+   */
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get(`/work-orders/${order.id}`);
+        if (!cancelled) setComments(res.data.comments ?? []);
+      } catch {
+        // The facts above are already on screen from the list row; a failed
+        // thread fetch should not blank them.
+        if (!cancelled) setThreadError("Couldn't load the thread.");
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [order.id]);
+
+  const patch = useCallback(
+    async (body: Record<string, unknown>) => {
+      setBusy(true);
+      setError(null);
+      try {
+        const res = await api.patch(`/work-orders/${order.id}`, body);
+        onChanged({ ...res.data, id: order.id });
+        return true;
+      } catch {
+        setError("That change didn't save. Try again.");
+        return false;
+      } finally {
+        setBusy(false);
+      }
+    },
+    [order.id, onChanged]
+  );
+
+  async function move(to: WorkOrderStatus) {
+    if (to === "COMPLETED" && !confirmComplete) { setConfirmComplete(true); return; }
+    const body: Record<string, unknown> = { status: to };
+    if (to === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
+    if (await patch(body)) { setConfirmComplete(false); setRemarks(""); }
+  }
+
+  async function sendBack() {
+    const reason = sendBackReason.trim();
+    if (!reason) return;
+    if (await patch({ status: "IN_PROGRESS", reason })) {
+      setSendingBack(false);
+      setSendBackReason("");
+      // The server writes the reason into the thread, so pull it back in.
+      try {
+        const res = await api.get(`/work-orders/${order.id}`);
+        setComments(res.data.comments ?? []);
+      } catch { /* the status change already landed */ }
+    }
+  }
+
+  async function openPicker() {
+    setShowPicker(true);
+    if (employees.length === 0) {
+      try {
+        const res = await api.get(`/accounts/${order.accountId}/employees`);
+        setEmployees(res.data);
+      } catch {
+        setError("Couldn't load the roster.");
+      }
+    }
+  }
+
+  async function assign(empId: string) {
+    setBusy(true);
+    try {
+      const res = await api.post(`/work-orders/${order.id}/assignments`, { employeeId: empId });
+      onChanged({ id: order.id, assignments: [...order.assignments, res.data] });
+      setShowPicker(false);
+    } catch {
+      setError("Couldn't assign that person.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unassign(empId: string) {
+    setBusy(true);
+    try {
+      await api.delete(`/work-orders/${order.id}/assignments/${empId}`);
+      onChanged({ id: order.id, assignments: order.assignments.filter((a) => a.employee.id !== empId) });
+    } catch {
+      setError("Couldn't remove that person.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function postComment() {
+    const text = commentText.trim();
+    if ((!text && staged.length === 0) || posting) return;
+    setPosting(true);
+    setThreadError("");
+    try {
+      // Multipart only when there is something to upload, so a text-only note
+      // stays a plain JSON request.
+      let res;
+      if (staged.length > 0) {
+        const form = new FormData();
+        if (text) form.append("body", text);
+        for (const f of staged) form.append("files", f);
+        res = await api.post(`/work-orders/${order.id}/comments`, form);
+      } else {
+        res = await api.post(`/work-orders/${order.id}/comments`, { body: text });
+      }
+      setComments((prev) => [...prev, res.data]);
+      setCommentText("");
+      setStaged([]);
+      if (fileRef.current) fileRef.current.value = "";
+    } catch (err: unknown) {
+      const r = (err as { response?: { data?: { error?: string } } })?.response;
+      setThreadError(r?.data?.error ?? "Could not post that update.");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  const settled = isSettled(order);
+  const overdue = isOverdue(order);
+  const cue = signOffCue(order, isClient);
+  const nexts = canActOnStatus && !settled ? STAFF_TRANSITIONS[order.status] : [];
+  const steps = order.checklistItems ?? [];
+  const done = steps.filter((s) => s.isDone).length;
+  const assignedIds = new Set(order.assignments.map((a) => a.employee.id));
+
+  // The client's two moves out of COMPLETED. Offered here rather than through
+  // STAFF_TRANSITIONS, which deliberately omits them so staff are never shown
+  // an Approve button the API refuses.
+  const clientDecision = isClient && order.status === "COMPLETED" && needsClientApproval(order);
+
+  return (
+    <div className="tu-detail">
+      <div className="tu-detail-header">
+        <div style={{ minWidth: 0 }}>
+          <h2 className="tu-detail-title">{order.title}</h2>
+          <p className="tu-detail-sub">
+            {/* The account name is only worth stating when the queue spans more
+                than one. Inside an account the page header already says which. */}
+            {[order.account?.name, order.asset?.name, order.isSpecialProject ? "Special project" : null]
+              .filter(Boolean)
+              .join(" · ") || "—"}
+          </p>
+        </div>
+        {onClose && (
+          <button type="button" className="tu-drawer-close tu-detail-back" onClick={onClose} aria-label="Back to the queue">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
+            </svg>
+          </button>
+        )}
+      </div>
+
+      <div className="tu-detail-body">
+        {error && <div className="tu-error-banner" role="alert">{error}</div>}
+
+        <div className="tu-detail-section">
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+            <span className={WORK_ORDER_STATUS[order.status].badge}>
+              {WORK_ORDER_STATUS[order.status].label}
+            </span>
+            {overdue && <span className="tu-badge tu-badge-danger">Overdue</span>}
+            {cue && <span className="tu-badge tu-badge-warning">{cue}</span>}
+          </div>
+          {order.status !== "REJECTED" && (
+            <StatusPipeline
+              status={order.status}
+              steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
+              ariaLabel={`Progress: ${WORK_ORDER_STATUS[order.status].label}`}
+            />
+          )}
+        </div>
+
+        {/* ── Transitions ── */}
+        {(nexts.length > 0 || clientDecision) && (
+          <div className="tu-detail-section">
+            <span className="tu-detail-label">Move this on</span>
+
+            {confirmComplete ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <textarea
+                  className="tu-input"
+                  rows={3}
+                  value={remarks}
+                  onChange={(e) => setRemarks(e.target.value)}
+                  placeholder="Closing remarks (optional)"
+                  aria-label="Closing remarks"
+                />
+                <div className="tu-detail-actions">
+                  <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setConfirmComplete(false)} disabled={busy}>
+                    Cancel
+                  </button>
+                  <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={() => move("COMPLETED")} disabled={busy}>
+                    {busy ? "Saving…" : "Confirm complete"}
+                  </button>
+                </div>
+              </div>
+            ) : sendingBack ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <textarea
+                  className="tu-input"
+                  rows={3}
+                  value={sendBackReason}
+                  onChange={(e) => setSendBackReason(e.target.value)}
+                  placeholder="What still needs doing? (required)"
+                  aria-label="Reason for sending back"
+                />
+                <div className="tu-detail-actions">
+                  <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setSendingBack(false)} disabled={busy}>
+                    Cancel
+                  </button>
+                  <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={sendBack} disabled={busy || !sendBackReason.trim()}>
+                    {busy ? "Sending…" : "Send back"}
+                  </button>
+                </div>
+              </div>
+            ) : clientDecision ? (
+              <div className="tu-detail-actions">
+                <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={() => patch({ status: "APPROVED" })} disabled={busy}>
+                  {busy ? "Saving…" : "Approve"}
+                </button>
+                <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setSendingBack(true)} disabled={busy}>
+                  Send back for rework
+                </button>
+              </div>
+            ) : (
+              <div className="tu-detail-actions">
+                {nexts.map((ns) => (
+                  <button
+                    key={ns}
+                    type="button"
+                    className={`tu-sheet-action tu-sheet-action-${transitionTone(ns)}`}
+                    onClick={() => move(ns)}
+                    disabled={busy}
+                  >
+                    {transitionLabel(order.status, ns)}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Facts ── */}
+        <div className="tu-detail-section">
+          <span className="tu-detail-label">Details</span>
+          <dl className="tu-detail-facts">
+            <div className="tu-sheet-fact">
+              <dt>Priority</dt>
+              <dd>
+                {canManage && !settled ? (
+                  <select
+                    className="tu-select"
+                    value={order.priority}
+                    disabled={busy}
+                    onChange={(e) => patch({ priority: e.target.value })}
+                    aria-label="Priority"
+                  >
+                    {(Object.keys(WORK_ORDER_PRIORITY) as WorkOrderPriority[]).map((p) => (
+                      <option key={p} value={p}>{WORK_ORDER_PRIORITY[p].label}</option>
+                    ))}
+                  </select>
+                ) : order.priority ? (
+                  <span className={WORK_ORDER_PRIORITY[order.priority].badge}>
+                    {WORK_ORDER_PRIORITY[order.priority].label}
+                  </span>
+                ) : "—"}
+              </dd>
+            </div>
+
+            <div className="tu-sheet-fact">
+              <dt>Due</dt>
+              <dd>
+                {canManage && !settled ? (
+                  <input
+                    type="date"
+                    className="tu-input"
+                    value={order.dueDate ? order.dueDate.slice(0, 10) : ""}
+                    disabled={busy}
+                    onChange={(e) => patch({ dueDate: e.target.value || null })}
+                    aria-label="Due date"
+                  />
+                ) : order.dueDate ? formatDate(order.dueDate) : "—"}
+              </dd>
+            </div>
+
+            <div className="tu-sheet-fact">
+              <dt>Man-hours</dt>
+              <dd style={{ fontVariantNumeric: "tabular-nums" }}>
+                {formatHM(loggedMinutes(order))}
+                {order.estimatedMinutes ? ` / ${formatHM(order.estimatedMinutes)}` : ""}
+                {order.timerStartedAt && <span className="tu-chip" style={{ marginLeft: 8 }}>Running</span>}
+              </dd>
+            </div>
+
+            {steps.length > 0 && (
+              <div className="tu-sheet-fact">
+                <dt>Steps</dt>
+                <dd style={{ fontVariantNumeric: "tabular-nums" }}>{done} / {steps.length} done</dd>
+              </div>
+            )}
+
+            {order.category && (
+              <div className="tu-sheet-fact"><dt>Category</dt><dd>{order.category}</dd></div>
+            )}
+          </dl>
+        </div>
+
+        {/* ── Assignees ── */}
+        <div className="tu-detail-section">
+          <span className="tu-detail-label">Assigned to</span>
+          {order.assignments.length === 0 && !showPicker && (
+            <p style={{ margin: 0, fontSize: 13, color: "var(--tu-text-subtle)" }}>Nobody yet.</p>
+          )}
+          {order.assignments.length > 0 && (
+            <div className="tu-chip-row">
+              {order.assignments.map((a) => (
+                <span key={a.employee.id} className="tu-chip">
+                  {a.employee.name}
+                  {canManage && !settled && (
+                    <button
+                      type="button"
+                      onClick={() => unassign(a.employee.id)}
+                      disabled={busy}
+                      aria-label={`Remove ${a.employee.name}`}
+                      style={{ background: "none", border: "none", cursor: "pointer", padding: 0, color: "inherit", lineHeight: 1 }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {canManage && !settled && (
+            showPicker ? (
+              <select
+                className="tu-select"
+                defaultValue=""
+                disabled={busy}
+                aria-label="Assign an employee"
+                style={{ maxWidth: 320 }}
+                onChange={(e) => { if (e.target.value) assign(e.target.value); }}
+              >
+                <option value="">Choose someone…</option>
+                {employees
+                  .filter((e) => !assignedIds.has(e.id))
+                  .map((e) => (
+                    <option key={e.id} value={e.id}>
+                      {e.name}{e.position ? ` — ${e.position}` : ""}
+                    </option>
+                  ))}
+              </select>
+            ) : (
+              <button type="button" className="tu-btn-secondary tu-btn-sm" style={{ alignSelf: "flex-start" }} onClick={openPicker} disabled={busy}>
+                Assign someone
+              </button>
+            )
+          )}
+        </div>
+
+        {order.description && (
+          <div className="tu-detail-section">
+            <span className="tu-detail-label">Description</span>
+            <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--tu-text-body)", whiteSpace: "pre-wrap" }}>
+              {order.description}
+            </p>
+          </div>
+        )}
+
+        {/* ── The thread ── */}
+        <div className="tu-detail-section">
+          <span className="tu-detail-label">Progress ({comments.length})</span>
+          <ProgressThread
+            entries={comments}
+            text={commentText}
+            onTextChange={setCommentText}
+            staged={staged}
+            onStageFiles={(e) => setStaged((prev) => [...prev, ...Array.from(e.target.files ?? [])])}
+            onUnstage={(i) => setStaged((prev) => prev.filter((_, n) => n !== i))}
+            fileInputRef={fileRef}
+            onPost={postComment}
+            posting={posting}
+            error={threadError}
+          />
+        </div>
+      </div>
+
+      <div className="tu-detail-footer">
+        <Link
+          href={`/accounts/${order.accountId}/work-orders/${order.id}`}
+          className="tu-btn-secondary tu-btn-sm"
+          style={{ display: "inline-flex", alignItems: "center", gap: 6 }}
+        >
+          Open full page
+          <span aria-hidden="true">↗</span>
+        </Link>
+        <span style={{ marginLeft: 10, fontSize: 12, color: "var(--tu-text-subtle)" }}>
+          for parts, attachments and steps
+        </span>
+      </div>
+    </div>
+  );
+}

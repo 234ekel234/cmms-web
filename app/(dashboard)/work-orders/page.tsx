@@ -8,7 +8,8 @@ import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
 import WorkOrderFilters from "@/components/WorkOrderFilters";
-import WorkOrderSheet, { type SheetPatch } from "@/components/WorkOrderSheet";
+import WorkOrderQueue from "@/components/WorkOrderQueue";
+import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
 import RowMenu from "@/components/RowMenu";
 import { EmptyRow } from "@/components/EmptyState";
 import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
@@ -32,7 +33,8 @@ type WorkOrder = {
   title: string;
   description: string | null;
   status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
-  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | null;
+  // Non-nullable in the schema (@default(MEDIUM)); this said otherwise.
+  priority: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
   dueDate: string | null;
   category: string | null;
   isSpecialProject: boolean;
@@ -53,7 +55,16 @@ type WorkOrder = {
 
 type PriorityFilter = "ALL" | NonNullable<WorkOrder["priority"]>;
 type SortKey = "SMART" | "NEWEST" | "OLDEST" | "DUE_SOON" | "PRIORITY" | "TITLE" | "ACCOUNT";
-type View = "list" | "calendar";
+/**
+ * Three ways to look at the same queue.
+ *
+ * `split` is the default because triage is the daily job: the queue on the left
+ * with one order open beside it, nothing overlaying anything. `table` keeps the
+ * wide sortable grid — nine columns that cannot fit a 380px rail, and the right
+ * shape for reading down a column rather than working a queue. Selecting a row
+ * there hands off to `split` rather than opening a second detail surface.
+ */
+type View = "split" | "table" | "calendar";
 
 // Every status, in pipeline order, for building the counts the chip row shows.
 const ALL_STATUSES: WorkOrderStatus[] = [
@@ -188,7 +199,7 @@ export default function WorkOrdersPage() {
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("SMART");
-  const [view, setView] = useState<View>("list");
+  const [view, setView] = useState<View>("split");
 
   // The row the sheet is open on, and the one that just changed under it.
   const [openId, setOpenId] = useState<string | null>(() => searchParams.get("open"));
@@ -307,20 +318,30 @@ export default function WorkOrdersPage() {
   // `replace`, not `push`: every chip click would otherwise be a history entry
   // and Back would walk the filter history one toggle at a time.
   useEffect(() => {
-    const q = new URLSearchParams();
-    if (statuses.size) q.set("status", [...statuses].join(","));
-    if (flags.size) q.set("flag", [...flags].join(","));
-    if (openId) q.set("open", openId);
-    const qs = q.toString();
-    router.replace(qs ? `/work-orders?${qs}` : "/work-orders", { scroll: false });
+    // Debounced: `openId` changes on every arrow key, and a router.replace per
+    // keystroke re-runs the route tree while someone is just walking the queue.
+    // The URL only has to be right once they stop moving.
+    const t = window.setTimeout(() => {
+      const q = new URLSearchParams();
+      if (statuses.size) q.set("status", [...statuses].join(","));
+      if (flags.size) q.set("flag", [...flags].join(","));
+      if (openId) q.set("open", openId);
+      const qs = q.toString();
+      router.replace(qs ? `/work-orders?${qs}` : "/work-orders", { scroll: false });
+    }, 300);
+    return () => window.clearTimeout(t);
   }, [statuses, flags, openId, router]);
 
-  const openOrder = openId ? workOrders.find((o) => o.id === openId) ?? null : null;
+  // Resolved from the *filtered* list, not the raw one. Narrowing the queue
+  // past the open order has to close the pane — otherwise the detail keeps
+  // showing a job the rail beside it no longer lists, and acting on it changes
+  // something the user can no longer see.
+  const openOrder = openId ? sorted.find((o) => o.id === openId) ?? null : null;
 
   // The sheet hands back the changed row; the list re-renders it in place.
   // Nothing moves and nothing disappears — there are no tabs to move between
   // any more — so the flash is what makes the change visible.
-  function applyChange(patch: SheetPatch) {
+  function applyChange(patch: PanelPatch) {
     setWorkOrders((prev) => prev.map((o) => (o.id === patch.id ? { ...o, ...patch } : o)));
     setFlashId(patch.id);
     window.setTimeout(() => setFlashId((cur) => (cur === patch.id ? null : cur)), 1500);
@@ -351,7 +372,8 @@ export default function WorkOrdersPage() {
         <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
           <div className="tu-segmented" role="tablist" aria-label="View">
             {([
-              { key: "list" as const, label: "List" },
+              { key: "split" as const, label: "Queue" },
+              { key: "table" as const, label: "Table" },
               { key: "calendar" as const, label: "Calendar" },
             ]).map((v) => (
               <button
@@ -439,7 +461,7 @@ export default function WorkOrdersPage() {
           </span>
         </div>
 
-        {view === "list" ? (
+        {view === "table" ? (
           <div id="wo-tabpanel" role="tabpanel" style={{ overflowX: "auto" }}>
             <table className="tu-table tu-table-interactive" aria-label="Work orders">
               <thead>
@@ -515,10 +537,11 @@ export default function WorkOrdersPage() {
                         key={wo.id}
                         className={rowCls || undefined}
                         aria-selected={openId === wo.id}
-                        // Opens the sheet over the list rather than navigating.
-                        // The title link still goes to the full page, so both
-                        // routes stay available and middle-click still works.
-                        onClick={() => setOpenId(wo.id)}
+                        // Hands off to the queue view with this order selected,
+                        // rather than opening a second detail surface here. The
+                        // title link still goes to the full page, so both routes
+                        // stay available and middle-click still works.
+                        onClick={() => { setOpenId(wo.id); setView("split"); }}
                       >
                         <td className="tu-strong">
                           <Link
@@ -635,7 +658,7 @@ export default function WorkOrdersPage() {
               </tbody>
             </table>
           </div>
-        ) : (
+        ) : view === "calendar" ? (
           <div id="wo-tabpanel" role="tabpanel" style={{ padding: 20 }}>
             <WorkOrderCalendar
               orders={sorted}
@@ -644,28 +667,59 @@ export default function WorkOrdersPage() {
               tooltipFor={(wo) => `${wo.title} — ${wo.account.name}`}
             />
           </div>
+        ) : (
+          <div
+            id="wo-tabpanel"
+            role="tabpanel"
+            className="tu-split"
+            // Drives the narrow-screen behaviour: below 1000px the two panes
+            // cannot both be useful, so the queue owns the width until an order
+            // is chosen and the detail takes over with a back control.
+            data-selected={openOrder ? "true" : "false"}
+          >
+            <div className="tu-queue-pane">
+              <WorkOrderQueue
+                orders={sorted}
+                selectedId={openId}
+                onSelect={setOpenId}
+                loading={loading}
+                changedId={flashId}
+              />
+            </div>
+
+            {openOrder ? (
+              <WorkOrderDetailPanel
+                // Keyed so moving down the queue remounts rather than carrying
+                // the previous job's half-typed note across to the next one.
+                key={openOrder.id}
+                order={openOrder}
+                onChanged={applyChange}
+                onClose={() => setOpenId(null)}
+                // The same three-way split the detail page makes, and for the
+                // same reason. Deciding *what the job is* — its priority, its
+                // due date, who is on it — is account administration and not a
+                // technician's call. Moving their own work along is, and every
+                // row a technician can see here is already theirs (the API
+                // narrows the list by assignment), so no per-row check is needed.
+                canManage={canAdministerAccount(user?.role)}
+                canActOnStatus={!isClient && (!openOrder.isSpecialProject || isManager)}
+                isClient={isClient}
+              />
+            ) : (
+              <div className="tu-detail-empty">
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "var(--tu-text-heading)" }}>
+                    Choose a work order
+                  </p>
+                  <p style={{ margin: "6px 0 0", fontSize: 13 }}>
+                    Pick one from the queue, or press ↓ to start at the top.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
-
-      {openOrder && (
-        <WorkOrderSheet
-          // Keyed so switching rows remounts rather than carrying the previous
-          // job's in-progress form state across.
-          key={openOrder.id}
-          order={openOrder}
-          onClose={() => setOpenId(null)}
-          onChanged={applyChange}
-          // The same three-way split the detail page makes, and for the same
-          // reason. Deciding *what the job is* — its priority, its due date,
-          // who is on it — is account administration and not a technician's
-          // call. Moving their own work along is, and on this list every row a
-          // technician can see is already theirs (the API narrows it by
-          // assignment), so no per-row check is needed here.
-          canManage={canAdministerAccount(user?.role)}
-          canActOnStatus={!isClient && (!openOrder.isSpecialProject || isManager)}
-          isClient={isClient}
-        />
-      )}
     </div>
   );
 }

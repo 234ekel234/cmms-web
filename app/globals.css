@@ -2774,104 +2774,172 @@ figure:hover .tu-attachment-remove,
   z-index: 1;
 }
 
-/* ── Work-order side sheet ───────────────────────────────── */
-/* A detail panel that opens *over* the list instead of navigating away, so a
-   status change never costs you your place in the queue. Distinct from
-   .tu-drawer, which is the mobile nav rail (left-anchored, hidden ≥1024px) and
-   cannot be reused here. */
+/* ── Work-order split view ───────────────────────────────── */
+/* Queue on the left, one order on the right. Replaces an overlay sheet: an
+   overlay sat *over* the list and dimmed it, so acting on a job still cost you
+   sight of the queue. Both halves stay live here, and the pane has room the
+   420px overlay did not — enough for the comment thread. */
 
-.tu-sheet-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  justify-content: flex-end;
-  background: rgb(8 13 24 / 0.42);
-  backdrop-filter: blur(2px);
+.tu-split {
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) 1fr;
+  gap: 0;
+  /* Both columns scroll independently inside the viewport rather than the page
+     scrolling as one — walking the queue with the arrow keys must not drag the
+     detail off screen. */
+  height: calc(100vh - var(--tu-split-offset, 260px));
+  min-height: 420px;
+  border-top: 1px solid var(--tu-border);
 }
 
-.tu-sheet {
-  width: 100%;
-  max-width: 420px;
-  height: 100%;
+.tu-queue-pane {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  border-right: 1px solid var(--tu-border);
+  background: var(--tu-bg-secondary);
+  overflow-y: auto;
+}
+.tu-queue-list { list-style: none; margin: 0; padding: 0; }
+.tu-queue-empty { padding: 28px 20px; text-align: center; }
+
+.tu-queue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 11px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--tu-border);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+.tu-queue-item:hover { background: var(--tu-bg-surface); }
+.tu-queue-item:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
+.tu-queue-item-active {
   background: var(--tu-bg-surface);
-  border-left: 1px solid var(--tu-border);
-  box-shadow: var(--tu-shadow-lg);
-  animation: tu-sheet-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-@keyframes tu-sheet-in {
-  from { transform: translateX(16px); opacity: 0; }
-  to   { transform: translateX(0);    opacity: 1; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tu-sheet { animation: none; }
+  border-left-color: var(--tu-text-brand);
 }
 
-.tu-sheet-header {
+.tu-queue-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+/* Status as a dot rather than a pill: at this width a pill would take a third
+   of the row to say what a colour says, and the pane states it in words. */
+.tu-queue-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.tu-queue-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--tu-text-heading);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.tu-queue-item-active .tu-queue-title { color: var(--tu-text-brand-strong); }
+.tu-queue-star { color: var(--tu-status-requested); font-size: 11px; flex-shrink: 0; }
+
+.tu-queue-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 9px;
+  padding-left: 14px;
+  font-size: 11.5px;
+  color: var(--tu-text-subtle);
+  min-width: 0;
+}
+.tu-queue-account { font-weight: 500; color: var(--tu-text-body); }
+.tu-queue-who { font-size: 11px; }
+.tu-queue-late { color: var(--tu-danger); font-weight: 600; }
+.tu-queue-waiting { color: var(--tu-on-warning); font-weight: 600; }
+.tu-queue-pri { font-weight: 700; letter-spacing: 0.04em; font-size: 10.5px; }
+.tu-queue-pri-critical { color: var(--tu-priority-critical); }
+.tu-queue-pri-high     { color: var(--tu-priority-high); }
+.tu-queue-pri-medium   { color: var(--tu-priority-medium); }
+.tu-queue-pri-low      { color: var(--tu-text-subtle); }
+
+/* ── The detail pane ── */
+.tu-detail {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--tu-bg-surface);
+  overflow: hidden;
+}
+.tu-detail-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+  color: var(--tu-text-subtle);
+  background: var(--tu-bg-surface);
+}
+.tu-detail-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  padding: 18px 20px 14px;
+  padding: 18px 24px 14px;
   border-bottom: 1px solid var(--tu-border);
   flex-shrink: 0;
 }
-.tu-sheet-title {
-  margin: 0;
-  font-size: 15.5px;
-  font-weight: 650;
-  line-height: 1.35;
-  color: var(--tu-text-heading);
-}
-.tu-sheet-sub {
-  margin: 4px 0 0;
-  font-size: 12.5px;
-  color: var(--tu-text-subtle);
-}
-.tu-sheet-body {
+.tu-detail-title { margin: 0; font-size: 17px; font-weight: 650; line-height: 1.3; color: var(--tu-text-heading); }
+.tu-detail-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--tu-text-subtle); }
+/* Only reachable on narrow screens, where the pane covers the queue. */
+.tu-detail-back { display: none; }
+
+.tu-detail-body {
   flex: 1;
   overflow-y: auto;
-  padding: 18px 20px;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
-.tu-sheet-footer {
+.tu-detail-footer {
   flex-shrink: 0;
-  padding: 12px 20px;
+  padding: 12px 24px;
   border-top: 1px solid var(--tu-border);
   background: var(--tu-bg-secondary);
 }
 
-/* A labelled block inside the sheet. */
-.tu-sheet-section { display: flex; flex-direction: column; gap: 9px; }
-.tu-sheet-label {
+.tu-detail-section { display: flex; flex-direction: column; gap: 10px; }
+.tu-detail-label {
   font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--tu-text-subtle);
 }
+.tu-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 
-/* Label/value rows — the facts a supervisor triages on. */
-.tu-sheet-facts { display: flex; flex-direction: column; gap: 1px; }
+/* Two columns of facts at this width — one long column of six rows wastes the
+   pane and pushes the thread below the fold. */
+.tu-detail-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0 28px;
+  margin: 0;
+}
 .tu-sheet-fact {
   display: grid;
-  grid-template-columns: 96px 1fr;
+  grid-template-columns: 92px 1fr;
   align-items: center;
   gap: 12px;
-  padding: 7px 0;
+  padding: 8px 0;
   font-size: 13px;
   border-bottom: 1px solid var(--tu-border);
 }
-.tu-sheet-fact:last-child { border-bottom: none; }
 .tu-sheet-fact dt { color: var(--tu-text-subtle); }
-.tu-sheet-fact dd { margin: 0; color: var(--tu-text-heading); font-weight: 500; }
+.tu-sheet-fact dd { margin: 0; color: var(--tu-text-heading); font-weight: 500; min-width: 0; }
+.tu-sheet-fact dd .tu-select,
+.tu-sheet-fact dd .tu-input { width: 100%; max-width: 190px; }
 
 /* Transition buttons. */
-.tu-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .tu-sheet-action {
   padding: 7px 13px;
   border-radius: var(--tu-radius-sm);
@@ -2889,8 +2957,15 @@ figure:hover .tu-attachment-remove,
 .tu-sheet-action-danger  { background: var(--tu-soft-danger);  color: var(--tu-on-danger);  border-color: var(--tu-bd-danger); }
 .tu-sheet-action-neutral { background: var(--tu-soft-neutral); color: var(--tu-on-neutral); border-color: var(--tu-bd-neutral); }
 
-@media (max-width: 520px) {
-  .tu-sheet { max-width: 100%; }
+/* Below this the two panes cannot both be useful, so the queue owns the width
+   and selecting an order swaps to the detail with a back control. */
+@media (max-width: 1000px) {
+  .tu-split { grid-template-columns: 1fr; height: auto; }
+  .tu-split[data-selected="true"] .tu-queue-pane { display: none; }
+  .tu-split[data-selected="false"] .tu-detail { display: none; }
+  .tu-detail-back { display: flex; }
+  .tu-queue-pane, .tu-detail { overflow: visible; }
+  .tu-detail-body { overflow: visible; }
 }
 
 /* ── Filter chips (multi-select) ─────────────────────────── */

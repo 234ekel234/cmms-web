@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
@@ -10,6 +10,8 @@ import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 import WorkOrderFilters from "@/components/WorkOrderFilters";
+import WorkOrderQueue from "@/components/WorkOrderQueue";
+import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
 import {
   STAFF_TRANSITIONS,
   awaitingClient,
@@ -47,7 +49,10 @@ type WorkOrder = {
   timerStartedAt: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
-  assignments: { employeeId: string; employee: { id: string; name: string } }[];
+  // `position` and `accountId` come back from the API and were simply not
+  // declared here. Both are needed by the shared queue and detail panel.
+  assignments: { employeeId?: string; employee: { id: string; name: string; position: string | null } }[];
+  accountId: string;
   checklistItems: { id: string; isDone: boolean }[];
 };
 
@@ -134,6 +139,7 @@ export default function WorkOrdersPage() {
   const params = useParams();
   const accountId = params.accountId as string;
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { user } = useAuth();
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
@@ -154,9 +160,52 @@ export default function WorkOrdersPage() {
   // make it vanish are gone — but a status change still has to *read* as having
   // happened, and a badge quietly swapping colour mid-list does not.
   const [flashId, setFlashId] = useState<string | null>(null);
+  // Which order the detail pane is showing, in queue mode.
+  const [openId, setOpenId] = useState<string | null>(() => searchParams.get("open"));
+
+  /**
+   * Keep the URL describing the view, the way the cross-account list does.
+   *
+   * This page already *read* `?status=` on mount and never wrote it back, and
+   * adding `?open=` beside it would have doubled a half-feature: params that
+   * look maintained, are not, and quietly go stale the moment anything changes.
+   * Either they describe the view or they should not be read at all — so they
+   * describe it. Debounced because `openId` changes on every arrow key.
+   */
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      const q = new URLSearchParams();
+      if (statuses.size) q.set("status", [...statuses].join(","));
+      if (flags.size) q.set("flag", [...flags].join(","));
+      if (openId) q.set("open", openId);
+      const qs = q.toString();
+      router.replace(
+        qs ? `/accounts/${accountId}/work-orders?${qs}` : `/accounts/${accountId}/work-orders`,
+        { scroll: false }
+      );
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [statuses, flags, openId, accountId, router]);
+
+  /**
+   * The pane hands the changed order back and the queue re-renders it in place.
+   * Same contract as the cross-account list — one detail surface, one update
+   * path, so the two views cannot disagree about what just happened.
+   */
+  function applyChange(patch: PanelPatch) {
+    setOrders((prev) => prev.map((o) => (o.id === patch.id ? { ...o, ...patch } : o)));
+    setFlashId(patch.id);
+    window.setTimeout(() => setFlashId((cur) => (cur === patch.id ? null : cur)), 1500);
+  }
   const [view, setView] = useState<"work" | "special">("work");
   const [sortKey, setSortKey] = useState<SortKey>("SMART");
-  const [mode, setMode] = useState<"list" | "calendar">("list");
+  /**
+   * Queue is the default here for the same reason it is on the cross-account
+   * list: working down a site's outstanding work is the daily job, and the
+   * cards are the better shape only when you want to read the whole record of
+   * each one rather than act on it.
+   */
+  const [mode, setMode] = useState<"queue" | "cards" | "calendar">("queue");
   // An `assetId` query param means we arrived from an asset page's "New Work
   // Order" action, so open the form with that asset already selected.
   const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId"));
@@ -388,6 +437,11 @@ export default function WorkOrdersPage() {
       }
     }
   });
+
+  // The row the pane is showing. Resolved from the *filtered* list so that
+  // narrowing the queue past the open order closes the pane rather than leaving
+  // it showing something the list no longer contains.
+  const openOrder = openId ? sorted.find((o) => o.id === openId) ?? null : null;
   const workCount = orders.filter((o) => !o.isSpecialProject).length;
   const specialCount = orders.filter((o) => o.isSpecialProject).length;
 
@@ -397,20 +451,25 @@ export default function WorkOrdersPage() {
       <div className="tu-page-header" style={{ marginBottom: 20 }}>
         <div>
           <h2 className="tu-page-title">{mode === "calendar" ? "Calendar" : view === "special" ? "Special Projects" : "Work Orders"}</h2>
-          {mode === "list" && !loading && overdueCount > 0 && (
+          {mode !== "calendar" && !loading && overdueCount > 0 && (
             <p className="tu-page-sub tu-danger-text">{overdueCount} overdue</p>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {/* List / Calendar toggle */}
           <div className="tu-segmented">
-            {(["list", "calendar"] as const).map((m) => (
+            {([
+              { key: "queue" as const, label: "Queue" },
+              { key: "cards" as const, label: "Cards" },
+              { key: "calendar" as const, label: "Calendar" },
+            ]).map((m) => (
               <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={mode === m ? "tu-active" : undefined}
+                key={m.key}
+                type="button"
+                onClick={() => setMode(m.key)}
+                className={mode === m.key ? "tu-active" : undefined}
               >
-                {m}
+                {m.label}
               </button>
             ))}
           </div>
@@ -421,7 +480,7 @@ export default function WorkOrdersPage() {
       </div>
 
       {/* View toggle */}
-      {mode === "list" && (
+      {mode !== "calendar" && (
       <div className="tu-toolbar">
         {([
           { key: "work" as const, label: "Work Orders", count: workCount },
@@ -439,7 +498,7 @@ export default function WorkOrdersPage() {
       )}
 
       {/* Status filters */}
-      {mode === "list" && !loading && (
+      {mode !== "calendar" && !loading && (
         <div className="tu-toolbar">
           <WorkOrderFilters
             statuses={statuses}
@@ -620,6 +679,47 @@ export default function WorkOrdersPage() {
             loading={loading}
             hrefFor={(wo) => `/accounts/${accountId}/work-orders/${wo.id}`}
           />
+        </div>
+      ) : mode === "queue" ? (
+        <div className="tu-card" style={{ padding: 0, overflow: "hidden" }}>
+          <div className="tu-split" data-selected={openOrder ? "true" : "false"}>
+            <div className="tu-queue-pane">
+              <WorkOrderQueue
+                orders={sorted}
+                selectedId={openId}
+                onSelect={setOpenId}
+                loading={loading}
+                changedId={flashId}
+                // Every row belongs to this account; saying so on each would be
+                // the same six words repeated down the rail.
+                showAccount={false}
+              />
+            </div>
+            {openOrder ? (
+              <WorkOrderDetailPanel
+                // Keyed so moving down the queue remounts rather than carrying
+                // the previous job's half-typed note across to the next one.
+                key={openOrder.id}
+                order={openOrder}
+                onChanged={applyChange}
+                onClose={() => setOpenId(null)}
+                canManage={canAssign}
+                canActOnStatus={!isClient && (!openOrder.isSpecialProject || isManager)}
+                isClient={isClient}
+              />
+            ) : (
+              <div className="tu-detail-empty">
+                <div>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: 14, color: "var(--tu-text-heading)" }}>
+                    Choose a work order
+                  </p>
+                  <p style={{ margin: "6px 0 0", fontSize: 13 }}>
+                    Pick one from the queue, or press ↓ to start at the top.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       ) : loading ? (
         <div className="space-y-3">

@@ -253,13 +253,11 @@ export default function WorkOrderDetailPage() {
     setLoading(true);
     setError(false);
     try {
-      // There's no single-work-order GET endpoint; the account list is the
-      // source of truth (it includes asset, comments, assignments, and the
-      // man-hour/timer fields), so find this order within it.
-      const res = await api.get(`/accounts/${accountId}/work-orders`);
-      const found = res.data.find((w: WorkOrder) => w.id === workOrderId);
-      if (!found) { setError(true); return; }
-      setOrder(found);
+      // One order, one request. This used to read the whole account's list and
+      // search it client-side, for want of a single-order endpoint — every
+      // work order on the site fetched to render one of them.
+      const res = await api.get(`/work-orders/${workOrderId}`);
+      setOrder(res.data);
     } catch {
       setError(true);
     } finally {

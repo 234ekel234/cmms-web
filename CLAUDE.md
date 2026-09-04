@@ -66,6 +66,31 @@ in it are load-bearing:
 `ROLE_HOME.TECHNICIAN` is `/work-orders`, not `/` — the dashboard is the account at a glance,
 which is exactly what a technician does not get.
 
+## Work orders
+
+Two list routes (`/work-orders` across accounts, `/accounts/[id]/work-orders` for one site)
+and a full detail page. Both lists default to **Queue** — `WorkOrderQueue` on the left,
+`WorkOrderDetailPanel` on the right — with `↑ / ↓` and `j / k` walking the rail. Two things
+about it are load-bearing:
+
+- **The pane and the rail must agree on what exists.** `openOrder` resolves from the
+  *filtered, sorted* list, never the raw one. Narrowing the queue past the open order has
+  to close the pane — otherwise the detail keeps showing a job the rail no longer lists,
+  and acting on it changes something the user cannot see.
+- **Filtering is two axes.** `passesFilters(order, statuses, flags)` in `lib/workOrders.ts`
+  ANDs them, and an empty set on either narrows nothing. Overdue and awaiting-sign-off are
+  *not* statuses — they are conditions that can be true at several statuses at once, which
+  is exactly why the old single tab bar could not express them together.
+
+`lib/workOrders.ts` mirrors `backend/helpers/workOrderApproval.js` and decides what to
+*offer*, never what to allow. `STAFF_TRANSITIONS` omits the client's two moves out of
+`COMPLETED` on purpose. Nothing here should draw a control the API answers 403 (or, worse,
+silently ignores — `priority` is non-nullable with `@default(MEDIUM)`, so there is no
+"None" to offer).
+
+Status and priority pills come from `lib/statuses.ts`. Both lists once kept private copies
+and had already drifted on `REQUESTED`.
+
 ## Auth Flow
 
 1. User logs in via `POST /api/auth/login`
