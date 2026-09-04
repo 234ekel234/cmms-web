@@ -7,9 +7,23 @@ import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import AccountFilter from "@/components/AccountFilter";
+import WorkOrderFilters from "@/components/WorkOrderFilters";
+import WorkOrderSheet, { type SheetPatch } from "@/components/WorkOrderSheet";
 import RowMenu from "@/components/RowMenu";
 import { EmptyRow } from "@/components/EmptyState";
-import { awaitingClient, triageRank } from "@/lib/workOrders";
+import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+// Aliased the way the detail page does: rbac's `canManage` is the account-
+// administration question, and reading it under its own name next to the
+// per-job one is how the two got conflated in the first place.
+import { canManage as canAdministerAccount } from "@/lib/rbac";
+import {
+  awaitingClient,
+  isOverdue,
+  matchesFlag,
+  passesFilters,
+  triageRank,
+  type WorkOrderFlag,
+} from "@/lib/workOrders";
 
 type Account = { id: string; name: string };
 
@@ -29,29 +43,23 @@ type WorkOrder = {
   accountId: string;
   account: Account;
   asset: { id: string; name: string } | null;
-  assignments: { employee: { id: string; name: string; position: string } }[];
+  // `position` is nullable on Employee, and this said otherwise.
+  assignments: { employee: { id: string; name: string; position: string | null } }[];
+  // Two columns only — enough for the "3/6" counter without dragging every
+  // procedure in the system across the wire. See the select on GET /work-orders.
+  checklistItems?: { id: string; isDone: boolean }[];
   createdAt: string;
 };
 
-// "AWAITING" is a question about the order, not a status the API knows — see
-// the note on the account list's own StatusFilter.
-type StatusFilter = "ALL" | "OVERDUE" | "AWAITING" | WorkOrder["status"];
 type PriorityFilter = "ALL" | NonNullable<WorkOrder["priority"]>;
 type SortKey = "SMART" | "NEWEST" | "OLDEST" | "DUE_SOON" | "PRIORITY" | "TITLE" | "ACCOUNT";
 type View = "list" | "calendar";
 
-const STATUS_TABS: { key: StatusFilter; label: string }[] = [
-  { key: "ALL",         label: "All"         },
-  { key: "OVERDUE",     label: "Overdue"     },
-  { key: "AWAITING",    label: "Awaiting sign-off" },
-  { key: "REQUESTED",   label: "Requested"   },
-  { key: "PENDING",     label: "Accepted"    },
-  { key: "IN_PROGRESS", label: "In Progress" },
-  { key: "ON_HOLD",     label: "On Hold"     },
-  { key: "COMPLETED",   label: "Completed"   },
-  { key: "APPROVED",    label: "Approved"    },
-  { key: "REJECTED",    label: "Rejected"    },
+// Every status, in pipeline order, for building the counts the chip row shows.
+const ALL_STATUSES: WorkOrderStatus[] = [
+  "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED",
 ];
+const ALL_FLAGS: WorkOrderFlag[] = ["OVERDUE", "AWAITING"];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "SMART",    label: "Smart (urgency)"   },
@@ -68,19 +76,24 @@ const PRIORITY_RANK: Record<NonNullable<WorkOrder["priority"]>, number> = {
   CRITICAL: 4, HIGH: 3, MEDIUM: 2, LOW: 1,
 };
 
-function parseStatusParam(raw: string | null): StatusFilter {
-  if (!raw) return "ALL";
-  const up = raw.toUpperCase();
-  return (STATUS_TABS.some((t) => t.key === up) ? up : "ALL") as StatusFilter;
+/**
+ * `?status=REQUESTED,PENDING` — a *set*, because the axis is multi-select now.
+ *
+ * Still accepts the single value the old tabs wrote, so links and bookmarks
+ * from before this change land on the same narrowing rather than on everything.
+ * An unrecognised name is dropped rather than failing the whole parse.
+ */
+function parseStatuses(raw: string | null): Set<WorkOrderStatus> {
+  if (!raw) return new Set();
+  const wanted = raw.split(",").map((s) => s.trim().toUpperCase());
+  return new Set(ALL_STATUSES.filter((s) => wanted.includes(s)));
 }
 
-const isOverdue = (wo: { dueDate: string | null; status: WorkOrder["status"] }) =>
-  !!wo.dueDate && !isTerminal(wo) && new Date(wo.dueDate).getTime() < Date.now();
-
-// Approved work is finished too — without it here, signing a job off would
-// make it reappear as overdue.
-const isTerminal = (wo: { status: WorkOrder["status"] }) =>
-  wo.status === "COMPLETED" || wo.status === "APPROVED" || wo.status === "REJECTED";
+function parseFlags(raw: string | null): Set<WorkOrderFlag> {
+  if (!raw) return new Set();
+  const wanted = raw.split(",").map((s) => s.trim().toUpperCase());
+  return new Set(ALL_FLAGS.filter((f) => wanted.includes(f)));
+}
 
 // "Smart" triage sort: closed orders sink; among open ones rank by priority
 // (Critical first), then overdue-first, then soonest due, then newest. Work
@@ -107,23 +120,11 @@ function smartCompare(a: WorkOrder, b: WorkOrder) {
   return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 }
 
-// One tone per status so the column is scannable; mirrors lib/statuses.ts.
-const STATUS_BADGE: Record<WorkOrder["status"], { cls: string; label: string }> = {
-  REQUESTED:   { cls: "tu-badge tu-badge-warning", label: "Requested"   },
-  PENDING:     { cls: "tu-badge tu-badge-info",    label: "Accepted"    },
-  IN_PROGRESS: { cls: "tu-badge tu-badge-brand",   label: "In Progress" },
-  ON_HOLD:     { cls: "tu-badge tu-badge-neutral", label: "On Hold"     },
-  COMPLETED:   { cls: "tu-badge tu-badge-success", label: "Completed"   },
-  APPROVED:    { cls: "tu-badge tu-badge-success", label: "Approved"    },
-  REJECTED:    { cls: "tu-badge tu-badge-danger",  label: "Rejected"    },
-};
-
-const PRIORITY_BADGE: Record<NonNullable<WorkOrder["priority"]>, { cls: string }> = {
-  LOW:      { cls: "tu-badge tu-badge-neutral" },
-  MEDIUM:   { cls: "tu-badge tu-badge-warning" },
-  HIGH:     { cls: "tu-badge tu-badge-danger"  },
-  CRITICAL: { cls: "tu-badge tu-badge-danger"  },
-};
+// Status and priority pills come from lib/statuses.ts. This page used to keep
+// its own copy, and the two had already drifted — Requested was `warning` here
+// and `brand` there, so the same status wore a different colour depending on
+// which list you were looking at. The chip row and the column now read from one
+// table, which is the point of having it.
 
 function IconSearch() {
   return (
@@ -162,6 +163,10 @@ export default function WorkOrdersPage() {
   const searchParams = useSearchParams();
   const { user } = useAuth();
   const isClient = user?.role === "CLIENT";
+  // Special projects are a manager's call to approve or reject — the gate the
+  // detail page applies, mirrored so the sheet cannot offer a button the API
+  // refuses.
+  const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
@@ -170,11 +175,24 @@ export default function WorkOrdersPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [selectedAccounts, setSelectedAccounts] = useState<Set<string>>(new Set());
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => parseStatusParam(searchParams.get("status")));
+  const [statuses, setStatuses] = useState<Set<WorkOrderStatus>>(
+    () => parseStatuses(searchParams.get("status"))
+  );
+  const [flags, setFlags] = useState<Set<WorkOrderFlag>>(() => {
+    // `?status=OVERDUE` was a real link before the axes were split. Honour it as
+    // the flag it always was, rather than silently showing everything.
+    const fromFlags = parseFlags(searchParams.get("flag"));
+    for (const f of parseFlags(searchParams.get("status"))) fromFlags.add(f);
+    return fromFlags;
+  });
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("ALL");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("SMART");
   const [view, setView] = useState<View>("list");
+
+  // The row the sheet is open on, and the one that just changed under it.
+  const [openId, setOpenId] = useState<string | null>(() => searchParams.get("open"));
+  const [flashId, setFlashId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,17 +218,8 @@ export default function WorkOrdersPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const matchesStatus = (wo: WorkOrder, key: StatusFilter) =>
-    key === "ALL"
-      ? true
-      : key === "OVERDUE"
-      ? isOverdue(wo)
-      : key === "AWAITING"
-      ? awaitingClient(wo)
-      : wo.status === key;
-
-  // Everything except the status filter — the tab counts are computed against
-  // this set so each tab shows how many rows it would reveal.
+  // Everything except the two chip axes — their counts are computed against
+  // this set, so each chip states how many rows it would reveal.
   const preStatus = useMemo(() => {
     const q = search.trim().toLowerCase();
     return workOrders.filter((wo) => {
@@ -227,16 +236,27 @@ export default function WorkOrdersPage() {
     });
   }, [workOrders, selectedAccounts, priorityFilter, search]);
 
-  const counts = useMemo(
-    () => Object.fromEntries(
-      STATUS_TABS.map((tab) => [tab.key, preStatus.filter((wo) => matchesStatus(wo, tab.key)).length])
-    ) as Record<StatusFilter, number>,
-    [preStatus]
-  );
+  // Each axis is counted against the *other* axis's selection, so the numbers
+  // answer "how many would I see if I clicked this", not "how many exist".
+  // Counting both against the unfiltered set made every flag chip claim rows
+  // that the active status selection would have hidden.
+  const statusCounts = useMemo(() => {
+    const base = preStatus.filter((wo) => [...flags].every((f) => matchesFlag(wo, f)));
+    return Object.fromEntries(
+      ALL_STATUSES.map((s) => [s, base.filter((wo) => wo.status === s).length])
+    ) as Record<WorkOrderStatus, number>;
+  }, [preStatus, flags]);
+
+  const flagCounts = useMemo(() => {
+    const base = preStatus.filter((wo) => statuses.size === 0 || statuses.has(wo.status));
+    return Object.fromEntries(
+      ALL_FLAGS.map((f) => [f, base.filter((wo) => matchesFlag(wo, f)).length])
+    ) as Record<WorkOrderFlag, number>;
+  }, [preStatus, statuses]);
 
   const filtered = useMemo(
-    () => preStatus.filter((wo) => matchesStatus(wo, statusFilter)),
-    [preStatus, statusFilter]
+    () => preStatus.filter((wo) => passesFilters(wo, statuses, flags)),
+    [preStatus, statuses, flags]
   );
 
   const sorted = useMemo(() => {
@@ -271,13 +291,39 @@ export default function WorkOrdersPage() {
     (selectedAccounts.size > 0 ? 1 : 0) +
     (priorityFilter !== "ALL" ? 1 : 0) +
     (search.trim() ? 1 : 0) +
-    (statusFilter !== "ALL" ? 1 : 0);
+    statuses.size +
+    flags.size;
 
   function resetFilters() {
     setSelectedAccounts(new Set());
     setPriorityFilter("ALL");
     setSearch("");
-    setStatusFilter("ALL");
+    setStatuses(new Set());
+    setFlags(new Set());
+  }
+
+  // Keep the URL describing the view, so a filtered queue is linkable and the
+  // browser Back button closes the sheet instead of leaving the page.
+  // `replace`, not `push`: every chip click would otherwise be a history entry
+  // and Back would walk the filter history one toggle at a time.
+  useEffect(() => {
+    const q = new URLSearchParams();
+    if (statuses.size) q.set("status", [...statuses].join(","));
+    if (flags.size) q.set("flag", [...flags].join(","));
+    if (openId) q.set("open", openId);
+    const qs = q.toString();
+    router.replace(qs ? `/work-orders?${qs}` : "/work-orders", { scroll: false });
+  }, [statuses, flags, openId, router]);
+
+  const openOrder = openId ? workOrders.find((o) => o.id === openId) ?? null : null;
+
+  // The sheet hands back the changed row; the list re-renders it in place.
+  // Nothing moves and nothing disappears — there are no tabs to move between
+  // any more — so the flash is what makes the change visible.
+  function applyChange(patch: SheetPatch) {
+    setWorkOrders((prev) => prev.map((o) => (o.id === patch.id ? { ...o, ...patch } : o)));
+    setFlashId(patch.id);
+    window.setTimeout(() => setFlashId((cur) => (cur === patch.id ? null : cur)), 1500);
   }
 
   async function toggleTimer(wo: WorkOrder) {
@@ -330,25 +376,15 @@ export default function WorkOrdersPage() {
       {error && <div className="tu-error-banner" role="alert">{error}</div>}
 
       <div className="tu-card">
-        <div className="tu-tab-group" role="tablist" aria-label="Filter by status">
-          {STATUS_TABS.map((tab) => (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={statusFilter === tab.key}
-              aria-controls="wo-tabpanel"
-              className={`tu-tab${statusFilter === tab.key ? " tu-active-tab" : ""}`}
-              onClick={() => setStatusFilter(tab.key)}
-              type="button"
-            >
-              {tab.label}
-              {counts[tab.key] > 0 && (
-                <span className="tu-tab-count" aria-label={`${counts[tab.key]} items`}>
-                  {counts[tab.key]}
-                </span>
-              )}
-            </button>
-          ))}
+        <div className="tu-toolbar tu-toolbar-inset">
+          <WorkOrderFilters
+            statuses={statuses}
+            onStatusesChange={setStatuses}
+            flags={flags}
+            onFlagsChange={setFlags}
+            statusCounts={statusCounts}
+            flagCounts={flagCounts}
+          />
         </div>
 
         {/* Search + priority + sort */}
@@ -467,13 +503,22 @@ export default function WorkOrdersPage() {
                   />
                 ) : (
                   sorted.map((wo) => {
-                    const st = STATUS_BADGE[wo.status];
-                    const pri = wo.priority ? PRIORITY_BADGE[wo.priority] : null;
+                    const st = WORK_ORDER_STATUS[wo.status];
+                    const pri = wo.priority ? WORK_ORDER_PRIORITY[wo.priority] : null;
                     const overdue = isOverdue(wo);
+                    const rowCls = [
+                      openId === wo.id ? "tu-row-selected" : "",
+                      flashId === wo.id ? "tu-row-changed" : "",
+                    ].filter(Boolean).join(" ");
                     return (
                       <tr
                         key={wo.id}
-                        onClick={() => router.push(`/accounts/${wo.accountId}/work-orders/${wo.id}`)}
+                        className={rowCls || undefined}
+                        aria-selected={openId === wo.id}
+                        // Opens the sheet over the list rather than navigating.
+                        // The title link still goes to the full page, so both
+                        // routes stay available and middle-click still works.
+                        onClick={() => setOpenId(wo.id)}
                       >
                         <td className="tu-strong">
                           <Link
@@ -506,7 +551,7 @@ export default function WorkOrdersPage() {
                           {wo.asset?.name ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                         </td>
                         <td>
-                          <span className={st.cls}>{st.label}</span>
+                          <span className={st.badge}>{st.label}</span>
                           {awaitingClient(wo) && (
                             <div
                               className="tu-badge tu-badge-info"
@@ -517,7 +562,7 @@ export default function WorkOrdersPage() {
                           )}
                         </td>
                         <td>
-                          {pri ? <span className={pri.cls}>{wo.priority}</span> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                          {pri ? <span className={pri.badge}>{pri.label}</span> : <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                         </td>
                         <td>
                           {wo.dueDate ? (
@@ -601,6 +646,26 @@ export default function WorkOrdersPage() {
           </div>
         )}
       </div>
+
+      {openOrder && (
+        <WorkOrderSheet
+          // Keyed so switching rows remounts rather than carrying the previous
+          // job's in-progress form state across.
+          key={openOrder.id}
+          order={openOrder}
+          onClose={() => setOpenId(null)}
+          onChanged={applyChange}
+          // The same three-way split the detail page makes, and for the same
+          // reason. Deciding *what the job is* — its priority, its due date,
+          // who is on it — is account administration and not a technician's
+          // call. Moving their own work along is, and on this list every row a
+          // technician can see is already theirs (the API narrows it by
+          // assignment), so no per-row check is needed here.
+          canManage={canAdministerAccount(user?.role)}
+          canActOnStatus={!isClient && (!openOrder.isSpecialProject || isManager)}
+          isClient={isClient}
+        />
+      )}
     </div>
   );
 }

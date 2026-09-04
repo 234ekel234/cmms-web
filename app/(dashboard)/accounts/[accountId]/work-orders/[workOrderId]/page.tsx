@@ -6,7 +6,7 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { awaitingClient, isClosed, isSettled, needsClientApproval } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval } from "@/lib/workOrders";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
@@ -102,19 +102,6 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
   MEDIUM:   { label: "Medium",   cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
   HIGH:     { label: "High",     cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
   CRITICAL: { label: "Critical", cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
-};
-
-// Staff transitions only. The two moves out of COMPLETED belong to the client
-// and are offered by their own controls below, not by this table — a manager
-// must not be shown an Approve button the API will refuse.
-const VALID_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-  REQUESTED:   ["PENDING", "REJECTED"],
-  PENDING:     ["IN_PROGRESS", "REJECTED"],
-  IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
-  ON_HOLD:     ["IN_PROGRESS", "REJECTED"],
-  COMPLETED:   [],
-  APPROVED:    [],
-  REJECTED:    [],
 };
 
 function formatDate(iso: string) {
@@ -677,7 +664,7 @@ export default function WorkOrderDetailPage() {
 
   const cfg = STATUS_CONFIG[order.status];
   const priorityCfg = PRIORITY_CONFIG[order.priority];
-  const nextStatuses = VALID_TRANSITIONS[order.status];
+  const nextStatuses = STAFF_TRANSITIONS[order.status];
   // "Nothing more will happen to this." Work awaiting a client is *not*
   // settled — it can still come back for rework — so the edit affordances stay
   // available until it actually is.

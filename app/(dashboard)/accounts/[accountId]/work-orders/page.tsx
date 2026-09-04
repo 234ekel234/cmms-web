@@ -9,17 +9,28 @@ import WorkOrderCalendar from "@/components/WorkOrderCalendar";
 import StatusPipeline from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
-import { awaitingClient, isClosed, signOffCue, triageRank } from "@/lib/workOrders";
+import WorkOrderFilters from "@/components/WorkOrderFilters";
+import {
+  STAFF_TRANSITIONS,
+  awaitingClient,
+  isClosed,
+  isOverdue,
+  matchesFlag,
+  passesFilters,
+  signOffCue,
+  triageRank,
+  type WorkOrderFlag,
+} from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-// "AWAITING" is not a status the API knows — it is COMPLETED work that still
-// needs the client, which is a question about the order and not about its
-// status alone. It lives in the filter union rather than beside the real
-// statuses so nothing can mistake it for one and send it to the API.
-type StatusFilter = WorkOrderStatus | "ALL" | "OVERDUE" | "AWAITING";
+// Overdue and awaiting-sign-off used to sit in this union alongside the real
+// statuses, which is what made them mutually exclusive with them: choosing a
+// status meant giving up the overdue view, so "overdue *and* in progress" could
+// not be asked. They are their own axis now — see WorkOrderFlag in
+// lib/workOrders.ts — and the status axis holds nothing but statuses.
 
 type WorkOrder = {
   id: string;
@@ -81,20 +92,6 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 // overdue check beside it was not, and having two of them is how that happened.
 const isTerminal = (o: WorkOrder) => isClosed(o);
 
-// Allowed status transitions a manager/supervisor can apply from each state.
-// Approving and sending back belong to the client and are offered only on the
-// work-order detail page, so both stay empty here — this list drives a staff
-// row menu, and an option the API refuses is worse than no option.
-const TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
-  REQUESTED: ["PENDING", "REJECTED"],
-  PENDING: ["IN_PROGRESS", "REJECTED"],
-  IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
-  ON_HOLD: ["IN_PROGRESS", "REJECTED"],
-  COMPLETED: [],
-  APPROVED: [],
-  REJECTED: [],
-};
-
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
 const EMPTY_FORM = {
@@ -141,11 +138,22 @@ export default function WorkOrdersPage() {
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
-    const raw = searchParams.get("status")?.toUpperCase();
-    const valid = ["OVERDUE", "AWAITING", "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED"];
-    return raw && valid.includes(raw) ? (raw as StatusFilter) : "ALL";
+  const [statuses, setStatuses] = useState<Set<WorkOrderStatus>>(() => {
+    const raw = searchParams.get("status")?.toUpperCase().split(",").map((x) => x.trim()) ?? [];
+    return new Set(STATUS_ORDER.filter((s) => raw.includes(s)));
   });
+  const [flags, setFlags] = useState<Set<WorkOrderFlag>>(() => {
+    // Old `?status=OVERDUE` links predate the split and still mean the flag.
+    const raw = [
+      ...(searchParams.get("flag")?.toUpperCase().split(",") ?? []),
+      ...(searchParams.get("status")?.toUpperCase().split(",") ?? []),
+    ].map((x) => x.trim());
+    return new Set((["OVERDUE", "AWAITING"] as WorkOrderFlag[]).filter((f) => raw.includes(f)));
+  });
+  // The card that just changed. Nothing moves any more — the tabs that used to
+  // make it vanish are gone — but a status change still has to *read* as having
+  // happened, and a badge quietly swapping colour mid-list does not.
+  const [flashId, setFlashId] = useState<string | null>(null);
   const [view, setView] = useState<"work" | "special">("work");
   const [sortKey, setSortKey] = useState<SortKey>("SMART");
   const [mode, setMode] = useState<"list" | "calendar">("list");
@@ -297,6 +305,8 @@ export default function WorkOrdersPage() {
       // wholesale dropped the array the card's "3/6" counter reads, and the
       // next render threw on `.length`. Changing a status blanked the page.
       setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...res.data } : o)));
+      setFlashId(id);
+      window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1500);
     } catch {
       // silent
     }
@@ -322,20 +332,25 @@ export default function WorkOrdersPage() {
   // signed off still counted as overdue, showed the red badge and appeared under
   // the OVERDUE filter — signed-off work reading as outstanding, which is the
   // thing the approval status exists to prevent.
-  const isOverdue = (o: WorkOrder) => !!o.dueDate && !isClosed(o) && new Date(o.dueDate) < now;
   const overdueCount = inView.filter(isOverdue).length;
   // Its own filter rather than a slice of COMPLETED: the whole point is that
   // this work is *not* the same as the completed work sitting beside it, and a
   // client scanning "Completed (8)" has no way to tell which one is theirs.
   const awaitingCount = inView.filter(awaitingClient).length;
-  const filtered =
-    statusFilter === "ALL"
-      ? inView
-      : statusFilter === "OVERDUE"
-      ? inView.filter(isOverdue)
-      : statusFilter === "AWAITING"
-      ? inView.filter(awaitingClient)
-      : inView.filter((o) => o.status === statusFilter);
+  // Each axis counted against the other's selection, so a chip's number says
+  // how many rows clicking it would reveal rather than how many exist.
+  const statusCounts = Object.fromEntries(
+    STATUS_ORDER.map((s) => [
+      s,
+      inView.filter((o) => o.status === s && [...flags].every((f) => matchesFlag(o, f))).length,
+    ])
+  ) as Record<WorkOrderStatus, number>;
+  const flagCounts = {
+    OVERDUE: inView.filter((o) => isOverdue(o) && (statuses.size === 0 || statuses.has(o.status))).length,
+    AWAITING: inView.filter((o) => awaitingClient(o) && (statuses.size === 0 || statuses.has(o.status))).length,
+  } as Record<WorkOrderFlag, number>;
+
+  const filtered = inView.filter((o) => passesFilters(o, statuses, flags));
   const sorted = [...filtered].sort((a, b) => {
     switch (sortKey) {
       case "STATUS":
@@ -414,7 +429,7 @@ export default function WorkOrdersPage() {
         ]).map((t) => (
           <button
             key={t.key}
-            onClick={() => { setView(t.key); setStatusFilter("ALL"); }}
+            onClick={() => { setView(t.key); setStatuses(new Set()); setFlags(new Set()); }}
             className={`tu-view-pill${view === t.key ? " tu-active" : ""}`}
           >
             {t.label}{t.count > 0 ? ` (${t.count})` : ""}
@@ -426,30 +441,14 @@ export default function WorkOrdersPage() {
       {/* Status filters */}
       {mode === "list" && !loading && (
         <div className="tu-toolbar">
-          {([
-            { key: "ALL" as StatusFilter, label: `All (${inView.length})` },
-            ...(overdueCount > 0
-              ? [{ key: "OVERDUE" as StatusFilter, label: `Overdue (${overdueCount})` }]
-              : []),
-            ...(awaitingCount > 0
-              ? [{
-                  key: "AWAITING" as StatusFilter,
-                  label: `${isClient ? "Awaiting you" : "Awaiting sign-off"} (${awaitingCount})`,
-                }]
-              : []),
-            ...STATUS_ORDER.filter((s) => inView.some((o) => o.status === s)).map((s) => ({
-              key: s as StatusFilter,
-              label: `${STATUS_CONFIG[s].label} (${inView.filter((o) => o.status === s).length})`,
-            })),
-          ]).map((f) => (
-            <button
-              key={f.key}
-              onClick={() => setStatusFilter(f.key as StatusFilter)}
-              className={`tu-filter-pill${statusFilter === f.key ? " tu-active" : ""}`}
-            >
-              {f.label}
-            </button>
-          ))}
+          <WorkOrderFilters
+            statuses={statuses}
+            onStatusesChange={setStatuses}
+            flags={flags}
+            onFlagsChange={setFlags}
+            statusCounts={statusCounts}
+            flagCounts={flagCounts}
+          />
           <label className="tu-toolbar-spacer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 500, color: "var(--tu-text-subtle)" }}>
             Sort
             <select
@@ -650,10 +649,10 @@ export default function WorkOrdersPage() {
             const statusCfg = STATUS_CONFIG[order.status];
             const isRejected = order.status === "REJECTED";
             const signOff = signOffCue(order, isClient);
-            const nextStatuses = TRANSITIONS[order.status];
+            const nextStatuses = STAFF_TRANSITIONS[order.status];
 
             return (
-              <div key={order.id} className="tu-wo-card" style={isRejected ? { opacity: 0.9 } : undefined}>
+              <div key={order.id} className={`tu-wo-card${flashId === order.id ? " tu-changed" : ""}`} style={isRejected ? { opacity: 0.9 } : undefined}>
                 {/* Top row: title + status pill */}
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <Link

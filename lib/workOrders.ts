@@ -94,6 +94,109 @@ export function signOffCue(
 }
 
 /**
+ * Past its due date and still outstanding.
+ *
+ * Built on `isClosed`, not `isSettled`: approved work is finished and must not
+ * keep reading as late, and a rejected job is not outstanding either. Both list
+ * pages had their own copy of this, spelled slightly differently.
+ */
+export function isOverdue(wo: { dueDate: string | null; status: WorkOrderStatus }): boolean {
+  return !!wo.dueDate && !isClosed(wo) && new Date(wo.dueDate).getTime() < Date.now();
+}
+
+/**
+ * The cross-cutting conditions a work order can be in, as opposed to the
+ * lifecycle status it sits at.
+ *
+ * These are the reason the old tab bar could not answer "what is overdue *and*
+ * in progress?": overdue and awaiting-sign-off are not stages, they are
+ * questions about an order that may be true at several stages, and putting them
+ * in the same mutually-exclusive control as the statuses made the two
+ * unaskable together.
+ */
+export type WorkOrderFlag = "OVERDUE" | "AWAITING";
+
+export function matchesFlag(
+  wo: ApprovalShape & { status: WorkOrderStatus; dueDate: string | null },
+  flag: WorkOrderFlag,
+): boolean {
+  return flag === "OVERDUE" ? isOverdue(wo) : awaitingClient(wo);
+}
+
+/**
+ * Does this order survive the two filter axes?
+ *
+ * Empty on either axis means "no narrowing on that axis" rather than "match
+ * nothing" — an empty status set is the old All tab. The axes are ANDed, and
+ * within the flag axis the selections are ANDed too: picking Overdue and
+ * Awaiting asks for orders that are both, which is a coherent question and the
+ * one a supervisor chasing a stalled sign-off actually has.
+ */
+export function passesFilters(
+  wo: ApprovalShape & { status: WorkOrderStatus; dueDate: string | null },
+  statuses: ReadonlySet<WorkOrderStatus>,
+  flags: ReadonlySet<WorkOrderFlag>,
+): boolean {
+  if (statuses.size > 0 && !statuses.has(wo.status)) return false;
+  for (const f of flags) if (!matchesFlag(wo, f)) return false;
+  return true;
+}
+
+/**
+ * The statuses staff may move an order to next.
+ *
+ * Mirrors `allowedTransitions` in backend/helpers/workOrderApproval.js, and
+ * lives here rather than inline on the detail page because the work-order list's
+ * side sheet offers the same buttons. Two copies of a transition table is how
+ * one of them ends up drawing a control the API refuses.
+ *
+ * Staff transitions only. The two moves out of COMPLETED — approve, or send
+ * back for rework — belong to the client and are offered by their own controls,
+ * so a manager is never shown an Approve button that would 403.
+ */
+export const STAFF_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
+  REQUESTED:   ["PENDING", "REJECTED"],
+  PENDING:     ["IN_PROGRESS", "REJECTED"],
+  IN_PROGRESS: ["COMPLETED", "PENDING", "ON_HOLD"],
+  ON_HOLD:     ["IN_PROGRESS", "REJECTED"],
+  COMPLETED:   [],
+  APPROVED:    [],
+  REJECTED:    [],
+};
+
+/**
+ * What to call a transition, given where the order is coming from.
+ *
+ * The destination alone is not enough: PENDING means "Accept" arriving from
+ * REQUESTED and "Revert to Accepted" arriving from IN_PROGRESS, and
+ * IN_PROGRESS means "Start work" from PENDING but "Resume work" from ON_HOLD.
+ * Labelling by destination alone told a supervisor they were starting work they
+ * had already started.
+ */
+export function transitionLabel(from: WorkOrderStatus, to: WorkOrderStatus): string {
+  if (to === "PENDING") return from === "IN_PROGRESS" ? "Revert to Accepted" : "Accept";
+  if (to === "IN_PROGRESS") return from === "ON_HOLD" ? "Resume work" : "Start work";
+  if (to === "ON_HOLD") return "Put on hold";
+  if (to === "COMPLETED") return "Mark as complete";
+  if (to === "REJECTED") return "Reject";
+  if (to === "APPROVED") return "Approve";
+  return to;
+}
+
+/**
+ * The visual weight a transition button carries.
+ *
+ * Returned as a token name rather than a class so the sheet and the detail page
+ * can spend it differently — one draws pills, the other full buttons.
+ */
+export function transitionTone(to: WorkOrderStatus): "danger" | "success" | "neutral" | "brand" {
+  if (to === "REJECTED") return "danger";
+  if (to === "COMPLETED") return "success";
+  if (to === "ON_HOLD") return "neutral";
+  return "brand";
+}
+
+/**
  * Triage rank for the "smart" sorts: 0 still being worked, 1 parked with the
  * client, 2 finished for good.
  *

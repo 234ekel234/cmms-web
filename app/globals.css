@@ -2773,3 +2773,199 @@ figure:hover .tu-attachment-remove,
   justify-content: center;
   z-index: 1;
 }
+
+/* ── Work-order side sheet ───────────────────────────────── */
+/* A detail panel that opens *over* the list instead of navigating away, so a
+   status change never costs you your place in the queue. Distinct from
+   .tu-drawer, which is the mobile nav rail (left-anchored, hidden ≥1024px) and
+   cannot be reused here. */
+
+.tu-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: flex-end;
+  background: rgb(8 13 24 / 0.42);
+  backdrop-filter: blur(2px);
+}
+
+.tu-sheet {
+  width: 100%;
+  max-width: 420px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--tu-bg-surface);
+  border-left: 1px solid var(--tu-border);
+  box-shadow: var(--tu-shadow-lg);
+  animation: tu-sheet-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes tu-sheet-in {
+  from { transform: translateX(16px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-sheet { animation: none; }
+}
+
+.tu-sheet-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--tu-border);
+  flex-shrink: 0;
+}
+.tu-sheet-title {
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 650;
+  line-height: 1.35;
+  color: var(--tu-text-heading);
+}
+.tu-sheet-sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--tu-text-subtle);
+}
+.tu-sheet-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.tu-sheet-footer {
+  flex-shrink: 0;
+  padding: 12px 20px;
+  border-top: 1px solid var(--tu-border);
+  background: var(--tu-bg-secondary);
+}
+
+/* A labelled block inside the sheet. */
+.tu-sheet-section { display: flex; flex-direction: column; gap: 9px; }
+.tu-sheet-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tu-text-subtle);
+}
+
+/* Label/value rows — the facts a supervisor triages on. */
+.tu-sheet-facts { display: flex; flex-direction: column; gap: 1px; }
+.tu-sheet-fact {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--tu-border);
+}
+.tu-sheet-fact:last-child { border-bottom: none; }
+.tu-sheet-fact dt { color: var(--tu-text-subtle); }
+.tu-sheet-fact dd { margin: 0; color: var(--tu-text-heading); font-weight: 500; }
+
+/* Transition buttons. */
+.tu-sheet-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.tu-sheet-action {
+  padding: 7px 13px;
+  border-radius: var(--tu-radius-sm);
+  border: 1px solid transparent;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 120ms ease;
+}
+.tu-sheet-action:disabled { opacity: 0.5; cursor: not-allowed; }
+.tu-sheet-action:not(:disabled):hover { filter: brightness(0.96); }
+.tu-sheet-action:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-sheet-action-brand   { background: var(--tu-text-brand);   color: #fff; }
+.tu-sheet-action-success { background: var(--tu-soft-success); color: var(--tu-on-success); border-color: var(--tu-bd-success); }
+.tu-sheet-action-danger  { background: var(--tu-soft-danger);  color: var(--tu-on-danger);  border-color: var(--tu-bd-danger); }
+.tu-sheet-action-neutral { background: var(--tu-soft-neutral); color: var(--tu-on-neutral); border-color: var(--tu-bd-neutral); }
+
+@media (max-width: 520px) {
+  .tu-sheet { max-width: 100%; }
+}
+
+/* ── Filter chips (multi-select) ─────────────────────────── */
+/* Interactive counterpart to .tu-chip, which is a static display pill. Two
+   independent axes use these: lifecycle status, and the cross-cutting flags
+   (overdue, awaiting sign-off) that can apply to several statuses at once. */
+
+.tu-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+}
+.tu-chip-axis-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--tu-text-subtle);
+  margin-right: 2px;
+}
+.tu-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  padding: 4px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--tu-border-strong);
+  background: var(--tu-bg-surface);
+  color: var(--tu-text-body);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.tu-chip-toggle:hover { background: var(--tu-bg-secondary); }
+.tu-chip-toggle:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-chip-toggle[aria-pressed="true"] {
+  background: var(--tu-bg-brand-soft);
+  border-color: var(--tu-text-brand);
+  color: var(--tu-text-brand-strong);
+  font-weight: 600;
+}
+/* The count rides inside the chip, so a chip states both what it filters to and
+   how much is behind it without a second element to align. */
+.tu-chip-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tu-text-subtle);
+}
+.tu-chip-toggle[aria-pressed="true"] .tu-chip-count { color: var(--tu-text-brand-strong); }
+.tu-chip-toggle:disabled { opacity: 0.45; cursor: default; }
+.tu-chip-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 5px;
+  background: var(--tu-border);
+}
+
+/* ── Row states on the work-order list ───────────────────── */
+/* The row you just acted on. Nothing moves any more — there are no status tabs
+   to move between — but a change still has to be *visible*, or acting from the
+   sheet feels like nothing happened. */
+.tu-row-selected > td { background: var(--tu-bg-brand-soft) !important; }
+.tu-row-changed > td { animation: tu-row-flash 1.4s ease-out; }
+/* Same acknowledgement on the account list, which renders cards rather than
+   table rows and already changed status inline — it was only ever the tabs
+   making work vanish there. */
+.tu-changed { animation: tu-row-flash 1.4s ease-out; }
+@keyframes tu-row-flash {
+  0%, 30% { background: var(--tu-soft-success); }
+  100%    { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tu-row-changed > td,
+  .tu-changed { animation: none; }
+}
