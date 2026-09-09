@@ -2,12 +2,14 @@
 
 import { useRef, useState } from "react";
 import api from "@/lib/api";
+import type { AssetLocationRef } from "@/lib/assetLocations";
 
 type Health = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
 type ImportedAsset = {
   id: string; name: string; category: string; status: string; health: Health;
   assetCode: string | null; brand: string | null; model: string | null;
+  location: AssetLocationRef | null;
 };
 
 type Row = {
@@ -181,6 +183,13 @@ export default function AssetImportModal({
               <p className="text-xs text-[var(--tu-text-subtle)] mb-3">
                 Upload a CSV with columns: <code className="text-[11px] bg-[var(--tu-bg-secondary)] px-1 py-0.5 rounded">{COLUMNS.join(", ")}</code>.
                 Only <code className="text-[11px]">name</code> and <code className="text-[11px]">category</code> are required.
+              </p>
+              <p className="text-xs text-[var(--tu-text-subtle)] mb-3">
+                Write <code className="text-[11px] bg-[var(--tu-bg-secondary)] px-1 py-0.5 rounded">location</code> as
+                {" "}<code className="text-[11px]">Tower B</code> or <code className="text-[11px]">Tower B / Level 3</code>.
+                Locations that don&apos;t exist yet are created, and existing ones are matched
+                whatever the capitalisation — so <code className="text-[11px]">level 3</code> lands in
+                {" "}<code className="text-[11px]">Level 3</code> rather than beside it.
               </p>
               <div className="flex items-center gap-3 mb-4">
                 <button

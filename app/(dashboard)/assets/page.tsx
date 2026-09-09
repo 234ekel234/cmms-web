@@ -5,6 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { EmptyRow } from "@/components/EmptyState";
+import { type AssetLocationRef, locationPath } from "@/lib/assetLocations";
 
 type Account = { id: string; name: string };
 
@@ -18,7 +19,7 @@ type Asset = {
   brand: string | null;
   model: string | null;
   serialNumber: string | null;
-  location: string | null;
+  location: AssetLocationRef | null;
   openWorkOrders: number;
   lastCompletedAt: string | null;
   archivedAt: string | null;
@@ -109,7 +110,9 @@ export default function AssetsPage() {
         a.name.toLowerCase().includes(q) ||
         a.category.toLowerCase().includes(q) ||
         a.account.name.toLowerCase().includes(q) ||
-        !!a.location?.toLowerCase().includes(q) ||
+        // The whole written path, so searching "Tower B" finds what is on its
+        // floors as well as what is filed at the building itself.
+        locationPath(a.location).toLowerCase().includes(q) ||
         !!a.serialNumber?.toLowerCase().includes(q) ||
         !!a.assetCode?.toLowerCase().includes(q) ||
         !!a.brand?.toLowerCase().includes(q) ||
@@ -367,7 +370,7 @@ export default function AssetsPage() {
                       <td><span className={health.cls}>{health.label}</span></td>
                       <td><span className="tu-badge tu-badge-neutral">{asset.status || "—"}</span></td>
                       <td style={{ color: "var(--tu-text-body)" }}>
-                        {asset.location ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        {locationPath(asset.location) || <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                       </td>
                       <td className="tu-center">
                         {asset.openWorkOrders > 0

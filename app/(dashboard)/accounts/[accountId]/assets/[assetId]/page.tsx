@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -12,6 +12,12 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import { fmtQty, type Part } from "@/lib/parts";
 import EmptyState from "@/components/EmptyState";
 import Attachments from "@/components/Attachments";
+import LocationPicker from "@/components/LocationPicker";
+import {
+  type AssetLocationNode,
+  type AssetLocationRef,
+  locationPath,
+} from "@/lib/assetLocations";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -25,7 +31,7 @@ type Asset = {
   brand: string | null;
   model: string | null;
   serialNumber: string | null;
-  location: string | null;
+  location: AssetLocationRef | null;
   purchaseDate: string | null;
   purchaseCost: number | null;
   warrantyExpiry: string | null;
@@ -136,6 +142,49 @@ function WorkOrderRow({ wo }: { wo: WorkOrder }) {
   );
 }
 
+const INPUT_CLS =
+  "w-full border border-[var(--tu-border)] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]";
+
+// The nine editable fields of the Details block, in the order they are shown.
+// `kind` drives both the input type and how the value is sent: text fields go
+// as trimmed strings (the API turns "" into null), dates as yyyy-mm-dd, and
+// cost as a number or null — never "", which would reach `parseFloat` as NaN.
+const DETAIL_FIELDS = [
+  { key: "assetCode",        label: "Asset Code",    kind: "text" },
+  { key: "brand",            label: "Brand",         kind: "text" },
+  { key: "model",            label: "Model",         kind: "text" },
+  { key: "serialNumber",     label: "Serial No.",    kind: "text" },
+  { key: "manufacturedDate", label: "Manufactured",  kind: "date" },
+  { key: "purchaseDate",     label: "Purchase Date", kind: "date" },
+  { key: "purchaseCost",     label: "Purchase Cost", kind: "cost" },
+  { key: "warrantyExpiry",   label: "Warranty Expiry", kind: "date" },
+] as const;
+
+type DetailKey = (typeof DETAIL_FIELDS)[number]["key"];
+type DetailsDraft = Record<DetailKey, string>;
+
+/**
+ * What the PUT accepts, which is no longer the same shape as what it returns:
+ * the asset carries a whole `location` record, but a write names the id it
+ * should point at. Typing this as `Partial<Asset>` let `locationId` through as
+ * an unchecked extra property in one direction and rejected it in the other.
+ */
+type AssetUpdate = Partial<Omit<Asset, "location">> & { locationId?: string | null };
+
+// Stored dates are UTC midnight, so slicing the ISO string is what a
+// <input type="date"> wants — going through a Date first would shift the day
+// for anyone west of UTC.
+const draftFromAsset = (a: Asset): DetailsDraft => ({
+  assetCode: a.assetCode ?? "",
+  brand: a.brand ?? "",
+  model: a.model ?? "",
+  serialNumber: a.serialNumber ?? "",
+  manufacturedDate: a.manufacturedDate?.slice(0, 10) ?? "",
+  purchaseDate: a.purchaseDate?.slice(0, 10) ?? "",
+  purchaseCost: a.purchaseCost != null ? String(a.purchaseCost) : "",
+  warrantyExpiry: a.warrantyExpiry?.slice(0, 10) ?? "",
+});
+
 // Warranty coverage relative to `now`, or null when no expiry is on file.
 function warrantyStatus(expiry: string | null, now: number) {
   if (!expiry) return null;
@@ -162,6 +211,11 @@ export default function AssetDetailPage() {
   const [editHealth, setEditHealth] = useState(false);
   const [editStatus, setEditStatus] = useState(false);
   const [statusDraft, setStatusDraft] = useState("");
+  const [editDetails, setEditDetails] = useState(false);
+  const [detailsDraft, setDetailsDraft] = useState<DetailsDraft | null>(null);
+  // Held apart from `detailsDraft`, which is all strings: this one is an id.
+  const [locationDraft, setLocationDraft] = useState<string | null>(null);
+  const [locations, setLocations] = useState<AssetLocationNode[]>([]);
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   // Captured once at mount so warranty/age math stays pure across re-renders.
@@ -170,6 +224,22 @@ export default function AssetDetailPage() {
   // below rather than calling a bare fetch function, so a retry keeps the same
   // cancellation guard as the mount fetch.
   const [reloadKey, setReloadKey] = useState(0);
+
+  const loadLocations = useCallback(async () => {
+    try {
+      const res = await api.get(`/accounts/${accountId}/asset-locations`);
+      setLocations(res.data);
+    } catch {
+      // The picker simply has nothing to offer; the record still reads.
+    }
+  }, [accountId]);
+
+  // Wrapped rather than called straight from the effect body: `loadLocations`
+  // sets state, and calling it bare is the cascading-render pattern the React
+  // lint rule refuses. The await also keeps it consistent with the fetches below.
+  useEffect(() => {
+    (async () => { await loadLocations(); })();
+  }, [loadLocations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -200,7 +270,7 @@ export default function AssetDetailPage() {
   // exposes. This used to PATCH /assets/:id — a route that does not exist — so
   // every edit from this page 404'd into the silent catch and the UI simply
   // snapped back to the old value with no error shown.
-  async function updateAsset(updates: Partial<Asset>) {
+  async function updateAsset(updates: AssetUpdate) {
     if (!asset) return;
     setSaving(true);
     setSaveError("");
@@ -209,12 +279,35 @@ export default function AssetDetailPage() {
       setAsset(res.data);
       setEditHealth(false);
       setEditStatus(false);
+      setEditDetails(false);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setSaveError(e?.response?.data?.error ?? "Could not save that change.");
     } finally {
       setSaving(false);
     }
+  }
+
+  // The Details block saves as one unit rather than field by field: nine
+  // separate inline editors would be nine chances to leave a half-typed serial
+  // number behind, and the API takes the whole set in one PUT anyway.
+  async function saveDetails() {
+    if (!detailsDraft) return;
+    if (detailsDraft.purchaseCost.trim() && !Number.isFinite(Number(detailsDraft.purchaseCost))) {
+      setSaveError("Purchase cost must be a number.");
+      return;
+    }
+    await updateAsset({
+      assetCode: detailsDraft.assetCode.trim() || null,
+      brand: detailsDraft.brand.trim() || null,
+      model: detailsDraft.model.trim() || null,
+      serialNumber: detailsDraft.serialNumber.trim() || null,
+      locationId: locationDraft,
+      manufacturedDate: detailsDraft.manufacturedDate || null,
+      purchaseDate: detailsDraft.purchaseDate || null,
+      purchaseCost: detailsDraft.purchaseCost.trim() ? Number(detailsDraft.purchaseCost) : null,
+      warrantyExpiry: detailsDraft.warrantyExpiry || null,
+    });
   }
 
   async function toggleArchive() {
@@ -383,42 +476,100 @@ export default function AssetDetailPage() {
 
         {/* Details */}
         <div className="pt-4 border-t border-[var(--tu-border)]">
-          <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Details</p>
-          <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
-            {[
-              { label: "Asset Code", value: asset.assetCode },
-              { label: "Brand", value: asset.brand },
-              { label: "Model", value: asset.model },
-              { label: "Serial No.", value: asset.serialNumber },
-              { label: "Location", value: asset.location },
-              { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
-              { label: "Purchased", value: asset.purchaseDate ? fmtDate(asset.purchaseDate) : null },
-              { label: "Purchase Cost", value: asset.purchaseCost != null ? fmtCost(asset.purchaseCost) : null },
-              { label: "Registered", value: fmtDate(asset.createdAt) },
-            ].map((f) => (
-              <div key={f.label}>
-                <dt className="font-semibold text-[var(--tu-text-subtle)]">{f.label}</dt>
-                <dd className="text-[var(--tu-text-body)] mt-0.5">{f.value ?? <span className="text-[var(--tu-text-disabled)]">—</span>}</dd>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Details</p>
+            {writable && !asset.archivedAt && !editDetails && (
+              <button
+                onClick={() => {
+                  setDetailsDraft(draftFromAsset(asset));
+                  setLocationDraft(asset.location?.id ?? null);
+                  setSaveError("");
+                  setEditDetails(true);
+                }}
+                className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
+              >
+                Edit
+              </button>
+            )}
+          </div>
+          {editDetails && detailsDraft ? (
+            <>
+              <div className="mb-4">
+                <LocationPicker
+                  accountId={accountId}
+                  tree={locations}
+                  value={locationDraft}
+                  onChange={setLocationDraft}
+                  onTreeChange={loadLocations}
+                />
               </div>
-            ))}
-            <div>
-              <dt className="font-semibold text-[var(--tu-text-subtle)]">Warranty</dt>
-              <dd className="mt-0.5">
-                {asset.warrantyExpiry ? (
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-[var(--tu-text-body)]">{fmtDate(asset.warrantyExpiry)}</span>
-                    {warranty && (
-                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${warranty.cls}`}>
-                        {warranty.label}
-                      </span>
-                    )}
-                  </span>
-                ) : (
-                  <span className="text-[var(--tu-text-disabled)]">—</span>
-                )}
-              </dd>
-            </div>
-          </dl>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                {DETAIL_FIELDS.map((f) => (
+                  <div key={f.key}>
+                    <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">{f.label}</label>
+                    <input
+                      className={INPUT_CLS}
+                      type={f.kind === "date" ? "date" : f.kind === "cost" ? "number" : "text"}
+                      {...(f.kind === "cost" ? { min: "0", step: "0.01" } : {})}
+                      value={detailsDraft[f.key]}
+                      onChange={(e) => setDetailsDraft((d) => (d ? { ...d, [f.key]: e.target.value } : d))}
+                    />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end mt-4">
+                <button
+                  onClick={() => { setEditDetails(false); setSaveError(""); }}
+                  className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveDetails}
+                  disabled={saving}
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </>
+          ) : (
+            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs">
+              {[
+                { label: "Asset Code", value: asset.assetCode },
+                { label: "Brand", value: asset.brand },
+                { label: "Model", value: asset.model },
+                { label: "Serial No.", value: asset.serialNumber },
+                { label: "Location", value: locationPath(asset.location) || null },
+                { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
+                { label: "Purchased", value: asset.purchaseDate ? fmtDate(asset.purchaseDate) : null },
+                { label: "Purchase Cost", value: asset.purchaseCost != null ? fmtCost(asset.purchaseCost) : null },
+                { label: "Registered", value: fmtDate(asset.createdAt) },
+              ].map((f) => (
+                <div key={f.label}>
+                  <dt className="font-semibold text-[var(--tu-text-subtle)]">{f.label}</dt>
+                  <dd className="text-[var(--tu-text-body)] mt-0.5">{f.value ?? <span className="text-[var(--tu-text-disabled)]">—</span>}</dd>
+                </div>
+              ))}
+              <div>
+                <dt className="font-semibold text-[var(--tu-text-subtle)]">Warranty</dt>
+                <dd className="mt-0.5">
+                  {asset.warrantyExpiry ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="text-[var(--tu-text-body)]">{fmtDate(asset.warrantyExpiry)}</span>
+                      {warranty && (
+                        <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${warranty.cls}`}>
+                          {warranty.label}
+                        </span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-[var(--tu-text-disabled)]">—</span>
+                  )}
+                </dd>
+              </div>
+            </dl>
+          )}
         </div>
       </div>
 
