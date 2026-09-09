@@ -44,6 +44,10 @@ export default function LocationPicker({
 
   // `null` when closed; otherwise which level is being added to.
   const [adding, setAdding] = useState<"root" | "child" | null>(null);
+  // The building a new sublocation belongs to, captured when the editor opens.
+  // Read live from `rootId` instead, changing the Location select while the
+  // input was open silently turned the sublocation into a top-level building.
+  const [addingUnder, setAddingUnder] = useState<{ id: string; name: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -54,13 +58,14 @@ export default function LocationPicker({
     setBusy(true);
     setError("");
     try {
-      const parentId = adding === "child" ? rootId : null;
+      const parentId = adding === "child" ? addingUnder?.id ?? null : null;
       const res = await api.post(`/accounts/${accountId}/asset-locations`, { name, parentId });
       // The tree has to be refreshed before the id is selected, or the picker
       // would hold an id it cannot find and show nothing.
       await onTreeChange();
       onChange(res.data.id);
       setAdding(null);
+      setAddingUnder(null);
       setDraft("");
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -107,11 +112,15 @@ export default function LocationPicker({
 
       {!disabled && (adding === null ? (
         <div className="flex gap-3">
-          <button type="button" className="tu-btn-ghost text-xs" onClick={() => { setAdding("root"); setDraft(""); setError(""); }}>
+          <button type="button" className="tu-btn-ghost text-xs" onClick={() => { setAdding("root"); setAddingUnder(null); setDraft(""); setError(""); }}>
             + New location
           </button>
           {root && (
-            <button type="button" className="tu-btn-ghost text-xs" onClick={() => { setAdding("child"); setDraft(""); setError(""); }}>
+            <button
+              type="button"
+              className="tu-btn-ghost text-xs"
+              onClick={() => { setAdding("child"); setAddingUnder({ id: root.id, name: root.name }); setDraft(""); setError(""); }}
+            >
               + New sublocation in {root.name}
             </button>
           )}
@@ -124,20 +133,20 @@ export default function LocationPicker({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); create(); } }}
-            placeholder={adding === "child" ? `New sublocation in ${root?.name}` : "New location, e.g. Tower B"}
+            placeholder={adding === "child" ? `New sublocation in ${addingUnder?.name}` : "New location, e.g. Tower B"}
           />
           <button type="button" className="tu-btn-primary text-xs" disabled={busy || !draft.trim()} onClick={create}>
             {busy ? "Adding…" : "Add"}
           </button>
-          <button type="button" className="tu-btn-secondary text-xs" onClick={() => { setAdding(null); setError(""); }}>
+          <button type="button" className="tu-btn-secondary text-xs" onClick={() => { setAdding(null); setAddingUnder(null); setError(""); }}>
             Cancel
           </button>
         </div>
       ))}
 
-      {adding === "child" && root && (
+      {adding === "child" && addingUnder && (
         <p className="text-[11px] text-[var(--tu-text-subtle)]">
-          Will be filed as {root.name}{PATH_SEPARATOR}{draft.trim() || "…"}
+          Will be filed as {addingUnder.name}{PATH_SEPARATOR}{draft.trim() || "…"}
         </p>
       )}
       {error && <p className="text-xs text-[var(--tu-on-danger)]">{error}</p>}

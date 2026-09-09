@@ -71,7 +71,18 @@ export default function LocationManagerModal({
     run(() => api.delete(`/accounts/${accountId}/asset-locations/${id}`));
 
   function row(node: AssetLocationNode, depth: number, parentName?: string) {
-    const inUse = node.assetCount > 0 || node.children.length > 0;
+    // Archived assets count too. The figure beside the name deliberately shows
+    // only what is standing there now, but retired kit still points at the
+    // location, so the API refuses the delete — and a Remove button that looks
+    // available and then returns 409 about an asset the register hides reads as
+    // a bug rather than a reason.
+    const archived = node.archivedAssetCount ?? 0;
+    const inUse = node.assetCount > 0 || archived > 0 || node.children.length > 0;
+    const why = [
+      node.assetCount > 0 ? `${node.assetCount} asset${node.assetCount === 1 ? "" : "s"}` : null,
+      archived > 0 ? `${archived} archived` : null,
+      node.children.length > 0 ? `${node.children.length} sublocation${node.children.length === 1 ? "" : "s"}` : null,
+    ].filter(Boolean).join(", ");
     const isRenaming = renaming === node.id;
     return (
       <div
@@ -100,6 +111,9 @@ export default function LocationManagerModal({
             <span className="tu-figure text-xs text-[var(--tu-text-subtle)]">
               {depth === 0 ? (node.totalAssetCount ?? node.assetCount) : node.assetCount}
             </span>
+            {archived > 0 && (
+              <span className="text-[11px] text-[var(--tu-text-disabled)]">+{archived} archived</span>
+            )}
             <button
               className="tu-btn-ghost text-xs"
               onClick={() => { setRenameDraft(node.name); setRenaming(node.id); setError(""); }}
@@ -117,7 +131,7 @@ export default function LocationManagerModal({
             <button
               className="tu-btn-ghost text-xs"
               disabled={busy || inUse}
-              title={inUse ? "Move its assets and sublocations out first" : "Remove this location"}
+              title={inUse ? `Still holds ${why} — move them out first` : "Remove this location"}
               onClick={() => remove(node.id)}
             >
               Remove

@@ -102,6 +102,18 @@ export default function AssetsPage() {
     (async () => { await loadLocations(); })();
   }, [loadLocations]);
 
+  // Both halves of this page can be invalidated by the other. A rename in the
+  // manager changes every row's Location cell; a CSV import mints locations the
+  // filter and the manager have never seen. Refreshing only the half that was
+  // written to left the other showing a stale name — or, with a filter active,
+  // hiding the very assets the import had just created.
+  const loadAssets = useCallback(async () => {
+    const res = await api.get(`/accounts/${accountId}/assets`, {
+      params: showArchived ? { includeArchived: "true" } : {},
+    });
+    setAssets(res.data);
+  }, [accountId, showArchived]);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -485,7 +497,7 @@ export default function AssetsPage() {
           accountId={accountId}
           tree={locations}
           onClose={() => setShowLocations(false)}
-          onChanged={loadLocations}
+          onChanged={async () => { await Promise.all([loadLocations(), loadAssets()]); }}
         />
       )}
 
@@ -493,11 +505,11 @@ export default function AssetsPage() {
         <AssetImportModal
           accountId={accountId}
           onClose={() => setShowImport(false)}
-          onImported={(created) => {
-            setAssets((prev) => [
-              ...prev,
-              ...created.map((a) => ({ ...a, openWorkOrders: 0, lastCompletedAt: null, archivedAt: null })),
-            ]);
+          onImported={async () => {
+            // Refetched rather than appended: import is the one path that
+            // creates locations, and the filter reads the tree, so appending
+            // rows against a stale tree could hide what was just imported.
+            await Promise.all([loadLocations(), loadAssets()]);
           }}
         />
       )}

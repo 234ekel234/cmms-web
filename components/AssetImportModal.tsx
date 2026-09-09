@@ -2,15 +2,8 @@
 
 import { useRef, useState } from "react";
 import api from "@/lib/api";
-import type { AssetLocationRef } from "@/lib/assetLocations";
 
 type Health = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
-
-type ImportedAsset = {
-  id: string; name: string; category: string; status: string; health: Health;
-  assetCode: string | null; brand: string | null; model: string | null;
-  location: AssetLocationRef | null;
-};
 
 type Row = {
   name: string;
@@ -119,7 +112,13 @@ export default function AssetImportModal({
 }: {
   accountId: string;
   onClose: () => void;
-  onImported: (created: ImportedAsset[]) => void;
+  /**
+   * Called once, after a run that created at least one asset. It takes nothing:
+   * import is the one path that also mints locations, so the caller has to
+   * refetch both the register and the location tree rather than append rows
+   * against a tree that has not caught up.
+   */
+  onImported: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState("");
@@ -154,7 +153,7 @@ export default function AssetImportModal({
         })),
       });
       setResult({ created: res.data.created.length, errors: res.data.errors });
-      if (res.data.created.length > 0) onImported(res.data.created);
+      if (res.data.created.length > 0) onImported();
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setTopError(e?.response?.data?.error ?? "Import failed.");

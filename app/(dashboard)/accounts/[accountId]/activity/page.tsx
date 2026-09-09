@@ -29,6 +29,11 @@ const ACTION_DOT: Record<string, string> = {
   ATTENDANCE_MARKED:    "bg-[var(--tu-status-on-hold)]",
   ASSET_CREATED:        "bg-violet-400",
   ASSET_STATUS_CHANGED: "bg-[var(--tu-health-poor)]",
+  ASSET_ARCHIVED:       "bg-[var(--tu-text-subtle)]",
+  ASSET_UNARCHIVED:     "bg-violet-400",
+  ASSET_LOCATION_CREATED: "bg-violet-400",
+  ASSET_LOCATION_UPDATED: "bg-[var(--tu-priority-high)]",
+  ASSET_LOCATION_DELETED: "bg-[var(--tu-priority-critical)]",
   MEMBER_ADDED:         "bg-violet-400",
   MEMBER_REMOVED:       "bg-[var(--tu-priority-critical)]",
 };
@@ -40,7 +45,7 @@ const FILTERS: { key: FilterKey; label: string; actions: string[] }[] = [
   { key: "work_orders", label: "Work Orders",  actions: ["WORK_ORDER_REQUESTED","WORK_ORDER_CREATED","WORK_ORDER_ACCEPTED","WORK_ORDER_REJECTED","WORK_ORDER_STARTED","WORK_ORDER_COMPLETED","WORK_ORDER_UPDATED"] },
   { key: "checklists",  label: "Checklists",   actions: ["CHECKLIST_COMPLETED","CHECKLIST_ASSIGNED","CHECKLIST_REMOVED","CHECKLIST_INCOMPLETE","CHECKLIST_EDITED"] },
   { key: "attendance",  label: "Attendance",   actions: ["ATTENDANCE_MARKED"] },
-  { key: "assets",      label: "Assets",       actions: ["ASSET_CREATED","ASSET_STATUS_CHANGED"] },
+  { key: "assets",      label: "Assets",       actions: ["ASSET_CREATED","ASSET_STATUS_CHANGED","ASSET_ARCHIVED","ASSET_UNARCHIVED","ASSET_LOCATION_CREATED","ASSET_LOCATION_UPDATED","ASSET_LOCATION_DELETED"] },
   { key: "members",     label: "Members",      actions: ["MEMBER_ADDED","MEMBER_REMOVED"] },
 ];
 

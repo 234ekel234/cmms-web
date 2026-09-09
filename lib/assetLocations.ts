@@ -21,6 +21,8 @@ export type AssetLocationNode = {
   name: string;
   parentId: string | null;
   assetCount: number;
+  /** Retired kit still filed here. It blocks a delete but is not the headline figure. */
+  archivedAssetCount: number;
   totalAssetCount?: number;
   children: AssetLocationNode[];
 };
