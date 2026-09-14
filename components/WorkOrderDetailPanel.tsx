@@ -313,7 +313,7 @@ export default function WorkOrderDetailPanel({
         {/* ── Transitions ── */}
         {(nexts.length > 0 || clientDecision) && (
           <div className="tu-detail-section">
-            <span className="tu-detail-label">Move this on</span>
+            <span className="tu-detail-label">Change status</span>
 
             {confirmComplete ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -322,7 +322,7 @@ export default function WorkOrderDetailPanel({
                   rows={3}
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Closing remarks (optional)"
+                  placeholder="Add closing remarks (optional)"
                   aria-label="Closing remarks"
                 />
                 <div className="tu-detail-actions">

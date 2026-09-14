@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggleButton from "@/components/ThemeToggleButton";
+import { roleLabel as roleLabelOf } from "@/lib/statuses";
 
 function IconBell(p: React.SVGProps<SVGSVGElement>) {
   return (
@@ -90,13 +91,6 @@ function IconKeyboard(p: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-const ROLE_LABELS: Record<string, string> = {
-  GENERAL_MANAGER: "General Manager",
-  MANAGER: "Manager",
-  SUPERVISOR: "Supervisor",
-  CLIENT: "Client",
-};
-
 // Set NEXT_PUBLIC_SUPPORT_EMAIL in .env.local to route support mail somewhere
 // real; this fallback is a placeholder, not a live mailbox.
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL ?? "support@example.com";
@@ -164,7 +158,7 @@ export default function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
   }, [menuOpen, helpOpen]);
 
   const initial = user?.name?.[0]?.toUpperCase() ?? "?";
-  const roleLabel = user?.role ? ROLE_LABELS[user.role] ?? user.role : null;
+  const roleLabel = user?.role ? roleLabelOf(user.role) : null;
 
   // Pre-fill the page and account context so a report is actionable without a
   // round-trip asking "where were you and who are you?".

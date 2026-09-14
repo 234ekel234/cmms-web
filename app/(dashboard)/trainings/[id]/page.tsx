@@ -175,10 +175,10 @@ export default function TrainingDetailPage() {
         </div>
       </div>
 
-      {/* Roster card */}
+      {/* Assignments card */}
       <div className="tu-card">
         <div className="tu-card-header" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-          <h2 className="tu-card-title" style={{ marginRight: "auto" }}>Employee Roster</h2>
+          <h2 className="tu-card-title" style={{ marginRight: "auto" }}>Assigned employees</h2>
           <input
             className="tu-input"
             style={{ width: 220 }}

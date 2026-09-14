@@ -268,7 +268,7 @@ export default function EmployeeDetailPage() {
           <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[var(--tu-border)]">
             <div className="text-center">
               <p className="text-xl font-bold text-[var(--tu-text-heading)]">{employee.openWorkOrders ?? 0}</p>
-              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Open WOs</p>
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Open work orders</p>
             </div>
             <div className="text-center">
               <p className="text-xl font-bold text-[var(--tu-text-heading)]">

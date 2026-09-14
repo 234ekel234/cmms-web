@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { frequencyMeta } from "@/lib/maintenancePlans";
 
 type PMChecklist = {
   id: string;
@@ -17,15 +18,6 @@ type Asset = {
   name: string;
   category: string;
   isArchived: boolean;
-};
-
-const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
-  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 export default function AssignChecklistPage() {
@@ -133,7 +125,7 @@ export default function AssignChecklistPage() {
                 />
                 <div className="flex flex-wrap gap-1.5">
                   {frequencies.map((f) => {
-                    const cfg = FREQUENCY_CONFIG[f];
+                    const cfg = frequencyMeta(f);
                     return (
                       <button
                         key={f}
@@ -158,7 +150,7 @@ export default function AssignChecklistPage() {
                   <p className="text-center text-sm text-[var(--tu-text-subtle)] py-8">No checklists found.</p>
                 ) : (
                   filtered.map((c) => {
-                    const cfg = FREQUENCY_CONFIG[c.frequency];
+                    const cfg = frequencyMeta(c.frequency);
                     const items = c.sections.reduce((sum, s) => sum + s.items.length, 0);
                     const isSelected = selectedChecklist?.id === c.id;
                     return (
@@ -257,8 +249,8 @@ export default function AssignChecklistPage() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--tu-text-subtle)]">Frequency</span>
-                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${FREQUENCY_CONFIG[selectedChecklist.frequency]?.cls ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]"}`}>
-                      {FREQUENCY_CONFIG[selectedChecklist.frequency]?.label ?? selectedChecklist.frequency}
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${frequencyMeta(selectedChecklist.frequency).cls}`}>
+                      {frequencyMeta(selectedChecklist.frequency).label}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm">

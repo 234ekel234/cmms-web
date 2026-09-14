@@ -316,7 +316,7 @@ export default function TrainingPage() {
       {completeTarget && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-[var(--tu-bg-surface)] rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-base font-bold text-[var(--tu-text-heading)] mb-2">Mark Training Complete</h3>
+            <h3 className="text-base font-bold text-[var(--tu-text-heading)] mb-2">Mark training complete</h3>
             <p className="text-sm text-[var(--tu-text-subtle)] mb-6">
               Confirm that <strong>{completeTarget.employee.name}</strong> has completed{" "}
               <strong>{completeTarget.title}</strong>?
@@ -333,7 +333,7 @@ export default function TrainingPage() {
                 disabled={completing}
                 className="flex-1 bg-[var(--tu-status-completed)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-status-completed)] disabled:opacity-50 transition-colors cursor-pointer"
               >
-                {completing ? "Saving…" : "Mark Complete"}
+                {completing ? "Saving…" : "Mark complete"}
               </button>
             </div>
           </div>

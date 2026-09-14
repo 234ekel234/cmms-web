@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import api from "@/lib/api";
-import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { WORK_ORDER_STATUS, NEEDS_ATTENTION_LABEL, type WorkOrderStatus } from "@/lib/statuses";
+import { FREQUENCY_LABEL, type Frequency } from "@/lib/maintenancePlans";
 import { TrendChart, StackedBar, GroupedBars } from "@/components/charts";
 import { isClosed } from "@/lib/workOrders";
 
@@ -675,7 +676,7 @@ export default function DashboardPage() {
           <div className="tu-card-header">
             <h2 className="tu-card-title">Assets</h2>
             {!loading && data && data.poorHealthAssets > 0 && (
-              <span className="tu-badge tu-badge-warning">{data.poorHealthAssets} poor</span>
+              <span className="tu-badge tu-badge-warning">{data.poorHealthAssets} need attention</span>
             )}
           </div>
           <div className="tu-card-body">
@@ -853,7 +854,7 @@ export default function DashboardPage() {
                 const pct = f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0;
                 const done = f.completed >= f.total && f.total > 0;
                 const color = done ? "var(--tu-status-completed)" : pct >= 50 ? "var(--tu-text-brand)" : "var(--tu-health-fair)";
-                const label = f.frequency.replace(/_/g, " ").toLowerCase();
+                const label = FREQUENCY_LABEL[f.frequency as Frequency] ?? f.frequency;
                 const accounts = f.accounts ?? [];
                 const expandable = accounts.length > 1;
                 const expanded = expandedFreq === f.frequency;
@@ -932,9 +933,9 @@ export default function DashboardPage() {
                 <thead>
                   <tr>
                     <th scope="col">Account</th>
-                    <th scope="col" className="tu-center">Open WOs</th>
+                    <th scope="col" className="tu-center">Open work orders</th>
                     <th scope="col" className="tu-center">Overdue</th>
-                    <th scope="col" className="tu-center">Poor Assets</th>
+                    <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
                     <th scope="col" className="tu-center">Checklists</th>
                     <th scope="col" className="tu-center">Attendance</th>
                   </tr>

@@ -95,7 +95,7 @@ export default function LoginPage() {
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }}
-                placeholder="you@example.com"
+                placeholder="name@example.com"
                 autoComplete="email"
                 disabled={loading}
                 className="tu-login-input"

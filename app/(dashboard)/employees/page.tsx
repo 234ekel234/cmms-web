@@ -223,7 +223,7 @@ export default function EmployeesPage() {
       {/* Header */}
       <div className="tu-page-header">
         <div>
-          <h1 className="tu-page-title">Employee Registry</h1>
+          <h1 className="tu-page-title">Employees</h1>
           <p className="tu-page-sub">
             {loading ? "Loading…" : `${employees.length} employees · ${regularCount} regular · ${relieverCount} reliever`}
           </p>
@@ -330,7 +330,7 @@ export default function EmployeesPage() {
                 className="tu-btn-primary"
                 style={{ opacity: saving ? 0.5 : 1 }}
               >
-                {saving ? "Saving…" : (editId ? "Save Changes" : "Create")}
+                {saving ? "Saving…" : (editId ? "Save changes" : "Create")}
               </button>
             </div>
           </div>
@@ -364,9 +364,9 @@ export default function EmployeesPage() {
             style={{ minWidth: 180 }}
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            aria-label="Filter by company"
+            aria-label="Filter by account"
           >
-            <option value="ALL">All companies</option>
+            <option value="ALL">All accounts</option>
             {allCompanies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}

@@ -317,7 +317,7 @@ export default function SchedulePage() {
               disabled={copying}
               className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-brand)] cursor-pointer disabled:opacity-50"
             >
-              {copying ? "Copying..." : "Copy →"}
+              {copying ? "Copying…" : "Copy →"}
             </button>
           )}
           {writable && !showShiftForm && (

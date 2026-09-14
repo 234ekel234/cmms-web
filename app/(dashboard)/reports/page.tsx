@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
+import { NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
 
 type Period = "today" | "week" | "month";
 
@@ -94,7 +95,7 @@ function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], peri
 
   // ── Per-account summary ──
   line(["Account Summary"]);
-  line(["Account", "Open WOs", "Overdue WOs", "Poor Assets", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"]);
+  line(["Account", "Open work orders", "Overdue work orders", "Assets needing attention", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"]);
   for (const a of accounts) {
     line([
       a.name,
@@ -114,7 +115,7 @@ function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], peri
   line(["Employee Performance"]);
   line([
     "Employee", "Position", "Type", "Companies",
-    "WOs Assigned", "WOs Completed", "WOs In Progress",
+    "Work orders assigned", "Work orders completed", "Work orders in progress",
     "Attendance %", "Present", "Absent",
     "Training Completed", "Training Total",
   ]);
@@ -260,7 +261,7 @@ export default function ReportsPage() {
           <p className="tu-stat-label">Assets</p>
           <p className="tu-stat-value">{loading ? "—" : totalAssets}</p>
           <p className="tu-stat-sub">
-            {loading ? " " : `${data?.poorHealthAssets ?? 0} poor health`}
+            {loading ? " " : `${data?.poorHealthAssets ?? 0} need attention`}
           </p>
         </div>
         <div className="tu-stat-card">
@@ -283,9 +284,9 @@ export default function ReportsPage() {
             <thead>
               <tr>
                 <th scope="col">Account</th>
-                <th scope="col" className="tu-center">Open WOs</th>
+                <th scope="col" className="tu-center">Open work orders</th>
                 <th scope="col" className="tu-center">Overdue</th>
-                <th scope="col" className="tu-center">Assets at risk</th>
+                <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
                 <th scope="col" style={{ minWidth: 160 }}>Checklists</th>
                 <th scope="col" style={{ minWidth: 160 }}>Attendance</th>
                 <th scope="col" style={{ width: 110 }}></th>

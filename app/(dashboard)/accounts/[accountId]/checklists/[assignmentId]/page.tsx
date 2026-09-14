@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { frequencyMeta } from "@/lib/maintenancePlans";
 
 type PMItem = { id: string; label: string; order: number };
 type PMSection = { id: string; title: string; answerOptions: string[]; order: number; items: PMItem[] };
@@ -14,7 +15,9 @@ type PMLog = {
   performedByName: string;
   isDraft: boolean;
   isLate: boolean;
-  items: { id: string; itemId: string; answer: string; remarks: string | null; answeredAt: string }[];
+  // `answeredByName` is per-answer and internal — the API withholds it from
+  // clients, so it is optional here rather than assumed present.
+  items: { id: string; itemId: string; answer: string; remarks: string | null; answeredAt: string; answeredByName?: string | null }[];
 };
 type Assignment = {
   id: string;
@@ -22,16 +25,7 @@ type Assignment = {
   asset: { id: string; name: string } | null;
   logs: PMLog[];
 };
-type ItemState = { answer: string; remarks: string; answeredAt?: string };
-
-const FREQ_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
-  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-};
+type ItemState = { answer: string; remarks: string; answeredAt?: string; answeredByName?: string | null };
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -71,9 +65,9 @@ function formatPeriod(date: Date, frequency: string): string {
     }
     case "MONTHLY":       return `${MONTHS[m]} ${y}`;
     case "QUARTERLY":     return `Q${Math.floor(m / 3) + 1} ${y}`;
-    case "SEMI_ANNUALLY": return `H${Math.floor(m / 6) + 1} ${y}`;
+    case "SEMI_ANNUALLY": return `${m < 6 ? "1st" : "2nd"} half ${y}`;
     case "ANNUALLY":      return `${y}`;
-    default:              return date.toLocaleDateString();
+    default:              return `${MONTHS[m]} ${d}, ${y}`;
   }
 }
 
@@ -92,7 +86,7 @@ function shortPeriodLabel(date: Date, frequency: string): string {
     case "WEEKLY":        return `${MONTHS[m]} ${d}`;
     case "MONTHLY":       return `${MONTHS[m]} '${String(y).slice(2)}`;
     case "QUARTERLY":     return `Q${Math.floor(m / 3) + 1} '${String(y).slice(2)}`;
-    case "SEMI_ANNUALLY": return `H${Math.floor(m / 6) + 1} '${String(y).slice(2)}`;
+    case "SEMI_ANNUALLY": return `${m < 6 ? "1st" : "2nd"} half '${String(y).slice(2)}`;
     case "ANNUALLY":      return `${y}`;
     default:              return `${MONTHS[m]} ${d}`; // DAILY
   }
@@ -143,7 +137,7 @@ export default function ChecklistFormPage() {
     if (log) {
       const states: Record<string, ItemState> = {};
       for (const li of log.items) {
-        states[li.itemId] = { answer: li.answer, remarks: li.remarks ?? "", answeredAt: li.answeredAt };
+        states[li.itemId] = { answer: li.answer, remarks: li.remarks ?? "", answeredAt: li.answeredAt, answeredByName: li.answeredByName ?? null };
       }
       setItemStates(states);
       setIsEditing(log.isDraft);
@@ -193,6 +187,26 @@ export default function ChecklistFormPage() {
     if (!times.length) return null;
     return times.reduce((a, b) => (new Date(a) >= new Date(b) ? a : b));
   }
+  /**
+   * Who answered this section.
+   *
+   * Usually one person, and naming them is the point of the column. When a
+   * draft has been picked up by somebody else it is genuinely more than one, and
+   * saying so is more honest than crediting whoever happens to sort first.
+   * Empty for rows written before the column existed, and for clients, who are
+   * not shown attribution at all.
+   */
+  function sectionAnsweredBy(sec: PMSection): string | null {
+    const names = new Set(
+      sec.items
+        .map((it) => itemStates[it.id]?.answeredByName)
+        .filter((n): n is string => !!n)
+    );
+    if (names.size === 0) return null;
+    if (names.size === 1) return [...names][0];
+    return `${names.size} people`;
+  }
+
   function sectionStats() {
     const sections = assignment?.checklist.sections ?? [];
     const complete = sections.filter(sectionFilled);
@@ -275,7 +289,7 @@ export default function ChecklistFormPage() {
   }
 
   const { checklist } = assignment;
-  const freq = FREQ_CONFIG[checklist.frequency] ?? { label: checklist.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
+  const freq = frequencyMeta(checklist.frequency);
   const atCurrent = isAtCurrentPeriod();
   const { total, completeCount, incompleteTitles } = sectionStats();
   const progressPct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
@@ -415,6 +429,7 @@ export default function ChecklistFormPage() {
           const locked = sectionSubmitted(sec);
           const editable = isEditing && !locked;
           const completedAt = sectionCompletedAt(sec);
+          const answeredBy = sectionAnsweredBy(sec);
           const touched = sectionTouched(sec);
           const filled = sectionFilled(sec);
 
@@ -426,6 +441,7 @@ export default function ChecklistFormPage() {
                 {completedAt ? (
                   <span className="text-xs font-semibold text-[var(--tu-on-success)]">
                     {locked && "🔒 "}✓ {fmtDateTime(completedAt)}
+                    {answeredBy && <span className="font-normal opacity-80"> · {answeredBy}</span>}
                   </span>
                 ) : touched ? (
                   <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${filled ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" : "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"}`}>

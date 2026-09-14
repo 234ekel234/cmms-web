@@ -219,7 +219,7 @@ export default function TrainingsPage() {
                 className="tu-btn-primary"
                 style={{ opacity: saving ? 0.5 : 1 }}
               >
-                {saving ? "Saving…" : (editId ? "Save Changes" : "Create")}
+                {saving ? "Saving…" : (editId ? "Save changes" : "Create")}
               </button>
             </div>
           </div>

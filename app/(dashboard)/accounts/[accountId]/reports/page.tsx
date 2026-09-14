@@ -322,7 +322,7 @@ export default function ReportsPage() {
     line(["Employee Performance"]);
     line([
       "Employee", "Position", "Type", "Company",
-      "WOs Assigned", "WOs Completed", "WOs In Progress",
+      "Work orders assigned", "Work orders completed", "Work orders in progress",
       "Attendance %", "Present", "Absent",
       "Training Completed", "Training Total",
     ]);

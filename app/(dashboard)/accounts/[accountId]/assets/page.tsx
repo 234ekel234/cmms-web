@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import AssetImportModal from "@/components/AssetImportModal";
 import LocationPicker from "@/components/LocationPicker";
 import LocationManagerModal from "@/components/LocationManagerModal";
+import { ASSET_HEALTH, ASSET_HEALTH_CLS } from "@/lib/statuses";
 import {
   type AssetLocationNode,
   type AssetLocationRef,
@@ -32,12 +33,6 @@ type Asset = {
   openWorkOrders: number;
   lastCompletedAt: string | null;
   archivedAt: string | null;
-};
-
-const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string }> = {
-  FUNCTIONAL:               { label: "Functional",               cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-  FUNCTIONAL_WITH_FINDINGS: { label: "Functional with Findings", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  BREAKDOWN:                { label: "Breakdown",                cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 // Ascending — the health sort puts the worst-off assets first.
@@ -305,6 +300,7 @@ export default function AssetsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, status: e.target.value }))}
                 placeholder="Operational"
               />
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">Free text — a note for your team.</p>
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Brand</label>
@@ -383,16 +379,19 @@ export default function AssetsPage() {
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Initial Health</label>
+              <p className="text-[11px] text-[var(--tu-text-subtle)] mb-1.5">
+                This is the one that counts: marking an asset as a breakdown starts its downtime clock.
+              </p>
               <div className="flex gap-2 flex-wrap">
-                {(Object.keys(HEALTH_CONFIG) as AssetHealth[]).map((h) => (
+                {(Object.keys(ASSET_HEALTH) as AssetHealth[]).map((h) => (
                   <button
                     key={h}
                     onClick={() => setForm((f) => ({ ...f, health: h }))}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                      form.health === h ? HEALTH_CONFIG[h].cls + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                      form.health === h ? ASSET_HEALTH_CLS[h] + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                     }`}
                   >
-                    {HEALTH_CONFIG[h].label}
+                    {ASSET_HEALTH[h].label}
                   </button>
                 ))}
               </div>
@@ -402,7 +401,7 @@ export default function AssetsPage() {
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => { setShowForm(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
             <button onClick={addAsset} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-              {saving ? "Saving..." : "Add Asset"}
+              {saving ? "Saving…" : "Add Asset"}
             </button>
           </div>
         </div>
@@ -436,13 +435,13 @@ export default function AssetsPage() {
                 <th className="px-6 py-3 text-left">Location</th>
                 <th className="px-6 py-3 text-left">Health</th>
                 <th className="px-6 py-3 text-left">Status</th>
-                <th className="px-6 py-3 text-center">Open WOs</th>
+                <th className="px-6 py-3 text-center">Open work orders</th>
                 <th className="px-6 py-3 text-left">Last Service</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--tu-border)]">
               {sorted.map((asset) => {
-                const hCfg = HEALTH_CONFIG[asset.health];
+                const hCfg = { label: ASSET_HEALTH[asset.health].label, cls: ASSET_HEALTH_CLS[asset.health] };
                 const isArchived = !!asset.archivedAt;
                 const daysSince = asset.lastCompletedAt
                   ? Math.floor((Date.now() - new Date(asset.lastCompletedAt).getTime()) / 86_400_000)

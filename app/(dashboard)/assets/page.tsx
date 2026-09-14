@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { EmptyRow } from "@/components/EmptyState";
 import { type AssetLocationRef, locationPath } from "@/lib/assetLocations";
+import { ASSET_HEALTH, assetHealthMeta } from "@/lib/statuses";
 
 type Account = { id: string; name: string };
 
@@ -31,17 +32,12 @@ type HealthFilter = "ALL" | Asset["health"];
 type StatusFilter = "ALL" | Asset["status"];
 type SortKey = "NAME" | "ACCOUNT" | "HEALTH" | "OPEN_WOS" | "LAST_MAINT";
 
-const HEALTH_BADGE: Record<Asset["health"], { cls: string; label: string }> = {
-  FUNCTIONAL:               { cls: "tu-badge tu-badge-success", label: "Functional"      },
-  FUNCTIONAL_WITH_FINDINGS: { cls: "tu-badge tu-badge-warning", label: "With Findings"   },
-  BREAKDOWN:                { cls: "tu-badge tu-badge-danger",  label: "Breakdown"       },
-};
-
 const HEALTH_TABS: { key: HealthFilter; label: string }[] = [
-  { key: "ALL",                      label: "All"                      },
-  { key: "FUNCTIONAL",               label: "Functional"               },
-  { key: "FUNCTIONAL_WITH_FINDINGS", label: "Functional with Findings" },
-  { key: "BREAKDOWN",                label: "Breakdown"                },
+  { key: "ALL", label: "All" },
+  ...(Object.keys(ASSET_HEALTH) as Asset["health"][]).map((k) => ({
+    key: k as HealthFilter,
+    label: ASSET_HEALTH[k].label,
+  })),
 ];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
@@ -152,8 +148,8 @@ export default function AssetsPage() {
     return rows;
   }, [preHealth, healthFilter, sortKey]);
 
-  const poorCount = assets.filter((a) => a.health !== "FUNCTIONAL").length;
-  const underMaintenanceCount = assets.filter((a) => a.health === "BREAKDOWN").length;
+  const findingsCount = assets.filter((a) => a.health === "FUNCTIONAL_WITH_FINDINGS").length;
+  const breakdownCount = assets.filter((a) => a.health === "BREAKDOWN").length;
 
   // The status filter is built from what is actually stored, because status is
   // free text — there is no fixed list to offer. Anything an account has
@@ -200,16 +196,16 @@ export default function AssetsPage() {
             <p className="tu-stat-sub">in registry</p>
           </div>
           <div className="tu-stat-card">
-            <p className="tu-stat-label">Under Maintenance</p>
-            <p className={`tu-stat-value${underMaintenanceCount > 0 ? " tu-stat-warning" : ""}`}>
-              {underMaintenanceCount}
+            <p className="tu-stat-label">{ASSET_HEALTH.FUNCTIONAL_WITH_FINDINGS.label}</p>
+            <p className={`tu-stat-value${findingsCount > 0 ? " tu-stat-warning" : ""}`}>
+              {findingsCount}
             </p>
-            <p className="tu-stat-sub">currently offline</p>
+            <p className="tu-stat-sub">still running, needs a look</p>
           </div>
           <div className="tu-stat-card">
-            <p className="tu-stat-label">Poor / Out of Service</p>
-            <p className={`tu-stat-value${poorCount > 0 ? " tu-stat-danger" : ""}`}>{poorCount}</p>
-            <p className="tu-stat-sub">need attention</p>
+            <p className="tu-stat-label">{ASSET_HEALTH.BREAKDOWN.label}</p>
+            <p className={`tu-stat-value${breakdownCount > 0 ? " tu-stat-danger" : ""}`}>{breakdownCount}</p>
+            <p className="tu-stat-sub">down right now</p>
           </div>
           <div className="tu-stat-card">
             <p className="tu-stat-label">Open Work Orders</p>
@@ -315,7 +311,7 @@ export default function AssetsPage() {
                 <th scope="col">Health</th>
                 <th scope="col">Status</th>
                 <th scope="col">Location</th>
-                <th scope="col" className="tu-center">Open WOs</th>
+                <th scope="col" className="tu-center">Open work orders</th>
                 <th scope="col">Last Maintenance</th>
               </tr>
             </thead>
@@ -346,7 +342,7 @@ export default function AssetsPage() {
                 />
               ) : (
                 sorted.map((asset) => {
-                  const health = HEALTH_BADGE[asset.health];
+                  const health = assetHealthMeta(asset.health);
                   return (
                     <tr key={asset.id} style={asset.archivedAt ? { opacity: 0.5 } : undefined}>
                       <td className="tu-strong">
@@ -367,7 +363,7 @@ export default function AssetsPage() {
                         </Link>
                       </td>
                       <td style={{ color: "var(--tu-text-body)" }}>{asset.category}</td>
-                      <td><span className={health.cls}>{health.label}</span></td>
+                      <td><span className={health.badge}>{health.label}</span></td>
                       <td><span className="tu-badge tu-badge-neutral">{asset.status || "—"}</span></td>
                       <td style={{ color: "var(--tu-text-body)" }}>
                         {locationPath(asset.location) || <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}

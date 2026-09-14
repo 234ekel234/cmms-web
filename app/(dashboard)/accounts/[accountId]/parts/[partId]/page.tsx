@@ -323,7 +323,7 @@ export default function PartDetailPage() {
             <div className="flex gap-3 justify-end mt-4">
               <button onClick={() => setMoveType(null)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
               <button onClick={submitMovement} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-                {saving ? "Saving..." : "Record"}
+                {saving ? "Saving…" : "Record"}
               </button>
             </div>
           </div>
@@ -365,7 +365,7 @@ export default function PartDetailPage() {
             </div>
             <div>
               <label className={labelCls}>Minimum</label>
-              <input className={inputCls} type="number" min="0" value={form.minQuantity} onChange={(e) => setForm((f) => ({ ...f, minQuantity: e.target.value }))} placeholder="Blank = no alert" />
+              <input className={inputCls} type="number" min="0" value={form.minQuantity} onChange={(e) => setForm((f) => ({ ...f, minQuantity: e.target.value }))} placeholder="Leave blank for no alert" />
             </div>
           </div>
           <p className="text-xs text-[var(--tu-text-subtle)] mt-3">
@@ -375,7 +375,7 @@ export default function PartDetailPage() {
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => setEditing(false)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
             <button onClick={saveDetails} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-              {saving ? "Saving..." : "Save"}
+              {saving ? "Saving…" : "Save"}
             </button>
           </div>
         </div>
@@ -418,7 +418,7 @@ export default function PartDetailPage() {
             <div className="flex gap-3 justify-end mt-4">
               <button onClick={() => setEditingAssets(false)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
               <button onClick={saveAssets} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-                {saving ? "Saving..." : "Save"}
+                {saving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

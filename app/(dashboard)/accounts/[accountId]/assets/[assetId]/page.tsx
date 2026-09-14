@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { isClosed } from "@/lib/workOrders";
-import type { WorkOrderStatus } from "@/lib/statuses";
+import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, type WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -18,6 +18,7 @@ import {
   type AssetLocationRef,
   locationPath,
 } from "@/lib/assetLocations";
+import { frequencyMeta } from "@/lib/maintenancePlans";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -68,12 +69,6 @@ type PMChecklistAssignment = {
   logs: PMLogLite[];
 };
 
-const HEALTH_CONFIG: Record<AssetHealth, { label: string; cls: string; hint: string }> = {
-  FUNCTIONAL:               { label: "Functional",               cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]", hint: "Working as it should" },
-  FUNCTIONAL_WITH_FINDINGS: { label: "Functional with Findings", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]", hint: "Still running, but something was found" },
-  BREAKDOWN:                { label: "Breakdown",                cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]",  hint: "Down — starts counting downtime" },
-};
-
 const WO_STATUS_CLS: Record<string, string> = {
   REQUESTED:   "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]",
   PENDING:     "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
@@ -86,15 +81,6 @@ const WO_STATUS_CLS: Record<string, string> = {
 const WO_STATUS_LABELS: Record<string, string> = {
   REQUESTED: "Requested", PENDING: "Accepted", IN_PROGRESS: "In Progress",
   ON_HOLD: "On Hold", COMPLETED: "Completed", REJECTED: "Rejected",
-};
-
-const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
-  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
@@ -344,7 +330,7 @@ export default function AssetDetailPage() {
     );
   }
 
-  const hCfg = HEALTH_CONFIG[asset.health];
+  const hCfg = { label: ASSET_HEALTH[asset.health].label, cls: ASSET_HEALTH_CLS[asset.health] };
   const openWOs = workOrders.filter((w) => !["COMPLETED", "REJECTED"].includes(w.status));
   const closedWOs = workOrders.filter((w) => ["COMPLETED", "REJECTED"].includes(w.status));
   const warranty = warrantyStatus(asset.warrantyExpiry, now);
@@ -402,21 +388,21 @@ export default function AssetDetailPage() {
           <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-1">Health</p>
           {editHealth ? (
             <div className="flex gap-2 flex-wrap">
-              {(Object.keys(HEALTH_CONFIG) as AssetHealth[]).map((h) => (
+              {(Object.keys(ASSET_HEALTH) as AssetHealth[]).map((h) => (
                 <button
                   key={h}
                   onClick={() => updateAsset({ health: h })}
                   disabled={saving}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                    asset.health === h ? HEALTH_CONFIG[h].cls + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                    asset.health === h ? ASSET_HEALTH_CLS[h] + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                   }`}
                 >
-                  {HEALTH_CONFIG[h].label}
+                  {ASSET_HEALTH[h].label}
                 </button>
               ))}
               <button onClick={() => setEditHealth(false)} className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer">Cancel</button>
               <p className="w-full text-[11px] text-[var(--tu-text-subtle)] mt-1">
-                {HEALTH_CONFIG[asset.health].hint}. Marking an asset as a breakdown starts its downtime clock; moving it off stops it.
+                {ASSET_HEALTH_HINT[asset.health]}. Marking an asset as a breakdown starts its downtime clock; moving it off stops it.
               </p>
             </div>
           ) : (
@@ -529,7 +515,7 @@ export default function AssetDetailPage() {
                   disabled={saving}
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
                 >
-                  {saving ? "Saving..." : "Save"}
+                  {saving ? "Saving…" : "Save"}
                 </button>
               </div>
             </>
@@ -649,7 +635,7 @@ export default function AssetDetailPage() {
         ) : (
           <div className="divide-y divide-[var(--tu-border)]">
             {pmChecklists.map((pm) => {
-              const freq = FREQUENCY_CONFIG[pm.checklist.frequency] ?? { label: pm.checklist.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
+              const freq = frequencyMeta(pm.checklist.frequency);
               const last = pm.logs[0];
               return (
                 <Link

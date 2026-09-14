@@ -206,7 +206,7 @@ export default function ActivityPage() {
               disabled={loadingMore}
               className="w-full py-3 text-sm text-[var(--tu-text-subtle)] border border-[var(--tu-border)] rounded-xl hover:bg-[var(--tu-bg-secondary)] cursor-pointer disabled:opacity-50 mt-4"
             >
-              {loadingMore ? "Loading..." : "Load more"}
+              {loadingMore ? "Loading…" : "Load more"}
             </button>
           )}
         </div>

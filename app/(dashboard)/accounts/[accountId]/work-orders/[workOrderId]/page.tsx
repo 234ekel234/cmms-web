@@ -837,7 +837,7 @@ export default function WorkOrderDetailPage() {
                 disabled={savingEdit}
                 className="px-3 py-1.5 text-xs text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
-                {savingEdit ? "Saving…" : "Save Changes"}
+                {savingEdit ? "Saving…" : "Save changes"}
               </button>
             </div>
           </div>
@@ -901,7 +901,7 @@ export default function WorkOrderDetailPage() {
         {/* Assignees */}
         <div className="mb-4">
           <div className="flex items-center justify-between mb-1">
-            <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Assigned To</p>
+            <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Assigned to</p>
             {/* Assignments stay editable after sign-off on purpose — a wrong
                 name on a finished job must still be correctable. */}
             {canAdmin && (
@@ -1196,7 +1196,7 @@ export default function WorkOrderDetailPage() {
                     disabled={updatingStatus}
                     className="px-3 py-1.5 text-xs text-white bg-[var(--tu-status-completed)] rounded-lg hover:bg-[var(--tu-status-completed)] disabled:opacity-50 cursor-pointer"
                   >
-                    {updatingStatus ? "Saving..." : "Confirm Complete"}
+                    {updatingStatus ? "Saving…" : "Confirm complete"}
                   </button>
                 </div>
               </div>
@@ -1407,7 +1407,7 @@ export default function WorkOrderDetailPage() {
                           disabled={removingPartId === p.id}
                           className="ml-3 text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] disabled:opacity-50 cursor-pointer"
                         >
-                          {removingPartId === p.id ? "..." : "Remove"}
+                          {removingPartId === p.id ? "…" : "Remove"}
                         </button>
                         </>
                         )}
@@ -1530,7 +1530,7 @@ export default function WorkOrderDetailPage() {
                   disabled={savingPart}
                   className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
                 >
-                  {savingPart ? "Saving..." : editingPartId ? "Save Changes" : "Add Part"}
+                  {savingPart ? "Saving…" : editingPartId ? "Save changes" : "Add part"}
                 </button>
               </div>
             </div>

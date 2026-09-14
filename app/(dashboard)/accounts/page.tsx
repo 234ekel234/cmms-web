@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RowMenu from "@/components/RowMenu";
 import EmptyState from "@/components/EmptyState";
+import { NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
 
 type Account = {
   id: string;
@@ -345,9 +346,9 @@ export default function AccountsPage() {
               <thead>
                 <tr>
                   <th scope="col">Account</th>
-                  <th scope="col" className="tu-center">Open</th>
+                  <th scope="col" className="tu-center">Open work orders</th>
                   <th scope="col" className="tu-center">Overdue</th>
-                  <th scope="col" className="tu-center">Assets at risk</th>
+                  <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
                   <th scope="col" className="tu-center">PM today</th>
                   <th scope="col"><span className="tu-sr-only">Actions</span></th>
                 </tr>

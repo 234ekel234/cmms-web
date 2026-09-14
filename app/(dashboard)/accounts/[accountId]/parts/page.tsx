@@ -174,7 +174,7 @@ export default function PartsPage() {
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => { setShowForm(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
             <button onClick={addPart} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-              {saving ? "Saving..." : "Add Part"}
+              {saving ? "Saving…" : "Add Part"}
             </button>
           </div>
         </div>

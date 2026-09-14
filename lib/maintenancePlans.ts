@@ -239,3 +239,32 @@ export const TONE_CLASS: Record<PlanState["tone"], string> = {
   danger: "tu-badge tu-badge-danger",
   neutral: "tu-badge tu-badge-neutral",
 };
+
+/**
+ * Soft chip classes per frequency, for the pages that draw a frequency pill.
+ *
+ * Five pages kept a byte-identical copy of this map and every one of them wrote
+ * the label as "Semi-Annually", against `FREQUENCY_LABEL`'s "Semi-annually" —
+ * the same word, capitalised two ways, on screens a user moves between.
+ *
+ * Three of the six colours were raw Tailwind (`bg-violet-50`, `bg-teal-50`,
+ * `bg-pink-50`), so they kept their light-mode wash in dark mode with dark text
+ * on top. These are the themed equivalents. `danger` is deliberately not used:
+ * no frequency is an alarm.
+ */
+export const FREQUENCY_CLS: Record<string, string> = {
+  DAILY: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
+  WEEKLY: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]",
+  MONTHLY: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
+  QUARTERLY: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
+  SEMI_ANNUALLY: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]",
+  ANNUALLY: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+};
+
+/** Label + chip class together, tolerating a value the UI does not know. */
+export function frequencyMeta(f: string): { label: string; cls: string } {
+  return {
+    label: FREQUENCY_LABEL[f as Frequency] ?? f,
+    cls: FREQUENCY_CLS[f] ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]",
+  };
+}

@@ -403,7 +403,7 @@ export default function MaintenancePlansPage() {
               disabled={saving}
               className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
-              {saving ? "Saving..." : "Create Plan"}
+              {saving ? "Saving…" : "Create Plan"}
             </button>
           </div>
         </div>

@@ -273,7 +273,7 @@ function RequestCard({
                     onClick={() => handleSignOff("APPROVED")}
                     className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
                   >
-                    {signingOff ? "Saving\u2026" : "Approve"}
+                    {signingOff ? "Saving…" : "Approve"}
                   </button>
                   <button
                     type="button"
@@ -327,7 +327,7 @@ function RequestCard({
             <textarea
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
-              placeholder="Add a comment..."
+              placeholder="Add a comment…"
               rows={1}
               className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-[13px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] max-h-20"
             />
@@ -557,7 +557,7 @@ export default function ClientPortalPage() {
               disabled={saving}
               className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
-              {saving ? "Submitting..." : "Submit Request"}
+              {saving ? "Submitting…" : "Submit Request"}
             </button>
           </div>
         </div>

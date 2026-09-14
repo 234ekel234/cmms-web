@@ -4,24 +4,9 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle, { ThemeHint } from "@/components/ThemeToggle";
+import { roleLabel, roleCls } from "@/lib/statuses";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
-
-const ROLE_LABELS: Record<Role, string> = {
-  GENERAL_MANAGER: "General Manager",
-  MANAGER:         "Manager",
-  SUPERVISOR:      "Supervisor",
-  TECHNICIAN:      "Technician",
-  CLIENT:          "Client",
-};
-
-const ROLE_CLS: Record<Role, string> = {
-  GENERAL_MANAGER: "bg-violet-50 text-violet-700",
-  MANAGER:         "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
-  SUPERVISOR:      "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
-  TECHNICIAN:      "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
-  CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
-};
 
 // `inApp` is null for events that only ever exist as email, so no bell toggle is
 // offered for them. `emailApplies` is false where the event is in-app only, or
@@ -142,8 +127,8 @@ export default function SettingsPage() {
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             <div style={{ flex: 1, minWidth: 160 }}>
               <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tu-text-subtle)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>Role</p>
-              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${ROLE_CLS[role]}`}>
-                {ROLE_LABELS[role]}
+              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${roleCls(role)}`}>
+                {roleLabel(role)}
               </span>
             </div>
             <div style={{ flex: 1, minWidth: 160 }}>

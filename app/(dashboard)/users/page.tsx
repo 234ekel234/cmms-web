@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { EmptyRow } from "@/components/EmptyState";
+import { roleLabel, roleCls } from "@/lib/statuses";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -12,14 +13,6 @@ type User = {
   name: string;
   email: string;
   role: Role;
-};
-
-const ROLE_CONFIG: Record<Role, { label: string; cls: string }> = {
-  GENERAL_MANAGER: { label: "General Manager", cls: "bg-violet-50 text-violet-700" },
-  MANAGER:         { label: "Manager",          cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]"    },
-  SUPERVISOR:      { label: "Supervisor",       cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"  },
-  TECHNICIAN:      { label: "Technician",       cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]"    },
-  CLIENT:          { label: "Client",           cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]"  },
 };
 
 function SkeletonRows({ count, cols }: { count: number; cols: number }) {
@@ -229,7 +222,7 @@ export default function UsersPage() {
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                placeholder="email@example.com"
+                placeholder="name@example.com"
               />
             </div>
             <div>
@@ -287,7 +280,7 @@ export default function UsersPage() {
               >
                 {saving
                   ? (editingId ? "Saving…" : "Creating…")
-                  : (editingId ? "Save Changes" : "Create User")}
+                  : (editingId ? "Save changes" : "Create user")}
               </button>
             </div>
           </div>
@@ -318,7 +311,7 @@ export default function UsersPage() {
               onClick={() => setRoleFilter(r)}
               className={`tu-period-pill${roleFilter === r ? " tu-active-pill" : ""}`}
             >
-              {ROLE_CONFIG[r].label} ({roleCounts[r]})
+              {roleLabel(r)} ({roleCounts[r]})
             </button>
           ))}
         </div>
@@ -355,7 +348,6 @@ export default function UsersPage() {
                 />
               ) : (
                 filtered.map((u) => {
-                  const cfg = ROLE_CONFIG[u.role];
                   const isMe = u.id === me?.id;
                   return (
                     <tr key={u.id}>
@@ -372,8 +364,8 @@ export default function UsersPage() {
                       </td>
                       <td style={{ color: "var(--tu-text-body)" }}>{u.email}</td>
                       <td>
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${cfg.cls}`}>
-                          {cfg.label}
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleCls(u.role)}`}>
+                          {roleLabel(u.role)}
                         </span>
                       </td>
                       {isGM && (

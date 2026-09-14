@@ -264,7 +264,7 @@ export default function EmployeesPage() {
                     )}
                     {emp.openWorkOrders > 0 && (
                       <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]">
-                        {emp.openWorkOrders} active WO{emp.openWorkOrders > 1 ? "s" : ""}
+                        {emp.openWorkOrders} open work order{emp.openWorkOrders > 1 ? "s" : ""}
                       </span>
                     )}
                   </div>
@@ -275,7 +275,7 @@ export default function EmployeesPage() {
                     disabled={unassigning === emp.id}
                     className="text-xs text-[var(--tu-on-danger)] border border-[var(--tu-bd-danger)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-soft-danger)] cursor-pointer disabled:opacity-50"
                   >
-                    {unassigning === emp.id ? "..." : "Remove"}
+                    {unassigning === emp.id ? "…" : "Remove"}
                   </button>
                 )}
               </div>
@@ -302,7 +302,7 @@ export default function EmployeesPage() {
             <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-4">Assign Employee</h2>
             <input
               className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] mb-4"
-              placeholder="Search registry..."
+              placeholder="Search all employees…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               autoFocus
@@ -312,7 +312,7 @@ export default function EmployeesPage() {
                 <div className="text-sm text-[var(--tu-text-subtle)] text-center py-8">Loading...</div>
               ) : available.length === 0 ? (
                 <div className="text-sm text-[var(--tu-text-subtle)] text-center py-8">
-                  {search ? "No matching employees." : "All employees are already assigned."}
+                  {search ? "No matches found." : "All employees are already assigned."}
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -354,7 +354,7 @@ export default function EmployeesPage() {
               disabled={assigning}
               className="w-full bg-[var(--tu-text-brand)] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
-              {assigning ? "Assigning..." : selectedIds.length > 0 ? `Assign ${selectedIds.length} Employee${selectedIds.length > 1 ? "s" : ""}` : "Done"}
+              {assigning ? "Assigning…" : selectedIds.length > 0 ? `Assign ${selectedIds.length} Employee${selectedIds.length > 1 ? "s" : ""}` : "Done"}
             </button>
           </div>
         </div>

@@ -6,7 +6,8 @@ import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
-import { canManage } from "@/lib/rbac";
+import { FIELD_STAFF, canManage, hasRole } from "@/lib/rbac";
+import { frequencyMeta } from "@/lib/maintenancePlans";
 
 type PMLog = {
   id: string;
@@ -20,15 +21,6 @@ type Assignment = {
   checklist: { id: string; name: string; frequency: string; sections: { items: unknown[] }[] };
   asset: { id: string; name: string } | null;
   logs: PMLog[];
-};
-
-const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
-  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 function getPeriodStart(frequency: string): Date {
@@ -63,10 +55,22 @@ function statusOf(a: Assignment): ChecklistState {
 }
 
 const STATUS_ORDER: ChecklistState[] = ["completed", "draft", "unanswered"];
-const STATUS_META: Record<ChecklistState, { label: string; activeCls: string }> = {
-  completed:  { label: "Completed",  activeCls: "bg-[var(--tu-status-completed)] text-white border-[var(--tu-status-completed)]" },
-  draft:      { label: "Draft",      activeCls: "bg-[var(--tu-priority-high)] text-white border-[var(--tu-priority-high)]" },
-  unanswered: { label: "Unanswered", activeCls: "bg-[var(--tu-text-body)] text-white border-[var(--tu-text-body)]" },
+const STATUS_META: Record<ChecklistState, { label: string; activeCls: string; badgeCls: string }> = {
+  completed: {
+    label: "Done",
+    activeCls: "bg-[var(--tu-status-completed)] text-white border-[var(--tu-status-completed)]",
+    badgeCls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+  },
+  draft: {
+    label: "Partial",
+    activeCls: "bg-[var(--tu-priority-high)] text-white border-[var(--tu-priority-high)]",
+    badgeCls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
+  },
+  unanswered: {
+    label: "Unanswered",
+    activeCls: "bg-[var(--tu-text-body)] text-white border-[var(--tu-text-body)]",
+    badgeCls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]",
+  },
 };
 
 function fmtDate(iso: string) {
@@ -80,7 +84,13 @@ export default function ChecklistsPage() {
   // A client sees which checklists are assigned and whether they were done this
   // period; assigning them and filling them in are staff jobs, and the cards
   // stop being links for a client because the detail page is the fill-in form.
-  const writable = canManage(user?.role);
+  // Two questions, not one. Deciding *what this site must inspect* — assigning
+  // a checklist, removing one — is scheduling, and stays staff. *Filling one in*
+  // is doing the round, which a technician does, so the card opens for them too.
+  // Asking `canManage` for both is what kept technicians off the fill-in form
+  // while the API was already handing them every question on it.
+  const canSchedule = canManage(user?.role);
+  const canFillIn = hasRole(user?.role, FIELD_STAFF);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
@@ -119,15 +129,15 @@ export default function ChecklistsPage() {
   const totalDone = byStatus.completed.length;
 
   function renderCard(a: Assignment) {
-    const freqCfg = FREQUENCY_CONFIG[a.checklist.frequency] ?? { label: a.checklist.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
-    const periodLog = getThisPeriodLog(a.logs, a.checklist.frequency);
-    const done = !!periodLog && !periodLog.isDraft;
-    const isDraft = !!periodLog && periodLog.isDraft;
+    const freqCfg = frequencyMeta(a.checklist.frequency);
+    const state = statusOf(a);
+    const done = state === "completed";
+    const isDraft = state === "draft";
     const lastLog = a.logs[0] ?? null;
     const itemCount = a.checklist.sections.reduce((sum, s) => sum + (s.items as unknown[]).length, 0);
 
     const cardClass = `block bg-[var(--tu-bg-surface)] rounded-xl border shadow-sm p-4 ${
-      writable ? "hover:shadow-md transition-shadow" : ""
+      canFillIn ? "hover:shadow-md transition-shadow" : ""
     } ${
       done ? "border-[var(--tu-bd-success)] bg-[var(--tu-soft-success)]/30" :
       isDraft ? "border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)]/30" :
@@ -154,14 +164,10 @@ export default function ChecklistsPage() {
             </div>
           </div>
           <div className="flex items-start gap-2 shrink-0">
-            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-              done ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" :
-              isDraft ? "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" :
-              "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]"
-            }`}>
-              {done ? "Done" : isDraft ? "Partial" : "Pending"}
+            <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${STATUS_META[state].badgeCls}`}>
+              {STATUS_META[state].label}
             </span>
-            {writable && (
+            {canSchedule && (
               <button
                 onClick={() => handleRemove(a.id)}
                 className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] transition-colors cursor-pointer"
@@ -174,7 +180,7 @@ export default function ChecklistsPage() {
       </>
     );
 
-    return writable ? (
+    return canFillIn ? (
       <Link key={a.id} href={`/accounts/${accountId}/checklists/${a.id}`} className={cardClass}>
         {body}
       </Link>
@@ -194,7 +200,7 @@ export default function ChecklistsPage() {
             </p>
           )}
         </div>
-        {writable && (
+        {canSchedule && (
           <Link
             href={`/accounts/${accountId}/checklists/assign`}
             className="border border-[var(--tu-text-brand)] text-[var(--tu-text-brand)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-soft-brand)] transition-colors"
@@ -213,7 +219,7 @@ export default function ChecklistsPage() {
           <EmptyState
             icon="checklist"
             title="No checklists assigned"
-            hint={writable ? (
+            hint={canSchedule ? (
               <>
                 Assign checklists from the{" "}
                 <Link href="/pm-checklists" className="tu-link">PM library</Link> to start

@@ -401,7 +401,7 @@ export default function AttendancePage() {
                       {grid.dates.map((d) => (
                         <th key={d} className="px-1 py-2 text-center font-semibold text-[var(--tu-text-subtle)] w-8">{dayNum(d)}</th>
                       ))}
-                      <th className="px-3 py-2 text-center font-semibold text-[var(--tu-text-subtle)] min-w-[56px]">P / A</th>
+                      <th className="px-3 py-2 text-center font-semibold text-[var(--tu-text-subtle)] min-w-[56px]">Present / Absent</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[var(--tu-border)]">

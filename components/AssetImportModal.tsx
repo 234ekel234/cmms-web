@@ -289,7 +289,7 @@ export default function AssetImportModal({
                 disabled={validRows.length === 0 || submitting}
                 className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
-                {submitting ? "Importing..." : `Import ${validRows.length || ""} Asset${validRows.length === 1 ? "" : "s"}`}
+                {submitting ? "Importing…" : `Import ${validRows.length || ""} Asset${validRows.length === 1 ? "" : "s"}`}
               </button>
             </>
           )}

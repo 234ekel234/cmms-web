@@ -113,7 +113,7 @@ export default function PartsPage() {
             <p className="tu-stat-sub">across all accounts</p>
           </div>
           <div className="tu-stat-card">
-            <p className="tu-stat-label">At or Below Minimum</p>
+            <p className="tu-stat-label">At or below minimum</p>
             <p className={`tu-stat-value${lowCount > 0 ? " tu-stat-danger" : ""}`}>{lowCount}</p>
             <p className="tu-stat-sub">need reordering</p>
           </div>

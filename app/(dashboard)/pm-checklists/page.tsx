@@ -5,21 +5,13 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
+import { FREQUENCIES, frequencyMeta } from "@/lib/maintenancePlans";
 
 type PMChecklist = {
   id: string;
   name: string;
   frequency: string;
   sections: { id: string; items: { id: string }[] }[];
-};
-
-const FREQUENCY_CONFIG: Record<string, { label: string; cls: string }> = {
-  DAILY:         { label: "Daily",         cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  WEEKLY:        { label: "Weekly",        cls: "bg-violet-50 text-violet-700" },
-  MONTHLY:       { label: "Monthly",       cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  QUARTERLY:     { label: "Quarterly",     cls: "bg-teal-50 text-teal-700" },
-  SEMI_ANNUALLY: { label: "Semi-Annually", cls: "bg-pink-50 text-pink-700" },
-  ANNUALLY:      { label: "Annually",      cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
 };
 
 export default function PMChecklistsPage() {
@@ -106,7 +98,7 @@ export default function PMChecklistsPage() {
             All
           </button>
           {presentFreqs.map((freq) => {
-            const cfg = FREQUENCY_CONFIG[freq] ?? { label: freq, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
+            const cfg = frequencyMeta(freq);
             const isActive = activeFreq === freq;
             return (
               <button
@@ -145,8 +137,8 @@ export default function PMChecklistsPage() {
                 value={form.frequency}
                 onChange={(e) => setForm((f) => ({ ...f, frequency: e.target.value }))}
               >
-                {Object.entries(FREQUENCY_CONFIG).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
+                {FREQUENCIES.map((k) => (
+                  <option key={k} value={k}>{frequencyMeta(k).label}</option>
                 ))}
               </select>
             </div>
@@ -155,7 +147,7 @@ export default function PMChecklistsPage() {
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => { setShowForm(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
             <button onClick={createChecklist} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-              {saving ? "Creating..." : "Create"}
+              {saving ? "Creating…" : "Create"}
             </button>
           </div>
         </div>
@@ -191,7 +183,7 @@ export default function PMChecklistsPage() {
       ) : (
         <div className="space-y-3">
           {visible.map((c) => {
-            const freq = FREQUENCY_CONFIG[c.frequency] ?? { label: c.frequency, cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" };
+            const freq = frequencyMeta(c.frequency);
             const itemCount = c.sections.reduce((sum, s) => sum + s.items.length, 0);
             return (
               <Link

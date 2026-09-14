@@ -346,7 +346,7 @@ export default function MaintenancePlanDetailPage() {
               Cancel
             </button>
             <button onClick={save} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-              {saving ? "Saving..." : "Save Changes"}
+              {saving ? "Saving…" : "Save changes"}
             </button>
           </div>
         </div>

@@ -105,7 +105,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
             ← Accounts
           </Link>
           <h1 className="tu-acct-title">
-            {account ? account.name : "Loading..."}
+            {account ? account.name : "Loading…"}
           </h1>
           {account?.description && (
             <p className="tu-acct-sub">{account.description}</p>

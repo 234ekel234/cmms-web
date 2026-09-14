@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
+import { roleLabel, roleCls } from "@/lib/statuses";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -22,22 +23,6 @@ type UserRecord = {
   name: string;
   email: string;
   role: Role;
-};
-
-const ROLE_LABELS: Record<Role, string> = {
-  GENERAL_MANAGER: "General Manager",
-  MANAGER: "Manager",
-  SUPERVISOR: "Supervisor",
-  TECHNICIAN: "Technician",
-  CLIENT: "Client",
-};
-
-const ROLE_CLS: Record<Role, string> = {
-  GENERAL_MANAGER: "bg-violet-50 text-violet-700",
-  MANAGER:         "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
-  SUPERVISOR:      "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
-  TECHNICIAN:      "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
-  CLIENT:          "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
 };
 
 export default function MembersPage() {
@@ -127,8 +112,8 @@ export default function MembersPage() {
                   <p className="text-xs text-[var(--tu-text-subtle)]">{m.email}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${ROLE_CLS[m.accountRole] ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]"}`}>
-                    {ROLE_LABELS[m.accountRole]}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleCls(m.accountRole)}`}>
+                    {roleLabel(m.accountRole)}
                   </span>
                   {isManager && (
                     <button
@@ -136,7 +121,7 @@ export default function MembersPage() {
                       disabled={removingId === m.id}
                       className="text-xs text-[var(--tu-on-danger)] hover:text-[var(--tu-on-danger)] cursor-pointer disabled:opacity-50"
                     >
-                      {removingId === m.id ? "..." : "✕"}
+                      {removingId === m.id ? "…" : "✕"}
                     </button>
                   )}
                 </div>
@@ -162,7 +147,7 @@ export default function MembersPage() {
                       assigningRole === r ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                     }`}
                   >
-                    {ROLE_LABELS[r]}
+                    {roleLabel(r)}
                   </button>
                 ))}
               </div>
@@ -191,7 +176,7 @@ export default function MembersPage() {
                           disabled={savingId === u.id}
                           className="bg-[var(--tu-text-brand)] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[var(--tu-text-brand-strong)] cursor-pointer disabled:opacity-50"
                         >
-                          {savingId === u.id ? "..." : "+ Add"}
+                          {savingId === u.id ? "…" : "+ Add"}
                         </button>
                       </div>
                     ))}

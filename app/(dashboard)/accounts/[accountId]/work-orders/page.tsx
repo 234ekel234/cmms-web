@@ -20,6 +20,7 @@ import {
   matchesFlag,
   passesFilters,
   signOffCue,
+  transitionLabel,
   triageRank,
   type WorkOrderFlag,
 } from "@/lib/workOrders";
@@ -660,7 +661,7 @@ export default function WorkOrdersPage() {
               Cancel
             </button>
             <button onClick={createWorkOrder} disabled={saving} className="tu-btn-primary">
-              {saving ? "Creating..." : "Create"}
+              {saving ? "Creating…" : "Create"}
             </button>
           </div>
         </div>
@@ -880,13 +881,7 @@ export default function WorkOrdersPage() {
                             : ""
                         }`}
                       >
-                        {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
-                         ns === "PENDING" && order.status === "IN_PROGRESS" ? "Revert to Accepted" :
-                         ns === "IN_PROGRESS" && order.status === "ON_HOLD" ? "Resume" :
-                         ns === "IN_PROGRESS" ? "Start" :
-                         ns === "ON_HOLD" ? "Put On Hold" :
-                         ns === "COMPLETED" ? "Mark Complete" :
-                         ns === "REJECTED" ? "Reject" : ns}
+                        {transitionLabel(order.status, ns)}
                       </button>
                     ))}
                   </div>
