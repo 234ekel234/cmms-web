@@ -3046,3 +3046,300 @@ figure:hover .tu-attachment-remove,
   .tu-row-changed > td,
   .tu-changed { animation: none; }
 }
+
+/* ── Dashboard grid ───────────────────────────────────────
+   One twelve-column grid in place of the four fixed ones this replaced
+   (`tu-kpi-grid`, `tu-trend-grid`, `tu-section-grid`, `tu-content-grid`, all
+   still used elsewhere). Those bands are what made the page unarrangeable: a
+   card could only move within the grid it was declared in, so reordering was a
+   markup change rather than a preference.
+
+   A widget's width is three custom properties, not three stored numbers. Only
+   the desktop span is saved; the tablet and phone widths are derived from it in
+   `lib/dashboardLayout.ts` (`responsiveSpans`), because three breakpoints of
+   saved widths is three things to keep in step and nobody arranges a dashboard
+   on a phone. The rule is the one the fixed grids already followed: narrow
+   cards pair up, wide cards go full width. */
+.tu-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+  align-items: stretch;
+}
+
+.tu-dash-item {
+  grid-column: span var(--tu-span, 12);
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Stretch the card to the row, so a row of KPI tiles with sub-lines of
+   different lengths still lines up along the bottom. */
+.tu-dash-widget { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.tu-dash-widget > * { flex: 1; min-width: 0; }
+.tu-dash-widget > section { display: flex; flex-direction: column; }
+.tu-dash-widget > section > .tu-card { flex: 1; }
+
+@media (max-width: 1279px) { .tu-dash-item { grid-column: span var(--tu-span-md, 12); } }
+@media (max-width: 767px)  { .tu-dash-item { grid-column: span var(--tu-span-sm, 12); } }
+
+/* ── Dashboard edit mode ──────────────────────────────── */
+.tu-dash-hint {
+  font-size: 13px;
+  color: var(--tu-text-subtle);
+  margin: 0 0 12px;
+}
+
+
+.tu-dash-editing .tu-dash-item {
+  position: relative;
+  padding: 34px 6px 6px;
+  border: 1px dashed var(--tu-border-strong);
+  border-radius: calc(var(--tu-radius-lg) + 5px);
+  background: var(--tu-bg-secondary);
+  cursor: grab;
+}
+.tu-dash-editing .tu-dash-item:active { cursor: grabbing; }
+
+/* Inert while arranging. Every card is a link or a table of links, and a drag
+   that ends a pixel short of a move would otherwise navigate away from the
+   half-finished layout. */
+.tu-dash-editing .tu-dash-widget { pointer-events: none; }
+
+.tu-dash-item.tu-dragging { opacity: 0.45; }
+
+.tu-dash-tools {
+  position: absolute;
+  top: 5px;
+  left: 8px;
+  right: 8px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tu-dash-handle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tu-text-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: grab;
+}
+.tu-dash-handle:hover { background: var(--tu-bg-secondary-strong); color: var(--tu-text-heading); }
+.tu-dash-handle:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 1px; }
+.tu-dash-tool-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.tu-dash-size { display: inline-flex; align-items: center; gap: 2px; }
+.tu-dash-size-val {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tu-text-subtle);
+  min-width: 30px;
+  text-align: center;
+}
+
+.tu-dash-tool {
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--tu-border);
+  border-radius: 6px;
+  background: var(--tu-bg-surface);
+  color: var(--tu-text-body);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tu-dash-tool:hover:not(:disabled) { border-color: var(--tu-border-strong); color: var(--tu-text-heading); }
+.tu-dash-tool:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 1px; }
+.tu-dash-tool:disabled { opacity: 0.4; cursor: not-allowed; }
+.tu-dash-hide:hover:not(:disabled) { color: var(--tu-priority-critical); border-color: var(--tu-priority-critical); }
+
+.tu-dash-placeholder { border-style: dashed; box-shadow: none; }
+
+/* ── Hidden-card tray ─────────────────────────────────── */
+/* ── Edit bar: a second navbar, under the app's own ───────
+   Sticky rather than a block above the grid, because edit mode means scrolling
+   the grid: a picker that scrolled away would be gone exactly when it is wanted,
+   which is when you have reached the bottom and want to add a card. `top` is the
+   app topbar's height, and the negative gutters let it span edge to edge inside
+   `.tu-page`'s padding the way the topbar does. Its z-index stays below the
+   topbar's 30, so it slides under rather than over it. */
+.tu-dash-editbar {
+  position: sticky;
+  top: 60px;
+  z-index: 25;
+  margin: 0 -32px 20px;
+  padding: 10px 32px;
+  background: color-mix(in srgb, var(--tu-bg-surface) 92%, transparent);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--tu-border);
+  border-bottom: 1px solid var(--tu-border);
+}
+@media (max-width: 640px) {
+  .tu-dash-editbar { margin: 0 -16px 16px; padding: 10px 16px; }
+}
+.tu-dash-editbar-inner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.tu-dash-editbar-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tu-text-brand);
+}
+.tu-dash-editbar-note { font-size: 12.5px; color: var(--tu-text-subtle); }
+.tu-dash-editbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+
+.tu-dash-picker { position: relative; }
+.tu-dash-picker-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9999px;
+  background: var(--tu-bg-secondary-strong);
+  color: var(--tu-text-body);
+  font-size: 11px;
+  font-weight: 700;
+}
+/* Anchored left, because the button sits at the left of the bar and a panel
+   that opened rightwards would run off a narrow window. */
+.tu-dash-picker-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 26;
+  min-width: 280px;
+  max-width: min(520px, calc(100vw - 48px));
+  max-height: min(60vh, 480px);
+  overflow-y: auto;
+  padding: 14px 16px;
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-lg);
+  background: var(--tu-bg-surface);
+  box-shadow: var(--tu-shadow-lg);
+}
+.tu-dash-tray-group + .tu-dash-tray-group { margin-top: 12px; }
+.tu-dash-tray-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tu-text-subtle);
+  margin: 0 0 6px;
+}
+.tu-dash-tray-items { display: flex; flex-wrap: wrap; gap: 8px; }
+.tu-dash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--tu-border);
+  border-radius: 9999px;
+  background: var(--tu-bg-surface);
+  color: var(--tu-text-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.tu-dash-chip:hover { border-color: var(--tu-text-brand); color: var(--tu-text-brand); }
+.tu-dash-chip:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+/* A copy in the tray can be thrown away; an original can only be put back.
+   Deleting the last instance of a type would have `reconcile` restore it on the
+   next load, which reads as a delete that did not work. */
+.tu-dash-chip-group { display: inline-flex; align-items: stretch; }
+.tu-dash-chip-group .tu-dash-chip { border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: 0; }
+.tu-dash-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 10px;
+  border: 1px solid var(--tu-border);
+  border-radius: 0 9999px 9999px 0;
+  background: var(--tu-bg-surface);
+  color: var(--tu-text-subtle);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tu-dash-chip-remove:hover { color: var(--tu-priority-critical); border-color: var(--tu-priority-critical); }
+.tu-dash-chip-remove:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+/* ── Per-card settings ────────────────────────────────────
+   Inline above the card rather than a floating popover: it pushes the grid row
+   down instead of covering the neighbour you are comparing against, and it
+   needs no positioning logic to stay on screen at the right-hand edge or on a
+   phone. */
+.tu-dash-settings {
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--tu-border);
+  border-radius: var(--tu-radius-md);
+  background: var(--tu-bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tu-dash-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tu-dash-field-label {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--tu-text-heading);
+  margin: 0;
+}
+.tu-dash-field-row { display: inline-flex; align-items: center; gap: 6px; }
+.tu-dash-field-number { width: 84px; }
+.tu-dash-field-suffix { font-size: 12px; color: var(--tu-text-subtle); }
+.tu-dash-field-control { max-width: 100%; }
+.tu-dash-field-help { font-size: 11.5px; line-height: 1.45; color: var(--tu-text-subtle); margin: 0; }
+.tu-dash-field-multi { display: flex; flex-direction: column; gap: 4px; }
+.tu-dash-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--tu-text-body);
+  cursor: pointer;
+}
+.tu-dash-check input { accent-color: var(--tu-text-brand); }
+.tu-dash-settings-reset {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--tu-text-subtle);
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.tu-dash-settings-reset:hover { color: var(--tu-text-heading); }
+.tu-dash-settings-reset:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+
+.tu-dash-tool-on {
+  border-color: var(--tu-text-brand);
+  color: var(--tu-text-brand);
+  background: var(--tu-bg-secondary);
+}
