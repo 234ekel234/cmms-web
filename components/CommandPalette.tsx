@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { canAccessRoute, type Role } from "@/lib/rbac";
+import { workOrderRef } from "@/lib/workOrders";
 
 // Global jump-to search (⌘K / Ctrl+K). Indexes navigation pages plus accounts,
 // assets, and work orders (the entities with unambiguous detail routes). Data
@@ -64,8 +65,10 @@ export default function CommandPalette() {
             id: `asset-${as.id}`, label: as.name, sub: a.name, kind: "Asset",
             href: `/accounts/${a.id}/assets/${as.id}`,
           }));
-          const woItems: Item[] = (wosR.data as { id: string; title: string }[]).map((wo) => ({
-            id: `wo-${wo.id}`, label: wo.title, sub: a.name, kind: "Work Order",
+          // The reference rides in `sub`, which the filter matches on, so typing
+          // "WO-1042" finds the order as well as its title does.
+          const woItems: Item[] = (wosR.data as { id: string; number: number; title: string }[]).map((wo) => ({
+            id: `wo-${wo.id}`, label: wo.title, sub: `${workOrderRef(wo.number)} · ${a.name}`, kind: "Work Order",
             href: `/accounts/${a.id}/work-orders/${wo.id}`,
           }));
           return [...assetItems, ...woItems];

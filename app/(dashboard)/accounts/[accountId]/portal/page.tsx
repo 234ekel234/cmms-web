@@ -8,7 +8,7 @@ import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 import type { WorkOrderStatus } from "@/lib/statuses";
-import { awaitingClient, isDone, needsClientApproval, signOffCue } from "@/lib/workOrders";
+import { awaitingClient, isDone, needsClientApproval, signOffCue, workOrderRef } from "@/lib/workOrders";
 
 // ── Types ────────────────────────────────────────────────
 // Imported, not re-declared. A local copy of this union is what crashed this
@@ -26,6 +26,7 @@ type Asset = { id: string; name: string };
 
 type WorkOrder = {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   status: Status;
@@ -166,6 +167,7 @@ function RequestCard({
       {/* Top row */}
       <div className="flex items-start justify-between gap-3 mb-2">
         <h3 className={`flex-1 text-base font-bold leading-snug ${isTerminal ? "text-[var(--tu-text-subtle)]" : "text-[var(--tu-text-heading)]"}`}>
+          <span className="tu-wo-ref" style={{ marginRight: 6 }}>{workOrderRef(order.number)}</span>
           {order.title}
         </h3>
         <span className={`shrink-0 rounded-lg px-2.5 py-1 text-xs font-bold ${cfg.cls}`}>{cfg.label}</span>

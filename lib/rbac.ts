@@ -55,7 +55,7 @@ const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts", "maintenance-plans"];
 // An allowlist rather than a deny-list, because the account branch below falls
 // through to ALL_ROLES: a section added later would otherwise open to them
 // silently, and the API would then refuse a page the nav had just offered.
-const TECHNICIAN_ACCOUNT_SECTIONS = ["work-orders", "assets"];
+const TECHNICIAN_ACCOUNT_SECTIONS = ["work-orders", "assets", "checklists"];
 
 /**
  * Which roles may access a given pathname. Ordered most-specific first.
@@ -69,17 +69,24 @@ function rolesForPath(path: string): Role[] {
     const sub = scoped[2];
     if (section === "members") return MANAGERS;
     if (STAFF_ONLY_ACCOUNT_SECTIONS.includes(section)) return STAFF;
-    // Everything under /checklists/ is a write surface — the assign form and
-    // the fill-in form — rather than a view of one. A client sees the checklist
-    // list and its per-period status, and gets the answers themselves from the
-    // Reports section, which carries the aggregated responses.
+    // Everything under /checklists/ is a write surface rather than a view of
+    // one, and a client reaches none of it: they see the checklist list and its
+    // per-period status, and get the answers themselves from the Reports
+    // section, which carries the aggregated responses.
     //
-    // This must stay ABOVE the technician narrowing below. It sat underneath it
-    // once, and because "checklists" is not a technician section the narrowing
-    // returned first — which left this line unreachable and quietly handed the
-    // assign and fill-in forms to CLIENT. Every STAFF-only case belongs before
-    // the fall-through, not after it.
-    if (section === "checklists" && sub) return STAFF;
+    // The two write surfaces are not the same tier, though. *Assigning* a
+    // checklist to a site decides what this account is obliged to inspect and
+    // how often — scheduling, and staff-only. *Filling one in* is doing the
+    // round, which is a technician's job, so the fill-in form names FIELD_STAFF.
+    // The API draws the same line: POST/PUT on a log went to FIELD_STAFF while
+    // assigning stayed STAFF.
+    //
+    // Both must stay ABOVE the technician narrowing below. This sat underneath
+    // it once and, because the narrowing returned first, the line was
+    // unreachable and quietly handed the assign form to CLIENT. Every
+    // role-specific case belongs before the fall-through, not after it.
+    if (section === "checklists" && sub === "assign") return STAFF;
+    if (section === "checklists" && sub) return FIELD_STAFF;
     // Narrow the rest to the two sections a technician has business in. The
     // account overview ("") is not one of them by name, but they never land on
     // it — the account root redirects them straight to their queue.
@@ -99,6 +106,10 @@ function rolesForPath(path: string): Role[] {
   if (path.startsWith("/pm-checklists")) return STAFF;
   if (path.startsWith("/trainings")) return STAFF;
   if (path.startsWith("/reports")) return STAFF;
+  // Printable sheets. Open to everyone because each one reads a single record
+  // through the same endpoint its screen page uses, and the API decides who may
+  // have it — a technician asking for someone else's job gets the same 404.
+  if (path.startsWith("/print")) return ALL_ROLES;
   if (path.startsWith("/accounts")) return ALL_ROLES; // accounts list (backend scopes to membership)
   if (path.startsWith("/notifications")) return ALL_ROLES;
   if (path.startsWith("/settings")) return ALL_ROLES;

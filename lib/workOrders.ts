@@ -210,3 +210,35 @@ export function triageRank(wo: ApprovalShape & { status: WorkOrderStatus }): num
   if (!isClosed(wo)) return 0;
   return awaitingClient(wo) ? 1 : 2;
 }
+
+/**
+ * The reference people quote — "WO-1042". `WorkOrder.number` is one sequence
+ * across every account, so the number alone is unique; the prefix is only so it
+ * reads as a work order when pasted into an email or a chat.
+ */
+export function workOrderRef(number: number): string {
+  return `WO-${number}`;
+}
+
+/**
+ * Whether a search box entry is asking for this order by number. Accepts the
+ * forms people actually type — "1042", "#1042", "wo-1042", "WO 1042" — and
+ * matches the whole number, so "104" does not return WO-1042.
+ */
+export function matchesWorkOrderRef(number: number | undefined, query: string): boolean {
+  if (number === undefined) return false;
+  const m = query.trim().match(/^(?:wo[-\s]?|#)?(\d+)$/i);
+  return m !== null && Number(m[1]) === number;
+}
+
+/**
+ * The most job sheets one batch print will take. A day's work for a site is a
+ * handful; past this it is a report, not a stack of sheets, and the print page
+ * makes one request per order.
+ */
+export const MAX_BATCH_PRINT = 100;
+
+/** The batch print page for these orders, in the order given. */
+export function batchPrintHref(ids: string[]): string {
+  return `/print/work-orders?ids=${ids.slice(0, MAX_BATCH_PRINT).map(encodeURIComponent).join(",")}`;
+}

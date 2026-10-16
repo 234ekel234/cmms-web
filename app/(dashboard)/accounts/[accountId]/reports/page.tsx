@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { csvBuilder } from "@/lib/csv";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import PmExportDialog from "@/components/PmExportDialog";
 
 type Period = "this_week" | "this_month" | "this_quarter" | "this_year" | "custom";
 
@@ -227,6 +229,7 @@ export default function ReportsPage() {
   const [customTo, setCustomTo] = useState(customFrom);
   const [customError, setCustomError] = useState("");
   const [data, setData] = useState<ReportData | null>(null);
+  const [showPmExport, setShowPmExport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [reliability, setReliability] = useState<ReliabilityData | null>(null);
 
@@ -272,9 +275,8 @@ export default function ReportsPage() {
   function exportChecklistCSV() {
     if (!data) return;
     const responses = data.checklistResponses ?? [];
-    const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-    const rows: string[] = [];
-    const line = (cells: (string | number)[]) => rows.push(cells.map(esc).join(","));
+    // Encoding and formula-safety live in lib/csv — see the note there.
+    const { line, download } = csvBuilder();
 
     const totalLate = responses.reduce((s, c) => s + c.lateCount, 0);
     const totalDrafts = responses.reduce((s, c) => s + c.inProgress, 0);
@@ -344,13 +346,7 @@ export default function ReportsPage() {
       ]);
     }
 
-    const blob = new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `account-report-${data.period.from}-to-${data.period.to}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    download(`account-report-${data.period.from}-to-${data.period.to}.csv`);
   }
 
   return (
@@ -368,8 +364,26 @@ export default function ReportsPage() {
               Export PM CSV
             </button>
           )}
+          {/* The detailed workbook: every round and answer, not just the totals. */}
+          <button
+            type="button"
+            onClick={() => setShowPmExport(true)}
+            className="text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer"
+          >
+            PM analytics (Excel)
+          </button>
         </div>
       </div>
+
+      {showPmExport && (
+        <PmExportDialog
+          onClose={() => setShowPmExport(false)}
+          scope={data?.accountName ?? "This site"}
+          accountId={accountId}
+          initialFrom={activeRange.from}
+          initialTo={activeRange.to}
+        />
+      )}
 
       {/* Period picker */}
       <div className="flex flex-wrap gap-2 mb-4">

@@ -66,6 +66,27 @@ in it are load-bearing:
 `ROLE_HOME.TECHNICIAN` is `/work-orders`, not `/` — the dashboard is the account at a glance,
 which is exactly what a technician does not get.
 
+## PM checklists
+
+`rolesForPath` splits `/accounts/<id>/checklists/<sub>` in two, and the order
+matters as much as the split: `assign` returns `STAFF`, any other sub-path
+returns `FIELD_STAFF`, and **both sit above the technician narrowing** — put
+either underneath it and the line becomes unreachable, which is how the assign
+form was once handed to CLIENT.
+
+The list page draws the same line in its own gating: `canSchedule`
+(`canManage`, staff) guards Assign and Remove, `canFillIn`
+(`hasRole(role, FIELD_STAFF)`) decides whether a card links to the fill-in form.
+Asking `canManage` for both is what kept technicians off a form the API was
+already willing to accept from them.
+
+Answers carry their own attribution: `PMLogItem.answeredByName` is per answer,
+distinct from `PMLog.performedByName` (who filed the round). It is **optional in
+the type on purpose** — the API withholds it from clients — so anything
+rendering it must tolerate its absence rather than assume a name. The fill-in
+page shows it per section, and says "N people" rather than picking one when a
+draft was finished by somebody else.
+
 ## Work orders
 
 Two list routes (`/work-orders` across accounts, `/accounts/[id]/work-orders` for one site)
@@ -98,3 +119,27 @@ and had already drifted on `REQUESTED`.
 3. Axios interceptor attaches token to every request
 4. 401 response → clears session and redirects to `/login`
 5. Protected pages check `isLoggedIn()` on mount and redirect if not authenticated
+
+## Printing
+
+Everything printable lives under `app/(print)/print/` — its own route group, so it renders
+with `AuthProvider` but without the sidebar and top bar, and `print.css` names its colours
+outright because paper is white whatever the screen theme is. `rolesForPath` opens `/print`
+to every role: each sheet reads through the same endpoint as its screen page, and the API
+decides who gets it.
+
+- **Job sheet** (`/print/work-orders/<id>`, and `?ids=a,b` for one per page — the lists'
+  "Print N" sends whatever the filters are showing, capped at `MAX_BATCH_PRINT`). Built from
+  `components/print/WorkOrderSheet.tsx`. **No cost on paper, for any role** — parts print by
+  quantity; a sheet handed around a site cannot be recalled.
+- **PM checklist form** (`/print/accounts/<id>/checklists/<assignmentId>?period=`) is
+  **blank on purpose** — a printed copy of filed answers is a second version that stops
+  agreeing with the record the moment a draft is edited.
+- **Asset QR labels** (`/print/accounts/<id>/assets/labels`, `?asset=` or `?location=`).
+  The QR encodes the asset page's URL and is drawn locally by `qrcode`. A filter rather than
+  an id list, so a large register is not a URL too long to send. Geometry is Avery L7160
+  under `@page labels`.
+
+`components/print/SheetParts.tsx` holds the letterhead, cells and signature blocks the
+sheets share. CSV downloads go through `lib/csv.ts` (byte-order mark for Excel, and a
+leading `'` on cells that would otherwise run as formulas).

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import api from "@/lib/api";
+import { downloadCsv } from "@/lib/csv";
 
 type Health = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -96,13 +97,9 @@ function toRows(text: string): Row[] {
 function downloadTemplate() {
   const header = COLUMNS.join(",");
   const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01"].join(",");
-  const blob = new Blob([`${header}\n${example}\n`], { type: "text/csv" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "cmms-asset-import-template.csv";
-  a.click();
-  URL.revokeObjectURL(url);
+  // Through lib/csv for the byte-order mark: a template that opens in Excel as
+  // UTF-8 is saved back as UTF-8, so an "ñ" typed into it survives the import.
+  downloadCsv([header, example], "cmms-asset-import-template.csv");
 }
 
 export default function AssetImportModal({

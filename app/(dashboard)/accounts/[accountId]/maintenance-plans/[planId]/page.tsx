@@ -22,6 +22,7 @@ import {
   type MaintenancePlan,
   type PlanOccurrence,
 } from "@/lib/maintenancePlans";
+import { workOrderRef } from "@/lib/workOrders";
 
 type Asset = { id: string; name: string };
 type Employee = { id: string; name: string; position: string | null };
@@ -436,6 +437,7 @@ export default function MaintenancePlanDetailPage() {
                     >
                       {fmtDate(o.scheduledPeriod)}
                     </Link>
+                    <span className="tu-wo-ref" style={{ marginLeft: 8, fontSize: 12 }}>{workOrderRef(o.number)}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={workOrderStatusMeta(o.status).badge}>

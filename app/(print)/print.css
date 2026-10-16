@@ -1,0 +1,205 @@
+/* Paper is white whatever the screen theme is, so the sheet names its colours
+   outright rather than reading --tu-* tokens that dark mode redefines. */
+
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+
+.ps-screen {
+  min-height: 100vh;
+  background: #e9ebef;
+  padding: 0 16px 48px;
+  color: #111;
+}
+
+.ps-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  max-width: 210mm;
+  margin: 0 auto 16px;
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  background: #e9ebef;
+  font-size: 13.5px;
+}
+.ps-toolbar a { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+.ps-toolbar a:hover { text-decoration: underline; }
+.ps-toolbar label { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.ps-toolbar .ps-spacer { flex: 1; }
+.ps-print-btn {
+  background: #111;
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.ps-print-btn:hover { background: #333; }
+
+.ps-sheet {
+  max-width: 210mm;
+  margin: 0 auto;
+  background: #fff;
+  color: #111;
+  padding: 14mm 12mm;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
+  font-size: 10.5pt;
+  line-height: 1.4;
+}
+
+/* A batch is several sheets: a gap between them on screen, a page break on paper. */
+.ps-sheet + .ps-sheet { margin-top: 24px; }
+
+.ps-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border-bottom: 2px solid #111;
+  padding-bottom: 10px;
+  margin-bottom: 12px;
+}
+.ps-logos { display: flex; align-items: center; gap: 12px; }
+.ps-logos img { height: 34px; width: auto; object-fit: contain; }
+.ps-logos .ps-logo-label { height: 20px; }
+.ps-doc-title { text-align: right; }
+.ps-doc-title .ps-kicker { font-size: 9pt; letter-spacing: 0.08em; text-transform: uppercase; color: #555; }
+.ps-doc-title .ps-ref { font-size: 20pt; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
+
+.ps-title { font-size: 14pt; font-weight: 700; margin: 0 0 2px; }
+.ps-flags { font-size: 9pt; color: #444; margin-bottom: 10px; }
+
+.ps-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border: 1px solid #999;
+  border-bottom: 0;
+  margin-bottom: 12px;
+}
+.ps-cell {
+  padding: 4px 8px;
+  border-bottom: 1px solid #999;
+  border-right: 1px solid #999;
+  min-height: 34px;
+}
+.ps-cell:nth-child(4n) { border-right: 0; }
+.ps-cell.ps-wide { grid-column: span 2; }
+.ps-cell.ps-full { grid-column: span 4; border-right: 0; }
+.ps-label { display: block; font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.05em; color: #555; }
+.ps-value { font-weight: 600; }
+.ps-value.ps-mono { font-variant-numeric: tabular-nums; }
+
+.ps-section { margin-bottom: 12px; break-inside: avoid; }
+.ps-section h2 {
+  font-size: 9pt;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 4px;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #111;
+}
+.ps-text { white-space: pre-wrap; margin: 0; }
+.ps-muted { color: #666; }
+
+.ps-table { width: 100%; border-collapse: collapse; }
+.ps-table th, .ps-table td { border: 1px solid #999; padding: 3px 6px; text-align: left; vertical-align: top; }
+.ps-table th { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.04em; background: #f2f2f2; }
+.ps-table td.ps-num, .ps-table th.ps-num { text-align: right; font-variant-numeric: tabular-nums; width: 70px; }
+.ps-table tr { break-inside: avoid; }
+.ps-box-col { width: 28px; text-align: center !important; }
+.ps-box {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #111;
+  line-height: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ps-lines div { border-bottom: 1px solid #999; height: 22px; }
+
+.ps-signs { display: grid; gap: 14px; margin-top: 16px; break-inside: avoid; }
+.ps-signs.ps-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.ps-signs.ps-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.ps-sign .ps-sign-line { border-bottom: 1px solid #111; height: 34px; display: flex; align-items: flex-end; padding-bottom: 2px; font-weight: 600; }
+.ps-sign .ps-sign-caption { font-size: 8pt; color: #444; margin-top: 3px; }
+.ps-sign .ps-sign-role { font-size: 8pt; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 2px; }
+
+.ps-foot {
+  margin-top: 14px;
+  padding-top: 6px;
+  border-top: 1px solid #ccc;
+  font-size: 8pt;
+  color: #666;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── Asset labels: Avery L7160 geometry (3 × 7, 63.5 × 38.1 mm) ───────────
+   A named page so the sheet's own margins apply here and nowhere else; the
+   job sheets keep the default @page above. */
+@page labels {
+  size: A4;
+  margin: 15.15mm 7.25mm 0;
+}
+.ps-labels {
+  page: labels;
+  width: 195.5mm;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(3, 63.5mm);
+  grid-auto-rows: 38.1mm;
+  column-gap: 2.5mm;
+  background: #fff;
+  color: #111;
+  padding: 15.15mm 7.25mm;
+  box-sizing: content-box;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+.ps-label-card {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  padding: 3mm;
+  overflow: hidden;
+  break-inside: avoid;
+  box-sizing: border-box;
+}
+.ps-labels-cut .ps-label-card { outline: 0.2mm dashed #bbb; outline-offset: -0.1mm; }
+.ps-label-qr { width: 28mm; height: 28mm; flex-shrink: 0; display: block; }
+.ps-label-text { min-width: 0; display: flex; flex-direction: column; gap: 0.6mm; }
+.ps-label-name { font-weight: 700; font-size: 9pt; line-height: 1.15; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.ps-label-code { font-size: 10pt; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
+.ps-label-meta { font-size: 6.5pt; color: #444; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.ps-screen { overflow-x: auto; }
+.ps-state { max-width: 210mm; margin: 64px auto; text-align: center; color: #333; }
+
+@media (max-width: 640px) {
+  .ps-sheet { padding: 16px; }
+  .ps-grid { grid-template-columns: repeat(2, 1fr); }
+  .ps-cell:nth-child(4n) { border-right: 1px solid #999; }
+  .ps-cell:nth-child(2n) { border-right: 0; }
+  .ps-cell.ps-wide, .ps-cell.ps-full { grid-column: span 2; border-right: 0; }
+  .ps-signs.ps-cols-2, .ps-signs.ps-cols-3 { grid-template-columns: 1fr; }
+}
+
+@media print {
+  html, body { background: #fff !important; }
+  .ps-screen { background: #fff; padding: 0; min-height: 0; }
+  .ps-toolbar { display: none; }
+  .ps-sheet { box-shadow: none; padding: 0; max-width: none; }
+  .ps-sheet + .ps-sheet { margin-top: 0; break-before: page; }
+  .ps-table th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* On paper the @page labels margins position the grid; padding would double them. */
+  .ps-labels { padding: 0; box-shadow: none; }
+}

@@ -11,25 +11,21 @@ import WorkOrderFilters from "@/components/WorkOrderFilters";
 import WorkOrderQueue from "@/components/WorkOrderQueue";
 import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
 import RowMenu from "@/components/RowMenu";
+import PrintListButton from "@/components/print/PrintListButton";
+import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
 import { EmptyRow } from "@/components/EmptyState";
 import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 // Aliased the way the detail page does: rbac's `canManage` is the account-
 // administration question, and reading it under its own name next to the
 // per-job one is how the two got conflated in the first place.
 import { canManage as canAdministerAccount } from "@/lib/rbac";
-import {
-  awaitingClient,
-  isOverdue,
-  matchesFlag,
-  passesFilters,
-  triageRank,
-  type WorkOrderFlag,
-} from "@/lib/workOrders";
+import { awaitingClient, isOverdue, matchesFlag, passesFilters, triageRank, type WorkOrderFlag, workOrderRef, matchesWorkOrderRef } from "@/lib/workOrders";
 
 type Account = { id: string; name: string };
 
 type WorkOrder = {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
@@ -181,6 +177,9 @@ export default function WorkOrdersPage() {
 
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
+  // The order whose Pause was pressed — the dialog asks why before stopping it.
+  const [pauseTarget, setPauseTarget] = useState<WorkOrder | null>(null);
+  const [timerError, setTimerError] = useState<string | null>(null);
   const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -238,6 +237,7 @@ export default function WorkOrdersPage() {
       const matchPriority = priorityFilter === "ALL" || wo.priority === priorityFilter;
       const matchSearch =
         !q ||
+        matchesWorkOrderRef(wo.number, q) ||
         wo.title.toLowerCase().includes(q) ||
         wo.asset?.name.toLowerCase().includes(q) ||
         wo.category?.toLowerCase().includes(q) ||
@@ -347,15 +347,21 @@ export default function WorkOrdersPage() {
     window.setTimeout(() => setFlashId((cur) => (cur === patch.id ? null : cur)), 1500);
   }
 
+  // Merge: the timer response omits `account`, which the table needs.
+  function applyTimer(id: string, result: TimerResult) {
+    setWorkOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...result } : o)));
+  }
+
   async function toggleTimer(wo: WorkOrder) {
+    setTimerError(null);
+    // Pausing needs a reason, which the dialog collects and posts.
+    if (wo.timerStartedAt) { setPauseTarget(wo); return; }
     setTimerBusyId(wo.id);
     try {
-      const action = wo.timerStartedAt ? "pause" : "resume";
-      const res = await api.post(`/work-orders/${wo.id}/timer`, { action });
-      // Merge: the timer response omits `account`, which the table needs.
-      setWorkOrders((prev) => prev.map((o) => (o.id === wo.id ? { ...o, ...res.data } : o)));
-    } catch {
-      // silent
+      const res = await api.post(`/work-orders/${wo.id}/timer`, { action: "resume" });
+      applyTimer(wo.id, res.data);
+    } catch (err: unknown) {
+      setTimerError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Couldn't resume the timer. Try again.");
     } finally {
       setTimerBusyId(null);
     }
@@ -370,6 +376,7 @@ export default function WorkOrdersPage() {
         </div>
 
         <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
+          {!loading && <PrintListButton ids={sorted.map((o) => o.id)} />}
           <div className="tu-segmented" role="tablist" aria-label="View">
             {([
               { key: "split" as const, label: "Queue" },
@@ -396,6 +403,14 @@ export default function WorkOrdersPage() {
       </div>
 
       {error && <div className="tu-error-banner" role="alert">{error}</div>}
+      {timerError && <div className="tu-error-banner" role="alert">{timerError}</div>}
+      {pauseTarget && (
+        <PauseTimerDialog
+          order={pauseTarget}
+          onClose={() => setPauseTarget(null)}
+          onPaused={(r) => applyTimer(pauseTarget.id, r)}
+        />
+      )}
 
       <div className="tu-card">
         <div className="tu-toolbar tu-toolbar-inset">
@@ -549,6 +564,7 @@ export default function WorkOrdersPage() {
                             className="tu-row-link"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <span className="tu-wo-ref" style={{ marginRight: 6 }}>{workOrderRef(wo.number)}</span>
                             {wo.title}
                           </Link>
                           {wo.isSpecialProject && (

@@ -14,6 +14,7 @@ import {
   signOffCue,
   transitionLabel,
   transitionTone,
+  workOrderRef,
 } from "@/lib/workOrders";
 
 /**
@@ -36,6 +37,7 @@ import {
 
 export type PanelOrder = {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   status: WorkOrderStatus;
@@ -276,9 +278,9 @@ export default function WorkOrderDetailPanel({
           <p className="tu-detail-sub">
             {/* The account name is only worth stating when the queue spans more
                 than one. Inside an account the page header already says which. */}
-            {[order.account?.name, order.asset?.name, order.isSpecialProject ? "Special project" : null]
+            {[workOrderRef(order.number), order.account?.name, order.asset?.name, order.isSpecialProject ? "Special project" : null]
               .filter(Boolean)
-              .join(" · ") || "—"}
+              .join(" · ")}
           </p>
         </div>
         {onClose && (
@@ -538,6 +540,14 @@ export default function WorkOrderDetailPanel({
         <span style={{ marginLeft: 10, fontSize: 12, color: "var(--tu-text-subtle)" }}>
           for parts, attachments and steps
         </span>
+        <Link
+          href={`/print/work-orders/${order.id}`}
+          target="_blank"
+          className="tu-btn-secondary tu-btn-sm"
+          style={{ marginLeft: "auto" }}
+        >
+          Print
+        </Link>
       </div>
     </div>
   );

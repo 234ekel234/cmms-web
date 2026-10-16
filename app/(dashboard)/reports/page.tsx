@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { csvBuilder } from "@/lib/csv";
+import PmExportDialog from "@/components/PmExportDialog";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
@@ -89,9 +91,8 @@ function PctBar({ value, danger = false }: { value: number | null; danger?: bool
 }
 
 function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], period: Period) {
-  const esc = (v: string | number) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const lines: string[] = [];
-  const line = (cells: (string | number)[]) => lines.push(cells.map(esc).join(","));
+  // Encoding and formula-safety live in lib/csv — see the note there.
+  const { line, download } = csvBuilder();
 
   // ── Per-account summary ──
   line(["Account Summary"]);
@@ -136,13 +137,7 @@ function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], peri
     ]);
   }
 
-  const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `cmms-report-${period}-${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  download(`cmms-report-${period}-${new Date().toISOString().slice(0, 10)}.csv`);
 }
 
 export default function ReportsPage() {
@@ -155,6 +150,7 @@ export default function ReportsPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [employees, setEmployees] = useState<EmployeeReport[]>([]);
   const [period, setPeriod] = useState<Period>("month");
+  const [showPmExport, setShowPmExport] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -217,6 +213,23 @@ export default function ReportsPage() {
             >
               ↓ Export CSV
             </button>
+          )}
+          <button type="button" onClick={() => setShowPmExport(true)} className="tu-btn-primary">
+            PM analytics (Excel)
+          </button>
+          {showPmExport && (
+            <PmExportDialog
+              onClose={() => setShowPmExport(false)}
+              // Follows the page's account filter: none selected means every site.
+              scope={
+                selectedAccounts.size === 0
+                  ? "All sites"
+                  : selectedAccounts.size === 1
+                    ? allAccounts.find((a) => selectedAccounts.has(a.id))?.name ?? "1 site"
+                    : `${selectedAccounts.size} sites`
+              }
+              accountIds={Array.from(selectedAccounts)}
+            />
           )}
           {allAccounts.length > 1 && (
             <AccountFilter accounts={allAccounts} selected={selectedAccounts} onChange={setSelectedAccounts} />

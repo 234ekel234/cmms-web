@@ -2854,6 +2854,9 @@ figure:hover .tu-attachment-remove,
   min-width: 0;
 }
 .tu-queue-account { font-weight: 500; color: var(--tu-text-body); }
+/* The work-order reference ("WO-1042"). Tabular figures so a column of them
+   lines up in the rail; quiet, because it is for quoting, not for scanning. */
+.tu-wo-ref { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--tu-text-subtle); white-space: nowrap; }
 .tu-queue-who { font-size: 11px; }
 .tu-queue-late { color: var(--tu-danger); font-weight: 600; }
 .tu-queue-waiting { color: var(--tu-on-warning); font-weight: 600; }
@@ -2904,6 +2907,10 @@ figure:hover .tu-attachment-remove,
 }
 .tu-detail-footer {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 0;
   padding: 12px 24px;
   border-top: 1px solid var(--tu-border);
   background: var(--tu-bg-secondary);

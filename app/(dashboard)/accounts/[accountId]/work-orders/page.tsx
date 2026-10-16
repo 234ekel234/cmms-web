@@ -12,18 +12,9 @@ import EmptyState from "@/components/EmptyState";
 import WorkOrderFilters from "@/components/WorkOrderFilters";
 import WorkOrderQueue from "@/components/WorkOrderQueue";
 import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
-import {
-  STAFF_TRANSITIONS,
-  awaitingClient,
-  isClosed,
-  isOverdue,
-  matchesFlag,
-  passesFilters,
-  signOffCue,
-  transitionLabel,
-  triageRank,
-  type WorkOrderFlag,
-} from "@/lib/workOrders";
+import PrintListButton from "@/components/print/PrintListButton";
+import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
+import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
@@ -37,6 +28,7 @@ type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type WorkOrder = {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   status: WorkOrderStatus;
@@ -222,6 +214,9 @@ export default function WorkOrdersPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [assignError, setAssignError] = useState("");
   const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
+  // The order whose Pause was pressed — the dialog asks why before stopping it.
+  const [pauseTarget, setPauseTarget] = useState<WorkOrder | null>(null);
+  const [timerError, setTimerError] = useState<string | null>(null);
 
   // Ticks once a second so running work-order timers stay live — but only while
   // at least one order is actually IN_PROGRESS with a running timer.
@@ -362,15 +357,21 @@ export default function WorkOrdersPage() {
     }
   }
 
+  // Merge so any field the timer response omits is preserved.
+  function applyTimer(id: string, result: TimerResult) {
+    setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...result } : o)));
+  }
+
   async function toggleTimer(order: WorkOrder) {
+    setTimerError(null);
+    // Pausing needs a reason, which the dialog collects and posts.
+    if (order.timerStartedAt) { setPauseTarget(order); return; }
     setTimerBusyId(order.id);
     try {
-      const action = order.timerStartedAt ? "pause" : "resume";
-      const res = await api.post(`/work-orders/${order.id}/timer`, { action });
-      // Merge so any field the timer response omits is preserved.
-      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...res.data } : o)));
-    } catch {
-      // silent
+      const res = await api.post(`/work-orders/${order.id}/timer`, { action: "resume" });
+      applyTimer(order.id, res.data);
+    } catch (err: unknown) {
+      setTimerError((err as { response?: { data?: { error?: string } } })?.response?.data?.error ?? "Couldn't resume the timer. Try again.");
     } finally {
       setTimerBusyId(null);
     }
@@ -474,6 +475,7 @@ export default function WorkOrdersPage() {
               </button>
             ))}
           </div>
+          {!loading && <PrintListButton ids={sorted.map((o) => o.id)} />}
           <button onClick={() => setShowForm(true)} className="tu-btn-primary">
             + New
           </button>
@@ -672,6 +674,14 @@ export default function WorkOrdersPage() {
           Failed to load work orders.
         </div>
       )}
+      {timerError && <div className="tu-error-banner" role="alert">{timerError}</div>}
+      {pauseTarget && (
+        <PauseTimerDialog
+          order={pauseTarget}
+          onClose={() => setPauseTarget(null)}
+          onPaused={(r) => applyTimer(pauseTarget.id, r)}
+        />
+      )}
 
       {mode === "calendar" ? (
         <div className="tu-card" style={{ padding: 20 }}>
@@ -761,6 +771,7 @@ export default function WorkOrdersPage() {
                     className="tu-wo-title flex-1"
                     style={isRejected ? { color: "var(--tu-text-subtle)" } : undefined}
                   >
+                    <span className="tu-wo-ref" style={{ marginRight: 6 }}>{workOrderRef(order.number)}</span>
                     {order.title}
                   </Link>
                   <span className={`shrink-0 ${statusCfg.cls}`}>{statusCfg.label}</span>

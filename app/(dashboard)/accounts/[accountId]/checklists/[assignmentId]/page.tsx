@@ -245,7 +245,15 @@ export default function ChecklistFormPage() {
         answer: itemStates[item.id].answer,
         remarks: itemStates[item.id].remarks?.trim() || null,
       })));
-    const isDraft = completeCount < total;
+    // A round that has been submitted stays submitted. Draft-ness is derived
+    // from how much is filled in, which is right while the round is being done
+    // — but editing an already-submitted log with a section outstanding (the
+    // checklist template gained one after it was filed) would otherwise ask the
+    // API to reopen it, and the API refuses: a submitted round going back to
+    // draft is what made its answers, their authors and its lateness verdict
+    // rewritable. Mirrors `accountPMChecklistRoutes`: the client decides what to
+    // offer, the API decides what to allow.
+    const isDraft = periodLog && !periodLog.isDraft ? false : completeCount < total;
     const scheduledDate = selectedDate.toISOString().split("T")[0];
 
     try {
@@ -338,6 +346,15 @@ export default function ChecklistFormPage() {
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${freq.cls}`}>
           {freq.label}
         </span>
+        {/* A blank paper form for the period on screen — for a round walked
+            with a clipboard and keyed in here afterwards. */}
+        <Link
+          href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, checklist.frequency))}`}
+          target="_blank"
+          className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0"
+        >
+          Print form
+        </Link>
         {!isEditing && periodLog && !periodLog.isDraft && (
           <button
             onClick={() => setIsEditing(true)}

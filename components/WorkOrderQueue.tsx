@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
-import { awaitingClient, isOverdue } from "@/lib/workOrders";
+import { awaitingClient, isOverdue, workOrderRef } from "@/lib/workOrders";
 
 /**
  * The left rail of the split view: the queue you work down.
@@ -20,6 +20,7 @@ import { awaitingClient, isOverdue } from "@/lib/workOrders";
 
 export type QueueOrder = {
   id: string;
+  number: number;
   title: string;
   status: WorkOrderStatus;
   priority: WorkOrderPriority | null;
@@ -148,6 +149,7 @@ export default function WorkOrderQueue({
               </span>
 
               <span className="tu-queue-meta">
+                <span className="tu-wo-ref">{workOrderRef(o.number)}</span>
                 {showAccount && o.account?.name && <span className="tu-queue-account">{o.account.name}</span>}
                 {o.asset?.name && <span>{o.asset.name}</span>}
                 {o.priority && <span className={`tu-queue-pri tu-queue-pri-${o.priority.toLowerCase()}`}>{o.priority}</span>}

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
-import { isClosed } from "@/lib/workOrders";
+import { isClosed, workOrderRef } from "@/lib/workOrders";
 import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, type WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -43,6 +43,7 @@ type Asset = {
 
 type WorkOrder = {
   id: string;
+  number: number;
   title: string;
   // The union, not `string`: it is what the shared status predicates take, and
   // it makes adding a status a compile error here rather than a silent gap.
@@ -114,7 +115,7 @@ function WorkOrderRow({ wo }: { wo: WorkOrder }) {
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-medium text-[var(--tu-text-heading)] truncate">{wo.title}</p>
+          <p className="text-sm font-medium text-[var(--tu-text-heading)] truncate"><span className="tu-wo-ref" style={{ marginRight: 6 }}>{workOrderRef(wo.number)}</span>{wo.title}</p>
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${pr.cls}`}>{pr.label}</span>
         </div>
         <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
@@ -365,6 +366,15 @@ export default function AssetDetailPage() {
                 className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] transition-colors"
               >
                 + New Work Order
+              </Link>
+            )}
+            {writable && !asset.archivedAt && (
+              <Link
+                href={`/print/accounts/${accountId}/assets/labels?asset=${asset.id}`}
+                target="_blank"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-[var(--tu-border)] text-[var(--tu-text-subtle)] hover:bg-[var(--tu-bg-secondary)] transition-colors"
+              >
+                Print label
               </Link>
             )}
             {writable && (

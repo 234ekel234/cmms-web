@@ -195,6 +195,15 @@ export default function AssetsPage() {
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assets</h2>
         {writable && (
           <div className="flex items-center gap-2">
+            {/* QR tags for the kit in view — the location filter carries over,
+                so "label everything in Tower B" is pick the building, press this. */}
+            <Link
+              href={`/print/accounts/${accountId}/assets/labels${locationFilter ? `?location=${encodeURIComponent(locationFilter)}` : ""}`}
+              target="_blank"
+              className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
+            >
+              Print labels
+            </Link>
             <button
               onClick={() => setShowImport(true)}
               className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"

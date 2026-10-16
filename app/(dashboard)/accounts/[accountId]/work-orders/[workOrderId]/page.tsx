@@ -6,7 +6,7 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval, workOrderRef } from "@/lib/workOrders";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
@@ -19,6 +19,7 @@ type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 type WorkOrder = {
   id: string;
+  number: number;
   title: string;
   description: string | null;
   type: "INTERNAL" | "EXTERNAL";
@@ -57,6 +58,18 @@ type WorkOrder = {
   plan?: { id: string; title: string; frequency: string } | null;
   // Omitted by the API for CLIENT users — parts carry cost, which clients don't see yet.
   parts?: WorkOrderPart[];
+  // Every press of Pause, newest first, with the reason given. Omitted by the
+  // API for CLIENT users: it is how the time was spent, not the service.
+  pauses?: WorkOrderPause[];
+};
+
+type WorkOrderPause = {
+  id: string;
+  reason: string;
+  pausedByName: string;
+  pausedAt: string;
+  /** Null while this pause is still in force. */
+  resumedAt: string | null;
 };
 
 type ChecklistItem = {
@@ -106,6 +119,10 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }>
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function formatDateTime(iso: string) {
+  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function formatHM(minutes: number) {
@@ -197,6 +214,11 @@ export default function WorkOrderDetailPage() {
   // Man-hour time tracking
   const [nowTick, setNowTick] = useState(() => Date.now());
   const [timerBusy, setTimerBusy] = useState(false);
+  // Pausing asks why before it stops the clock; the API refuses a pause
+  // without a reason.
+  const [pausing, setPausing] = useState(false);
+  const [pauseReason, setPauseReason] = useState("");
+  const [timerError, setTimerError] = useState<string | null>(null);
   const [editingEst, setEditingEst] = useState(false);
   const [estHrs, setEstHrs] = useState("");
   const [estMins, setEstMins] = useState("");
@@ -209,15 +231,26 @@ export default function WorkOrderDetailPage() {
     return () => clearInterval(id);
   }, [timerRunning]);
 
-  async function toggleTimer() {
+  async function setTimer(action: "pause" | "resume", reason?: string) {
     if (!order) return;
     setTimerBusy(true);
+    setTimerError(null);
     try {
-      const action = order.timerStartedAt ? "pause" : "resume";
-      const res = await api.post(`/work-orders/${order.id}/timer`, { action });
+      const res = await api.post(`/work-orders/${order.id}/timer`, { action, reason });
       setOrder((prev) => prev ? { ...prev, status: res.data.status, timerStartedAt: res.data.timerStartedAt, actualSeconds: res.data.actualSeconds } : prev);
-    } catch {
-      // silent
+      setPausing(false);
+      setPauseReason("");
+      // The timer route answers with the order but not its pause history, so
+      // read that back quietly — fetchOrder would blank the page to a spinner.
+      // Outside the error path on purpose: the clock has already changed, and
+      // a failed re-read only means a stale list, not a failed pause.
+      api
+        .get(`/work-orders/${order.id}`)
+        .then((fresh) => setOrder((prev) => prev ? { ...prev, pauses: fresh.data.pauses } : prev))
+        .catch(() => {});
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      setTimerError(msg ?? "Couldn't update the timer. Try again.");
     } finally {
       setTimerBusy(false);
     }
@@ -710,6 +743,7 @@ export default function WorkOrderDetailPage() {
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex-1 min-w-0">
+            <p className="tu-wo-ref" style={{ fontSize: 12.5, margin: "0 0 2px" }}>{workOrderRef(order.number)}</p>
             <h1 className="text-xl font-bold text-[var(--tu-text-heading)]">{order.title}</h1>
             <div className="flex items-center gap-2 flex-wrap mt-1">
               {order.isSpecialProject && (
@@ -745,6 +779,15 @@ export default function WorkOrderDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Everyone who can read the order can print it; the sheet carries
+                no cost, so there is nothing role-specific to withhold. */}
+            <Link
+              href={`/print/work-orders/${order.id}`}
+              target="_blank"
+              className="text-xs text-[var(--tu-text-subtle)] border border-[var(--tu-border)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
+            >
+              Print
+            </Link>
             {canAdmin && !isTerminal && (
               <button
                 onClick={openEdit}
@@ -1064,15 +1107,67 @@ export default function WorkOrderDetailPage() {
 
               {/* Timer control (only while actively in progress) */}
               {canManage && order.status === "IN_PROGRESS" && (
-                <button
-                  onClick={toggleTimer}
-                  disabled={timerBusy}
-                  className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
-                    order.timerStartedAt ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]" : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
-                  }`}
-                >
-                  {timerBusy ? "…" : order.timerStartedAt ? "❚❚ Pause Timer" : "▶ Resume Timer"}
-                </button>
+                pausing ? (
+                  <div className="mt-3">
+                    <label htmlFor="pause-reason" className="tu-label">Why are you pausing?</label>
+                    <textarea
+                      id="pause-reason"
+                      className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-none"
+                      rows={2}
+                      maxLength={500}
+                      value={pauseReason}
+                      onChange={(e) => setPauseReason(e.target.value)}
+                      placeholder="Waiting for the spare seal to arrive."
+                      autoFocus
+                    />
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        className="tu-btn-primary tu-btn-sm"
+                        disabled={timerBusy || !pauseReason.trim()}
+                        onClick={() => setTimer("pause", pauseReason.trim())}
+                      >
+                        {timerBusy ? "Pausing…" : "Pause timer"}
+                      </button>
+                      <button
+                        type="button"
+                        className="tu-btn-secondary tu-btn-sm"
+                        onClick={() => { setPausing(false); setPauseReason(""); setTimerError(null); }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => (order.timerStartedAt ? setPausing(true) : setTimer("resume"))}
+                    disabled={timerBusy}
+                    className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
+                      order.timerStartedAt ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]" : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
+                    }`}
+                  >
+                    {timerBusy ? "…" : order.timerStartedAt ? "❚❚ Pause Timer" : "▶ Resume Timer"}
+                  </button>
+                )
+              )}
+              {timerError && <p className="text-xs text-[var(--tu-on-danger)] mt-2">{timerError}</p>}
+
+              {/* Pause history: each stop of the clock and the reason given. */}
+              {order.pauses && order.pauses.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[11px] font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-1.5">Pauses</p>
+                  <ul className="space-y-2">
+                    {order.pauses.map((p) => (
+                      <li key={p.id} className="text-xs">
+                        <p className="text-[var(--tu-text-body)]">{p.reason}</p>
+                        <p className="text-[var(--tu-text-subtle)] mt-0.5">
+                          {p.pausedByName} · {formatDateTime(p.pausedAt)}
+                          {p.resumedAt ? ` – resumed ${formatDateTime(p.resumedAt)}` : " · still paused"}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
           );

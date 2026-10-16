@@ -76,6 +76,7 @@ export function maxLeadDays(frequency: Frequency): number {
 
 export type PlanOccurrence = {
   id: string;
+  number: number;
   title: string;
   status: string;
   dueDate: string | null;
