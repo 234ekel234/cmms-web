@@ -1,6 +1,7 @@
 "use client";
 
 import { API_BASE_URL } from "@/lib/api";
+import { ACCEPT } from "@/lib/attachments";
 import EmptyState from "@/components/EmptyState";
 
 /**
@@ -44,8 +45,6 @@ type Props = {
   posting: boolean;
   error?: string;
 };
-
-const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
 
 function contentUrl(a: ProgressAttachment) {
   return `${API_BASE_URL}/attachments/${a.id}/content?token=${encodeURIComponent(a.viewToken)}`;
@@ -194,7 +193,7 @@ export default function ProgressThread({
             id="progress-files"
           />
           <label htmlFor="progress-files" className="tu-btn-secondary tu-btn-sm" style={{ cursor: "pointer", whiteSpace: "nowrap" }}>
-            + Photo
+            + Attach
           </label>
           <button
             onClick={onPost}

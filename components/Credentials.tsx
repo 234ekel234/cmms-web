@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import {
-  ACCEPT,
+  ACCEPT_SCANS,
   MAX_MB,
   contentUrl,
   credentialStatus,
@@ -214,7 +214,7 @@ export default function Credentials({
             </label>
             <label>
               <span className="tu-label">Scan or photo</span>
-              <input ref={fileRef} type="file" accept={ACCEPT} className="tu-input" style={{ padding: 6 }} />
+              <input ref={fileRef} type="file" accept={ACCEPT_SCANS} className="tu-input" style={{ padding: 6 }} />
             </label>
           </div>
           <p style={{ fontSize: 11.5, color: "var(--tu-text-subtle)", marginTop: 8 }}>

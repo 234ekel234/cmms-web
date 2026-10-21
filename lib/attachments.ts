@@ -9,8 +9,27 @@ import { API_BASE_URL } from "@/lib/api";
  * mirror backend/helpers/storage.js; when that changes, this changes with it.
  */
 
-/** Mirrors ALLOWED_MIME in backend/helpers/storage.js. */
-export const ACCEPT = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
+/**
+ * Mirrors ALLOWED_MIME in backend/helpers/storage.js. Extensions ride alongside
+ * the types because a browser that does not know a file's type (an .xlsx on a
+ * machine without Office, say) would otherwise grey it out in the picker; the
+ * API decides from the extension in exactly that case.
+ */
+export const ACCEPT = [
+  "image/jpeg", "image/png", "image/webp", "image/heic", "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "text/csv", "text/plain",
+  ".jpg", ".jpeg", ".png", ".webp", ".heic", ".pdf", ".docx", ".xlsx", ".pptx", ".csv", ".txt",
+].join(",");
+
+/**
+ * A credential is a scanned certificate or licence, so its picker offers scans
+ * only. The API would take a document too; this keeps the picker to what the
+ * form asks for.
+ */
+export const ACCEPT_SCANS = "image/jpeg,image/png,image/webp,image/heic,application/pdf";
 
 /** Mirrors MAX_BYTES in backend/helpers/storage.js. */
 export const MAX_MB = 15;
