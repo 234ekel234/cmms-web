@@ -2,14 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
-import { awaitingClient, isOverdue, workOrderRef } from "@/lib/workOrders";
+import { isOverdue, stageNote, workOrderRef, type StageShape } from "@/lib/workOrders";
 
 /**
  * The left rail of the split view: the queue you work down.
  *
  * Compact by necessity — the wide table has nine columns and none of them
  * survive 380px — so this carries only what you scan for when choosing what to
- * open next: what it is, where, how urgent, and whether it is late. Everything
+ * open next: what stage it is at and whose move it is, what it is, where, how
+ * urgent, and whether it is late. Everything
  * else is one selection away in the pane beside it, and the full table is still
  * a view of its own for the times you genuinely want to read down a column.
  *
@@ -18,7 +19,7 @@ import { awaitingClient, isOverdue, workOrderRef } from "@/lib/workOrders";
  * input is left alone — j and k are letters before they are shortcuts.
  */
 
-export type QueueOrder = {
+export type QueueOrder = StageShape & {
   id: string;
   number: number;
   title: string;
@@ -43,6 +44,7 @@ export default function WorkOrderQueue({
   loading,
   changedId,
   showAccount = true,
+  isClient = false,
 }: {
   orders: QueueOrder[];
   selectedId: string | null;
@@ -52,6 +54,8 @@ export default function WorkOrderQueue({
   changedId?: string | null;
   /** Hidden on the account-scoped list, where every row says the same thing. */
   showAccount?: boolean;
+  /** Words the stage line from the client's side — see stageNote. */
+  isClient?: boolean;
 }) {
   const listRef = useRef<HTMLUListElement>(null);
 
@@ -127,7 +131,8 @@ export default function WorkOrderQueue({
     <ul className="tu-queue-list" ref={listRef} aria-label="Work order queue">
       {orders.map((o) => {
         const late = isOverdue(o);
-        const waiting = awaitingClient(o);
+        const stage = WORK_ORDER_STATUS[o.status];
+        const note = stageNote(o, isClient);
         const selected = o.id === selectedId;
         return (
           <li key={o.id}>
@@ -139,13 +144,13 @@ export default function WorkOrderQueue({
               onClick={() => onSelect(o.id)}
             >
               <span className="tu-queue-top">
-                <span
-                  className="tu-queue-dot"
-                  style={{ background: WORK_ORDER_STATUS[o.status].color }}
-                  aria-hidden="true"
-                />
+                <span className={stage.badge}>{stage.label}</span>
                 <span className="tu-queue-title">{o.title}</span>
                 {o.isSpecialProject && <span className="tu-queue-star" title="Special project" aria-label="Special project">★</span>}
+              </span>
+
+              <span className={`tu-queue-note${note.attention ? " tu-attention" : ""}`} title={note.text}>
+                {note.text}
               </span>
 
               <span className="tu-queue-meta">
@@ -158,7 +163,6 @@ export default function WorkOrderQueue({
                     {late ? "Late " : "Due "}{shortDate(o.dueDate)}
                   </span>
                 )}
-                {waiting && <span className="tu-queue-waiting">Awaiting sign-off</span>}
               </span>
 
               <span className="tu-queue-meta tu-queue-who">

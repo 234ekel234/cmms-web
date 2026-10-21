@@ -42,16 +42,24 @@ export type StatusMeta = {
 
 // ── Work order status ────────────────────────────────────
 // Order matches the pipeline so callers can iterate for legends/segment bars.
+//
+// The pill is a `.tu-stage`: a dot and a light tint in the status's own chart
+// colour, so a stage is the same colour on a pill, a queue row and a chart. It
+// used to borrow the generic badge tones, which gave Requested and In Progress
+// the same blue and Completed and Approved the same green — two stages that
+// look alike are worse than no colour. Text stays in the body colour: several
+// status hues are under 3:1 as text in light mode, and the palette is
+// validator-verified rather than something to darken by eye.
 export const WORK_ORDER_STATUS: Record<WorkOrderStatus, StatusMeta> = {
-  REQUESTED: { label: "Requested", badge: "tu-badge tu-badge-brand", color: "var(--tu-status-requested)" },
-  PENDING: { label: "Accepted", badge: "tu-badge tu-badge-info", color: "var(--tu-status-pending)" },
-  IN_PROGRESS: { label: "In Progress", badge: "tu-badge tu-badge-brand", color: "var(--tu-status-in-progress)" },
-  ON_HOLD: { label: "On Hold", badge: "tu-badge tu-badge-neutral", color: "var(--tu-status-on-hold)" },
-  COMPLETED: { label: "Completed", badge: "tu-badge tu-badge-success", color: "var(--tu-status-completed)" },
+  REQUESTED: { label: "Requested", badge: "tu-badge tu-stage tu-stage-requested", color: "var(--tu-status-requested)" },
+  PENDING: { label: "Accepted", badge: "tu-badge tu-stage tu-stage-pending", color: "var(--tu-status-pending)" },
+  IN_PROGRESS: { label: "In Progress", badge: "tu-badge tu-stage tu-stage-in-progress", color: "var(--tu-status-in-progress)" },
+  ON_HOLD: { label: "On Hold", badge: "tu-badge tu-stage tu-stage-on-hold", color: "var(--tu-status-on-hold)" },
+  COMPLETED: { label: "Completed", badge: "tu-badge tu-stage tu-stage-completed", color: "var(--tu-status-completed)" },
   // "Approved" rather than "Signed off": the client sees this word on their own
   // button, and the two should match.
-  APPROVED: { label: "Approved", badge: "tu-badge tu-badge-success", color: "var(--tu-status-approved)" },
-  REJECTED: { label: "Rejected", badge: "tu-badge tu-badge-danger", color: "var(--tu-status-rejected)" },
+  APPROVED: { label: "Approved", badge: "tu-badge tu-stage tu-stage-approved", color: "var(--tu-status-approved)" },
+  REJECTED: { label: "Rejected", badge: "tu-badge tu-stage tu-stage-rejected", color: "var(--tu-status-rejected)" },
 };
 
 /**

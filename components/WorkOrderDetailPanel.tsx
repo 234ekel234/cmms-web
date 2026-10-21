@@ -11,10 +11,11 @@ import {
   isOverdue,
   isSettled,
   needsClientApproval,
-  signOffCue,
+  stageNote,
   transitionLabel,
   transitionTone,
   workOrderRef,
+  type StageFacts,
 } from "@/lib/workOrders";
 
 /**
@@ -35,7 +36,7 @@ import {
  * a queue, and the page is one click away.
  */
 
-export type PanelOrder = {
+export type PanelOrder = StageFacts & {
   id: string;
   number: number;
   title: string;
@@ -259,7 +260,7 @@ export default function WorkOrderDetailPanel({
 
   const settled = isSettled(order);
   const overdue = isOverdue(order);
-  const cue = signOffCue(order, isClient);
+  const note = stageNote(order, isClient);
   const nexts = canActOnStatus && !settled ? STAFF_TRANSITIONS[order.status] : [];
   const steps = order.checklistItems ?? [];
   const done = steps.filter((s) => s.isDone).length;
@@ -301,8 +302,10 @@ export default function WorkOrderDetailPanel({
               {WORK_ORDER_STATUS[order.status].label}
             </span>
             {overdue && <span className="tu-badge tu-badge-danger">Overdue</span>}
-            {cue && <span className="tu-badge tu-badge-warning">{cue}</span>}
           </div>
+          {/* Where it stands and whose move it is. This replaced a sign-off
+              badge, which said the same thing for one stage out of seven. */}
+          <p className={`tu-stage-note${note.attention ? " tu-attention" : ""}`}>{note.text}</p>
           {order.status !== "REJECTED" && (
             <StatusPipeline
               status={order.status}

@@ -94,6 +94,80 @@ export function signOffCue(
 }
 
 /**
+ * What the API adds to every work order it sends (`withStageFacts` in
+ * backend/routes/workOrderRoutes.js) so a row can say where it stands. Optional
+ * so a row from an older response still type-checks; `stageNote` copes.
+ */
+export type StageFacts = {
+  /** The pause the clock is stopped on; always null for a client. */
+  openPause?: { reason: string; pausedAt?: string; pausedByName?: string } | null;
+  /** When an unanswered sign-off closes itself — the API alone knows the grace period. */
+  autoApproveAt?: string | null;
+  /** Null on approved work means the nightly sweep closed it, not the client. */
+  approvedById?: string | null;
+  approvedByName?: string | null;
+};
+
+/** What `stageNote` reads. Every field beyond status is optional so any list's row will do. */
+export type StageShape = ApprovalShape & StageFacts & {
+  status: WorkOrderStatus;
+  assignments?: { employee: { name: string } }[];
+  timerStartedAt?: string | null;
+};
+
+export type StageNote = {
+  text: string;
+  /** Somebody has to act and nothing says they are: unassigned, paused, parked with the client. */
+  attention: boolean;
+};
+
+const DAY_MS = 86_400_000;
+
+/**
+ * One line saying where an order stands and whose move it is — the thing a
+ * status name alone does not say. "In Progress" covers a technician on the job
+ * right now and a job parked for three days on a missing part; "Completed"
+ * covers work that is finished for good and work waiting on a client.
+ *
+ * A client reads it from the other side of the counter: their sign-off is
+ * "yours", and they are never told about the clock — pause reasons are
+ * withheld from them by the API in any case.
+ */
+export function stageNote(wo: StageShape, isClient: boolean, now = Date.now()): StageNote {
+  const note = (text: string, attention = false): StageNote => ({ text, attention });
+  switch (wo.status) {
+    case "REQUESTED":
+      if (isClient) return note("Waiting for the team to accept it");
+      return note(wo.isSpecialProject ? "Waiting for a manager to accept it" : "Waiting to be accepted", true);
+    case "PENDING":
+      if (isClient) return note("Accepted — work has not started yet");
+      return (wo.assignments?.length ?? 0) > 0
+        ? note("Ready to start")
+        : note("Accepted — nobody assigned yet", true);
+    case "IN_PROGRESS":
+      if (isClient) return note("Work under way");
+      if (wo.timerStartedAt) return note("Being worked on — clock running");
+      if (wo.openPause) return note(`Paused — ${wo.openPause.reason}`, true);
+      return note("Started — clock not running", true);
+    case "ON_HOLD":
+      return note("On hold — resume it to continue", !isClient);
+    case "COMPLETED": {
+      if (!needsClientApproval(wo)) return note("Done");
+      const who = isClient ? "Waiting for your sign-off" : "Waiting for client sign-off";
+      if (!wo.autoApproveAt) return note(who, true);
+      const days = Math.ceil((new Date(wo.autoApproveAt).getTime() - now) / DAY_MS);
+      const when = days <= 0 ? "at the next daily run" : days === 1 ? "in 1 day" : `in ${days} days`;
+      return note(`${who} — closes automatically ${when}`, true);
+    }
+    case "APPROVED":
+      if (!wo.approvedById) return note("Closed automatically — no client response");
+      return note(wo.approvedByName ? `Signed off by ${wo.approvedByName}` : "Signed off by the client");
+    case "REJECTED":
+      return note("Rejected — closed without work");
+  }
+}
+
+/**
  * Past its due date and still outstanding.
  *
  * Built on `isClosed`, not `isSettled`: approved work is finished and must not

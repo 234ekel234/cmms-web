@@ -684,6 +684,32 @@ code, kbd, pre, .tu-mono {
      were breaking onto a second line in narrow table columns. */
   white-space: nowrap;
 }
+/* A work-order stage: see WORK_ORDER_STATUS in lib/statuses.ts. The colour is
+   the status's chart token, carried by the dot and a tint; the text is body
+   colour so it reads at any hue. color-mix against transparent keeps the tint
+   correct on dark surfaces without a second set of values. */
+.tu-stage {
+  gap: 6px;
+  background: color-mix(in srgb, var(--tu-stage-c) 14%, transparent);
+  border-color: color-mix(in srgb, var(--tu-stage-c) 40%, transparent);
+  color: var(--tu-text-heading);
+  font-weight: 600;
+}
+.tu-stage::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--tu-stage-c);
+  flex-shrink: 0;
+}
+.tu-stage-requested   { --tu-stage-c: var(--tu-status-requested); }
+.tu-stage-pending     { --tu-stage-c: var(--tu-status-pending); }
+.tu-stage-in-progress { --tu-stage-c: var(--tu-status-in-progress); }
+.tu-stage-on-hold     { --tu-stage-c: var(--tu-status-on-hold); }
+.tu-stage-completed   { --tu-stage-c: var(--tu-status-completed); }
+.tu-stage-approved    { --tu-stage-c: var(--tu-status-approved); }
+.tu-stage-rejected    { --tu-stage-c: var(--tu-status-rejected); }
 .tu-badge-danger {
   background: #FEF0F2;
   border-color: #FECDD3;
@@ -2828,9 +2854,21 @@ figure:hover .tu-attachment-remove,
 }
 
 .tu-queue-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
-/* Status as a dot rather than a pill: at this width a pill would take a third
-   of the row to say what a colour says, and the pane states it in words. */
-.tu-queue-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+/* The stage is named in every row. It used to be a bare dot, on the theory that
+   the pane states it in words — but choosing what to open next means reading
+   the stage of rows that are *not* open, and seven colours is too many to
+   decode at 7px. The pill is compact so the title keeps the room. */
+.tu-queue-top .tu-stage { flex-shrink: 0; padding: 0 7px; font-size: 10.5px; line-height: 18px; }
+.tu-queue-note {
+  font-size: 11.5px;
+  color: var(--tu-text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tu-queue-note.tu-attention, .tu-stage-note.tu-attention { color: var(--tu-on-warning); font-weight: 600; }
+/* The same line in the detail pane and on the full page, where it has room to wrap. */
+.tu-stage-note { margin-top: 6px; font-size: 13px; color: var(--tu-text-body); }
 .tu-queue-title {
   font-size: 13.5px;
   font-weight: 600;
@@ -2848,7 +2886,6 @@ figure:hover .tu-attachment-remove,
   flex-wrap: wrap;
   align-items: center;
   gap: 4px 9px;
-  padding-left: 14px;
   font-size: 11.5px;
   color: var(--tu-text-subtle);
   min-width: 0;
@@ -2859,7 +2896,6 @@ figure:hover .tu-attachment-remove,
 .tu-wo-ref { font-variant-numeric: tabular-nums; font-weight: 500; color: var(--tu-text-subtle); white-space: nowrap; }
 .tu-queue-who { font-size: 11px; }
 .tu-queue-late { color: var(--tu-danger); font-weight: 600; }
-.tu-queue-waiting { color: var(--tu-on-warning); font-weight: 600; }
 .tu-queue-pri { font-weight: 700; letter-spacing: 0.04em; font-size: 10.5px; }
 .tu-queue-pri-critical { color: var(--tu-priority-critical); }
 .tu-queue-pri-high     { color: var(--tu-priority-high); }

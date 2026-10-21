@@ -14,8 +14,9 @@ import WorkOrderQueue from "@/components/WorkOrderQueue";
 import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
 import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
-import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
+import { WORK_ORDER_STATUS } from "@/lib/statuses";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -26,7 +27,8 @@ type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 // not be asked. They are their own axis now — see WorkOrderFlag in
 // lib/workOrders.ts — and the status axis holds nothing but statuses.
 
-type WorkOrder = {
+// StageFacts: why the clock stopped and when sign-off closes itself — the queue's stage line.
+type WorkOrder = StageFacts & {
   id: string;
   number: number;
   title: string;
@@ -50,19 +52,6 @@ type WorkOrder = {
 };
 
 type AccountEmployee = { id: string; name: string; position: string | null };
-
-// Pills reuse the theme-aware .tu-badge-* variants so they track dark mode.
-// Labels stay local: this workspace calls PENDING "Accepted" to match the
-// pipeline wording, which differs from the global label in lib/statuses.ts.
-const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
-  REQUESTED:   { label: "Requested",   cls: "tu-badge tu-badge-brand" },
-  PENDING:     { label: "Accepted",    cls: "tu-badge tu-badge-brand" },
-  IN_PROGRESS: { label: "In Progress", cls: "tu-badge tu-badge-warning" },
-  ON_HOLD:     { label: "On Hold",     cls: "tu-badge tu-badge-neutral" },
-  COMPLETED:   { label: "Completed",   cls: "tu-badge tu-badge-success" },
-  APPROVED:    { label: "Approved",    cls: "tu-badge tu-badge-success" },
-  REJECTED:    { label: "Rejected",    cls: "tu-badge tu-badge-danger" },
-};
 
 const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }> = {
   LOW:      { label: "Low",      cls: "tu-badge tu-badge-neutral" },
@@ -704,6 +693,7 @@ export default function WorkOrdersPage() {
                 // Every row belongs to this account; saying so on each would be
                 // the same six words repeated down the rail.
                 showAccount={false}
+                isClient={isClient}
               />
             </div>
             {openOrder ? (
@@ -757,7 +747,7 @@ export default function WorkOrdersPage() {
           {sorted.map((order) => {
             const overdue = isOverdue(order);
             const priorityCfg = PRIORITY_CONFIG[order.priority];
-            const statusCfg = STATUS_CONFIG[order.status];
+            const statusCfg = WORK_ORDER_STATUS[order.status];
             const isRejected = order.status === "REJECTED";
             const signOff = signOffCue(order, isClient);
             const nextStatuses = STAFF_TRANSITIONS[order.status];
@@ -774,7 +764,7 @@ export default function WorkOrdersPage() {
                     <span className="tu-wo-ref" style={{ marginRight: 6 }}>{workOrderRef(order.number)}</span>
                     {order.title}
                   </Link>
-                  <span className={`shrink-0 ${statusCfg.cls}`}>{statusCfg.label}</span>
+                  <span className={`shrink-0 ${statusCfg.badge}`}>{statusCfg.label}</span>
                 </div>
 
                 {/* Meta row */}

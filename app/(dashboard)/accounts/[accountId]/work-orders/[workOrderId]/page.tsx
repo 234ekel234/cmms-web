@@ -6,7 +6,8 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { WORK_ORDER_STATUS } from "@/lib/statuses";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
@@ -17,7 +18,8 @@ const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-type WorkOrder = {
+// StageFacts: why the clock stopped and when sign-off closes itself — the stage line.
+type WorkOrder = StageFacts & {
   id: string;
   number: number;
   title: string;
@@ -98,16 +100,6 @@ type CatalogPart = {
   unit: string | null;
   unitCost: number | null;
   quantityOnHand: number;
-};
-
-const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; cls: string }> = {
-  REQUESTED:   { label: "Requested",   cls: "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" },
-  PENDING:     { label: "Accepted",    cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
-  IN_PROGRESS: { label: "In Progress", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]" },
-  ON_HOLD:     { label: "On Hold",     cls: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]" },
-  COMPLETED:   { label: "Completed",   cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-  APPROVED:    { label: "Approved",    cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]" },
-  REJECTED:    { label: "Rejected",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]" },
 };
 
 const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; cls: string }> = {
@@ -693,7 +685,8 @@ export default function WorkOrderDetailPage() {
     );
   }
 
-  const cfg = STATUS_CONFIG[order.status];
+  const cfg = WORK_ORDER_STATUS[order.status];
+  const note = stageNote(order, isClient);
   const priorityCfg = PRIORITY_CONFIG[order.priority];
   const nextStatuses = STAFF_TRANSITIONS[order.status];
   // "Nothing more will happen to this." Work awaiting a client is *not*
@@ -796,7 +789,7 @@ export default function WorkOrderDetailPage() {
                 Edit
               </button>
             )}
-            <span className={`rounded-full px-3 py-1 text-sm font-semibold ${cfg.cls}`}>
+            <span className={cfg.badge} style={{ fontSize: 13.5, padding: "3px 11px" }}>
               {cfg.label}
             </span>
           </div>
@@ -809,16 +802,10 @@ export default function WorkOrderDetailPage() {
           </div>
         ) : (
           <>
-            {order.status === "ON_HOLD" && (
-              <div className="flex items-center justify-center gap-2 bg-[var(--tu-soft-neutral)] border border-[var(--tu-bd-neutral)] rounded-lg p-2.5 my-2.5 text-[13px] font-semibold text-[var(--tu-on-neutral)]">
-                <span className="flex gap-[3px]" aria-hidden="true">
-                  <span className="w-[3px] h-3.5 rounded-sm bg-[var(--tu-status-on-hold)]" />
-                  <span className="w-[3px] h-3.5 rounded-sm bg-[var(--tu-status-on-hold)]" />
-                </span>
-                On hold — work is paused. Resume it to continue.
-              </div>
-            )}
             <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+            {/* Where it stands and whose move it is — the same line as the queue.
+                It absorbed the old On Hold banner, which said this for one stage. */}
+            <p className={`tu-stage-note${note.attention ? " tu-attention" : ""}`} style={{ textAlign: "center" }}>{note.text}</p>
           </>
         )}
 

@@ -19,11 +19,12 @@ import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/
 // administration question, and reading it under its own name next to the
 // per-job one is how the two got conflated in the first place.
 import { canManage as canAdministerAccount } from "@/lib/rbac";
-import { awaitingClient, isOverdue, matchesFlag, passesFilters, triageRank, type WorkOrderFlag, workOrderRef, matchesWorkOrderRef } from "@/lib/workOrders";
+import { awaitingClient, isOverdue, matchesFlag, passesFilters, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef, matchesWorkOrderRef } from "@/lib/workOrders";
 
 type Account = { id: string; name: string };
 
-type WorkOrder = {
+// StageFacts: why the clock stopped and when sign-off closes itself — the queue's stage line.
+type WorkOrder = StageFacts & {
   id: string;
   number: number;
   title: string;
@@ -700,6 +701,7 @@ export default function WorkOrdersPage() {
                 onSelect={setOpenId}
                 loading={loading}
                 changedId={flashId}
+                isClient={isClient}
               />
             </div>
 
