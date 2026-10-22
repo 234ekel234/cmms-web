@@ -67,6 +67,8 @@ export type PmExport = {
   })[];
   schedule: (Base & {
     roundId: string | null;
+    /** "PM-2026-00142"; null for a period nobody started. */
+    controlNo: string | null;
     period: string;
     periodEnd: string;
     status: PeriodStatus;
@@ -96,6 +98,7 @@ export type PmExport = {
   })[];
   answers: (Base & {
     roundId: string;
+    controlNo: string | null;
     period: string;
     periodStatus: PeriodStatus;
     section: string | null;
@@ -254,6 +257,7 @@ function scheduleSheet(wb: Workbook, data: PmExport) {
     ...BASE_COLS,
     { header: "Period start", width: 12, fmt: FMT.date },
     { header: "Period end", width: 12, fmt: FMT.date },
+    { header: "Control no.", width: 15 },
     { header: "Status", width: 20 },
     { header: "Submitted at", width: 17, fmt: FMT.dateTime },
     { header: "Days late", width: 9, fmt: FMT.int },
@@ -265,7 +269,7 @@ function scheduleSheet(wb: Workbook, data: PmExport) {
     { header: "Round ID", width: 14 },
     ...ID_COLS,
   ], data.schedule.map((r) => [
-    ...baseCells(r), day(r.period), day(r.periodEnd), PERIOD_STATUS_LABEL[r.status],
+    ...baseCells(r), day(r.period), day(r.periodEnd), r.controlNo, PERIOD_STATUS_LABEL[r.status],
     local(r.submittedAt), r.daysLate, r.performedBy, r.itemsAnswered, r.itemsTotal, r.findings, r.findingItems,
     r.roundId, r.assignmentId,
   ]));
@@ -302,6 +306,7 @@ function answersSheet(wb: Workbook, data: PmExport) {
   addTable(ws, "Answers", 1, [
     ...BASE_COLS,
     { header: "Period start", width: 12, fmt: FMT.date },
+    { header: "Control no.", width: 15 },
     { header: "Round status", width: 20 },
     { header: "Section", width: 22 },
     { header: "#", width: 5, fmt: FMT.int },
@@ -315,7 +320,7 @@ function answersSheet(wb: Workbook, data: PmExport) {
     { header: "Item ID", width: 14 },
     ...ID_COLS,
   ], data.answers.map((r) => [
-    ...baseCells(r), day(r.period), PERIOD_STATUS_LABEL[r.periodStatus], r.section, r.itemNo, r.item,
+    ...baseCells(r), day(r.period), r.controlNo, PERIOD_STATUS_LABEL[r.periodStatus], r.section, r.itemNo, r.item,
     r.answer, RESULT_LABEL[r.result], r.remarks, local(r.answeredAt),
     ...(withAuthor ? [r.answeredBy ?? null] : []),
     r.roundId, r.itemId, r.assignmentId,

@@ -127,6 +127,27 @@
 
 .ps-lines div { border-bottom: 1px solid #999; height: 22px; }
 
+/* PM checklist: the Blank / Answered switch, attribution column, and the mark
+   on a draft printed before it was submitted. */
+.ps-mode { display: inline-flex; gap: 14px; }
+.ps-by { font-size: 8.5pt; }
+.ps-draft { position: relative; }
+.ps-watermark {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 110pt;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: rgba(0, 0, 0, 0.07);
+  transform: rotate(-30deg);
+  pointer-events: none;
+  z-index: 0;
+}
+.ps-draft-note { margin: -4px 0 8px; font-size: 9pt; font-weight: 700; }
+
 .ps-signs { display: grid; gap: 14px; margin-top: 16px; break-inside: avoid; }
 .ps-signs.ps-cols-2 { grid-template-columns: repeat(2, 1fr); }
 .ps-signs.ps-cols-3 { grid-template-columns: repeat(3, 1fr); }

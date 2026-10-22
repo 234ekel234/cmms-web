@@ -6,6 +6,8 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
+import { useConfirm } from "@/components/ConfirmDialog";
+import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
 
 type PMItem = { id?: string; label: string };
 type PMSection = { id?: string; title: string; answerOptions: string[]; items: PMItem[] };
@@ -39,7 +41,10 @@ export default function EditChecklistPage() {
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
+  // Any edit since load or the last save. Leaving asks first while it holds.
+  const [dirty, setDirty] = useState(false);
+  const confirm = useConfirm();
+  useUnsavedChanges(dirty, "Your changes to this template since the last save will be lost.");
 
   useEffect(() => { fetchChecklist(); }, [id]);
 
@@ -56,6 +61,7 @@ export default function EditChecklistPage() {
           items: (s.items ?? []).map((it) => ({ ...it })),
         }))
       );
+      setDirty(false);
     } catch {
       setError("Failed to load checklist.");
     } finally {
@@ -65,26 +71,41 @@ export default function EditChecklistPage() {
 
   // --- Section mutations ---
   const addSection = useCallback(() => {
+    setDirty(true);
     setSections((prev) => [
       ...prev,
       { _key: uid(), title: "", answerOptions: [...DEFAULT_OPTIONS], items: [] },
     ]);
   }, []);
 
-  const removeSection = useCallback((key: string) => {
+  // Removing asks first once there is something in it to lose — a titled
+  // section or a typed question. An empty row added by mistake just goes.
+  async function removeSection(key: string) {
+    const sec = sections.find((s) => s._key === key);
+    if (!sec) return;
+    const filled = sec.items.filter((it) => it.label.trim()).length;
+    if ((sec.title.trim() || filled > 0) && !(await confirm({
+      title: "Remove this section?",
+      message: `“${sec.title.trim() || "Untitled section"}”${filled ? ` and its ${filled} question${filled === 1 ? "" : "s"}` : ""} will be removed when you save. A question with answers on file can't be removed — the save will say so.`,
+      confirmLabel: "Remove",
+    }))) return;
+    setDirty(true);
     setSections((prev) => prev.filter((s) => s._key !== key));
-  }, []);
+  }
 
   const updateSection = useCallback((key: string, field: "title", value: string) => {
+    setDirty(true);
     setSections((prev) => prev.map((s) => s._key === key ? { ...s, [field]: value } : s));
   }, []);
 
   const updateAnswerOptions = useCallback((key: string, raw: string) => {
+    setDirty(true);
     const opts = raw.split(",").map((o) => o.trim()).filter(Boolean);
     setSections((prev) => prev.map((s) => s._key === key ? { ...s, answerOptions: opts } : s));
   }, []);
 
   const addItem = useCallback((sectionKey: string) => {
+    setDirty(true);
     setSections((prev) =>
       prev.map((s) =>
         s._key === sectionKey ? { ...s, items: [...s.items, { label: "" }] } : s
@@ -92,15 +113,23 @@ export default function EditChecklistPage() {
     );
   }, []);
 
-  const removeItem = useCallback((sectionKey: string, idx: number) => {
+  async function removeItem(sectionKey: string, idx: number) {
+    const label = sections.find((s) => s._key === sectionKey)?.items[idx]?.label.trim();
+    if (label && !(await confirm({
+      title: "Remove this question?",
+      message: `“${label}” will be removed when you save. If it has answers on file, the save will refuse.`,
+      confirmLabel: "Remove",
+    }))) return;
+    setDirty(true);
     setSections((prev) =>
       prev.map((s) =>
         s._key === sectionKey ? { ...s, items: s.items.filter((_, i) => i !== idx) } : s
       )
     );
-  }, []);
+  }
 
   const updateItem = useCallback((sectionKey: string, idx: number, label: string) => {
+    setDirty(true);
     setSections((prev) =>
       prev.map((s) =>
         s._key === sectionKey
@@ -115,17 +144,47 @@ export default function EditChecklistPage() {
     const emptySection = sections.find((s) => !s.title.trim());
     if (emptySection) { setError("All sections must have a title."); return; }
 
-    setSaving(true); setError(null);
+    setError(null);
+    // A template in use changes the form at every site using it, and rewording
+    // a question rewords it on rounds already filed (answers point at the
+    // question, not a copy). Say so before it happens.
     try {
-      await api.put(`/pm-checklists/${id}`, {
+      const { data: usage } = await api.get(`/pm-checklists/${id}/usage`);
+      if (usage.sites > 0 && !(await confirm({
+        title: "Save changes to a template in use?",
+        message: `It is assigned at ${usage.sites === 1 ? "1 site" : `${usage.sites} sites`}, and changes apply to their next rounds.` +
+          (usage.rounds > 0 ? ` Reworded questions also read the new way on the ${usage.rounds} round${usage.rounds === 1 ? "" : "s"} already filed.` : ""),
+        confirmLabel: "Save changes",
+        destructive: false,
+      }))) return;
+    } catch {
+      // The warning is a courtesy; the save itself is still checked by the API.
+    }
+
+    setSaving(true);
+    try {
+      // Ids go back with each section and question, so the API updates them in
+      // place — that is what keeps filed answers attached to their questions.
+      const res = await api.put(`/pm-checklists/${id}`, {
         name: name.trim(),
         frequency,
         sections: sections.map((s) => ({
+          id: s.id,
           title: s.title.trim(),
           answerOptions: s.answerOptions.length ? s.answerOptions : DEFAULT_OPTIONS,
-          items: s.items.filter((it) => it.label.trim()).map((it) => ({ label: it.label.trim() })),
+          items: s.items.filter((it) => it.label.trim()).map((it) => ({ id: it.id, label: it.label.trim() })),
         })),
       });
+      // Re-read the saved ids: new sections and questions only have one now,
+      // and the next save must send it or it would create them a second time.
+      setSections(
+        (res.data.sections ?? []).map((s: PMSection) => ({
+          ...s,
+          _key: uid(),
+          items: (s.items ?? []).map((it) => ({ ...it })),
+        }))
+      );
+      setDirty(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
@@ -137,6 +196,10 @@ export default function EditChecklistPage() {
   }
 
   async function handleDelete() {
+    if (!(await confirm({
+      title: "Delete this template?",
+      message: `“${name}” and all its sections and questions will be permanently deleted. A template assigned at any site can't be deleted — the API will say so.`,
+    }))) return;
     setDeleting(true);
     try {
       await api.delete(`/pm-checklists/${id}`);
@@ -145,7 +208,6 @@ export default function EditChecklistPage() {
       const e = err as { response?: { data?: { error?: string } } };
       setError(e?.response?.data?.error ?? "Failed to delete.");
       setDeleting(false);
-      setConfirmDelete(false);
     }
   }
 
@@ -310,7 +372,8 @@ export default function EditChecklistPage() {
           {saved && <p className="text-sm text-[var(--tu-on-success)] font-semibold flex-1">Saved successfully.</p>}
           {!error && !saved && <span className="flex-1" />}
           <button
-            onClick={() => setConfirmDelete(true)}
+            onClick={handleDelete}
+            disabled={deleting}
             className="text-sm text-[var(--tu-on-danger)] hover:text-[var(--tu-on-danger)] font-semibold transition-colors cursor-pointer"
           >
             Delete template
@@ -325,32 +388,6 @@ export default function EditChecklistPage() {
         </div>
       )}
 
-      {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-[var(--tu-bg-surface)] rounded-2xl shadow-2xl w-full max-w-sm p-6">
-            <h3 className="text-base font-bold text-[var(--tu-text-heading)] mb-2">Delete Checklist?</h3>
-            <p className="text-sm text-[var(--tu-text-subtle)] mb-6">
-              This will permanently delete <strong>{name}</strong> and all its sections and items. This cannot be undone.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setConfirmDelete(false)}
-                className="flex-1 border border-[var(--tu-border)] text-[var(--tu-text-body)] py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={deleting}
-                className="flex-1 bg-[var(--tu-priority-critical)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-priority-critical)] disabled:opacity-50 cursor-pointer"
-              >
-                {deleting ? "Deleting…" : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

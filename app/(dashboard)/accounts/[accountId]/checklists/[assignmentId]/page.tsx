@@ -5,6 +5,9 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { pmControlNumber } from "@/lib/pmControlNumber";
+import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type PMItem = { id: string; label: string; order: number };
 type PMSection = { id: string; title: string; answerOptions: string[]; order: number; items: PMItem[] };
@@ -13,6 +16,9 @@ type PMLog = {
   scheduledDate: string;
   completedAt: string;
   performedByName: string;
+  /** With createdAt, the control number — see lib/pmControlNumber. */
+  number: number;
+  createdAt: string;
   isDraft: boolean;
   isLate: boolean;
   // `answeredByName` is per-answer and internal — the API withholds it from
@@ -124,6 +130,11 @@ export default function ChecklistFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saveMsg, setSaveMsg] = useState("");
+  // Answers changed since the period was loaded or last saved. Leaving — by a
+  // link, the period arrows or the history strip — asks first while this holds.
+  const [dirty, setDirty] = useState(false);
+  const confirm = useConfirm();
+  useUnsavedChanges(dirty);
   // Captured once so the history window stays stable across re-renders.
   const [nowMs] = useState(() => Date.now());
 
@@ -145,6 +156,7 @@ export default function ChecklistFormPage() {
       setItemStates({});
       setIsEditing(true);
     }
+    setDirty(false);
   }, [selectedDate, allLogs, assignment]);
 
   async function fetchData() {
@@ -165,10 +177,12 @@ export default function ChecklistFormPage() {
   }
 
   const setAnswer = useCallback((itemId: string, answer: string) => {
+    setDirty(true);
     setItemStates((prev) => ({ ...prev, [itemId]: { ...prev[itemId], answer, remarks: prev[itemId]?.remarks ?? "" } }));
   }, []);
 
   const setRemarks = useCallback((itemId: string, remarks: string) => {
+    setDirty(true);
     setItemStates((prev) => ({ ...prev, [itemId]: { ...prev[itemId], remarks, answer: prev[itemId]?.answer ?? "" } }));
   }, []);
 
@@ -214,8 +228,17 @@ export default function ChecklistFormPage() {
     return { total: sections.length, completeCount: complete.length, incompleteTitles: incomplete.map((s) => s.title) };
   }
 
-  function navigate(dir: 1 | -1) {
-    if (!assignment) return;
+  // Moving to another period reloads the form, so it is a way of leaving too.
+  async function confirmDiscard() {
+    return !dirty || confirm({
+      title: "Discard unsaved answers?",
+      message: "Your answers since the last save will be lost.",
+      confirmLabel: "Discard",
+    });
+  }
+
+  async function navigate(dir: 1 | -1) {
+    if (!assignment || !(await confirmDiscard())) return;
     setSelectedDate((prev) => stepPeriod(prev, assignment.checklist.frequency, dir));
     setError(null); setSaveMsg("");
   }
@@ -254,6 +277,21 @@ export default function ChecklistFormPage() {
     // rewritable. Mirrors `accountPMChecklistRoutes`: the client decides what to
     // offer, the API decides what to allow.
     const isDraft = periodLog && !periodLog.isDraft ? false : completeCount < total;
+    // Submitting is the one step that cannot be taken back: from here the
+    // answers are the record, and the API refuses to rewrite them.
+    if (!isDraft) {
+      setSubmitting(false);
+      const ok = await confirm({
+        title: "Submit this round?",
+        message: incompleteTitles.length > 0
+          ? `Answers can't be changed after submitting. ${incompleteTitles.length} partly answered section${incompleteTitles.length === 1 ? " is" : "s are"} not included: ${incompleteTitles.join(", ")}.`
+          : "Answers can't be changed after submitting.",
+        confirmLabel: "Submit",
+        destructive: false,
+      });
+      if (!ok) return;
+      setSubmitting(true);
+    }
     const scheduledDate = selectedDate.toISOString().split("T")[0];
 
     try {
@@ -266,6 +304,7 @@ export default function ChecklistFormPage() {
         savedLog = res.data;
       }
       setAllLogs((prev) => [savedLog, ...prev.filter((l) => l.id !== savedLog.id)]);
+      setDirty(false);
       if (isDraft) {
         const msg = incompleteTitles.length > 0
           ? `Saved ${completeCount} section(s); ${incompleteTitles.length} incomplete skipped`
@@ -346,15 +385,26 @@ export default function ChecklistFormPage() {
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${freq.cls}`}>
           {freq.label}
         </span>
-        {/* A blank paper form for the period on screen — for a round walked
-            with a clipboard and keyed in here afterwards. */}
+        {/* Two printouts: a blank form for a round walked with a clipboard and
+            keyed in afterwards, and the round as filed — answers, remarks and
+            its control number — once one exists for this period. */}
         <Link
           href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, checklist.frequency))}`}
           target="_blank"
           className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0"
         >
-          Print form
+          Print blank
         </Link>
+        {periodLog && (
+          <Link
+            href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, checklist.frequency))}&log=${periodLog.id}`}
+            target="_blank"
+            className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0"
+            title={dirty ? "Prints what was last saved, not unsaved changes" : undefined}
+          >
+            Print answered
+          </Link>
+        )}
         {!isEditing && periodLog && !periodLog.isDraft && (
           <button
             onClick={() => setIsEditing(true)}
@@ -378,6 +428,7 @@ export default function ChecklistFormPage() {
           <div className="flex items-center justify-center gap-2 mt-1">
             {periodLog ? (
               <>
+                <span className="tu-wo-ref">{pmControlNumber(periodLog)}</span>
                 <span className={`text-xs font-semibold ${periodLog.isDraft ? "text-[var(--tu-on-warning)]" : "text-[var(--tu-on-success)]"}`}>
                   {periodLog.isDraft ? "Partial" : `Done · ${fmtTime(periodLog.completedAt)}`}
                 </span>
@@ -415,7 +466,10 @@ export default function ChecklistFormPage() {
               <button
                 key={time}
                 type="button"
-                onClick={() => { setSelectedDate(date); setError(null); setSaveMsg(""); }}
+                onClick={async () => {
+                  if (time === selectedStart || !(await confirmDiscard())) return;
+                  setSelectedDate(date); setError(null); setSaveMsg("");
+                }}
                 aria-current={selected ? "true" : undefined}
                 className={`shrink-0 w-[68px] rounded-lg px-2 py-2 text-center transition-colors cursor-pointer ${cfg.bg} ${
                   selected ? "border-2 border-[var(--tu-text-brand)]" : "border border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"

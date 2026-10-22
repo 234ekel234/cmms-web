@@ -132,9 +132,11 @@ decides who gets it.
   "Print N" sends whatever the filters are showing, capped at `MAX_BATCH_PRINT`). Built from
   `components/print/WorkOrderSheet.tsx`. **No cost on paper, for any role** — parts print by
   quantity; a sheet handed around a site cannot be recalled.
-- **PM checklist form** (`/print/accounts/<id>/checklists/<assignmentId>?period=`) is
-  **blank on purpose** — a printed copy of filed answers is a second version that stops
-  agreeing with the record the moment a draft is edited.
+- **PM checklist form** (`/print/accounts/<id>/checklists/<assignmentId>?period=`) prints
+  **blank** for a round walked with a clipboard, or **answered** with `&log=<round id>` — the
+  round as filed, under its control number (`lib/pmControlNumber.ts`). A submitted round's
+  answers cannot be rewritten, so its copy cannot go stale; a draft can, so it prints under a DRAFT
+  mark. The toolbar switches between the two.
 - **Asset QR labels** (`/print/accounts/<id>/assets/labels`, `?asset=` or `?location=`).
   The QR encodes the asset page's URL and is drawn locally by `qrcode`. A filter rather than
   an id list, so a large register is not a URL too long to send. Geometry is Avery L7160
