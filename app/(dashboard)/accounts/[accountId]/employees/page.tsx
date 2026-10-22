@@ -148,7 +148,7 @@ export default function EmployeesPage() {
   async function unassign(emp: Employee) {
     if (!(await confirm({
       title: "Remove from this account?",
-      message: `${emp.name} will no longer be on this site's roster. Their employee record stays, and they can be added back.`,
+      message: `${emp.name} will no longer be on this site's roster, and their weekly shifts and upcoming schedule here are cleared. Past shifts and attendance stay on record, and they can be added back.`,
       confirmLabel: "Remove",
     }))) return;
     setUnassigning(emp.id);
