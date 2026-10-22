@@ -6,6 +6,7 @@ import { EmptyRow } from "@/components/EmptyState";
 import { EMPLOYEE_CATEGORIES, orderSkills, skillLabel } from "@/lib/employeeCategories";
 import GiveLoginModal, { type LoginTarget } from "@/components/GiveLoginModal";
 import { useConfirm } from "@/components/ConfirmDialog";
+import ArchivedList from "@/components/ArchivedList";
 
 type EmployeeType = "REGULAR" | "RELIEVER";
 
@@ -75,6 +76,14 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // A failed removal says why; it used to be swallowed, so the button simply
+  // did nothing.
+  const [actionError, setActionError] = useState("");
+  // Someone with history is archived rather than deleted — say so, since the
+  // row leaving the list looks the same either way.
+  const [actionNote, setActionNote] = useState("");
+  // Bumped after a restore, to refetch the registry.
+  const [reloadKey, setReloadKey] = useState(0);
   const [loginFor, setLoginFor] = useState<LoginTarget | null>(null);
 
   useEffect(() => {
@@ -91,7 +100,7 @@ export default function EmployeesPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   function openCreate() {
     setEditId(null);
@@ -149,15 +158,20 @@ export default function EmployeesPage() {
   async function deleteEmployee(id: string) {
     const emp = employees.find((e) => e.id === id);
     if (!(await confirm({
-      title: "Delete this employee?",
-      message: `${emp?.name ?? "This employee"} will be removed from the registry and every site's roster, and their credential scans deleted. This can't be undone. Someone with work or shift history can't be deleted — remove them from their accounts instead.`,
+      title: "Remove this employee?",
+      message: `${emp?.name ?? "This employee"} will leave the registry and every site's roster. If they have any history — shifts, work, training — they are archived and everything they did is kept; restoring puts them back on the same sites. Someone with no history is deleted, credential scans included.`,
+      confirmLabel: "Remove",
     }))) return;
     setDeletingId(id);
+    setActionError("");
+    setActionNote("");
     try {
-      await api.delete(`/employees/${id}`);
+      const res = await api.delete(`/employees/${id}`);
       setEmployees((prev) => prev.filter((e) => e.id !== id));
-    } catch {
-      // silent
+      if (res.data?.archived) setActionNote(`${emp?.name ?? "They"} had history, so they were archived — restore them from “Show archived employees”.`);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setActionError(e?.response?.data?.error ?? "Could not remove that employee.");
     } finally {
       setDeletingId(null);
     }
@@ -247,6 +261,10 @@ export default function EmployeesPage() {
       {error && (
         <div className="tu-error-banner" role="alert">Failed to load employees.</div>
       )}
+      {actionError && (
+        <div className="tu-error-banner" role="alert">{actionError}</div>
+      )}
+      {actionNote && <p className="tu-page-sub" role="status" style={{ marginBottom: 12 }}>{actionNote}</p>}
 
       {/* Create/Edit form */}
       {showForm && (
@@ -564,7 +582,7 @@ export default function EmployeesPage() {
                             disabled={deletingId === emp.id}
                             style={{ fontSize: 12, color: "#C70036", background: "none", border: "none", cursor: "pointer", fontWeight: 600, opacity: deletingId === emp.id ? 0.5 : 1 }}
                           >
-                            {deletingId === emp.id ? "…" : "Delete"}
+                            {deletingId === emp.id ? "…" : "Remove"}
                           </button>
                         </div>
                       </td>
@@ -591,6 +609,15 @@ export default function EmployeesPage() {
           }
         />
       )}
+      <ArchivedList<Employee & { archivedAt?: string }>
+        noun="archived employees"
+        load={async () => (await api.get("/employees?archived=true")).data}
+        title={(e) => e.name}
+        detail={(e) => [e.position, e.archivedAt ? `archived ${new Date(e.archivedAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : null].filter(Boolean).join(" · ") || null}
+        restore={async (e) => { await api.post(`/employees/${e.id}/restore`); }}
+        canRestore
+        onRestored={() => setReloadKey((k) => k + 1)}
+      />
     </div>
   );
 }

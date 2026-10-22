@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmDialog";
+import ArchivedList from "@/components/ArchivedList";
 
 type Training = {
   id: string;
@@ -44,8 +45,12 @@ export default function TrainingsPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // A refused delete has to say why; it used to fail in silence.
+  const [actionError, setActionError] = useState("");
 
   const canEdit = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
+  // Bumped after a restore, to refetch the library.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -60,7 +65,7 @@ export default function TrainingsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   function openCreate() {
     setEditId(null);
@@ -111,15 +116,18 @@ export default function TrainingsPage() {
   async function deleteTraining(id: string) {
     const t = trainings.find((x) => x.id === id);
     if (!(await confirm({
-      title: "Delete this training?",
-      message: `“${t?.title ?? "This training"}” will be removed from the library. This can't be undone.`,
+      title: "Remove this training?",
+      message: `If anyone has been assigned “${t?.title ?? "this training"}”, it is archived instead: it leaves the library and can't be assigned again, their records keep it, and it can be restored. A training nobody was given is deleted.`,
+      confirmLabel: "Remove",
     }))) return;
     setDeletingId(id);
+    setActionError("");
     try {
       await api.delete(`/trainings/${id}`);
       setTrainings((prev) => prev.filter((t) => t.id !== id));
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setActionError(e?.response?.data?.error ?? "Could not remove that training.");
     } finally {
       setDeletingId(null);
     }
@@ -161,6 +169,10 @@ export default function TrainingsPage() {
           </button>
         )}
       </div>
+
+      {actionError && (
+        <div className="tu-error-banner" role="alert">{actionError}</div>
+      )}
 
       {/* Create/Edit form */}
       {showForm && (
@@ -348,7 +360,7 @@ export default function TrainingsPage() {
                                     disabled={deletingId === t.id}
                                     style={{ fontSize: 12, color: "#C70036", background: "none", border: "none", cursor: "pointer", fontWeight: 600, opacity: deletingId === t.id ? 0.5 : 1 }}
                                   >
-                                    {deletingId === t.id ? "…" : "Delete"}
+                                    {deletingId === t.id ? "…" : "Remove"}
                                   </button>
                                 </div>
                               </td>
@@ -364,6 +376,15 @@ export default function TrainingsPage() {
           })}
         </div>
       )}
+      <ArchivedList<Training>
+        noun="archived trainings"
+        load={async () => (await api.get("/trainings?archived=true")).data}
+        title={(t) => t.title}
+        detail={(t) => t.category}
+        restore={async (t) => { await api.post(`/trainings/${t.id}/restore`); }}
+        canRestore={canEdit}
+        onRestored={() => setReloadKey((k) => k + 1)}
+      />
     </div>
   );
 }

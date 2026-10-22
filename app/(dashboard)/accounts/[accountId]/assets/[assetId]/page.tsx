@@ -372,12 +372,17 @@ export default function AssetDetailPage() {
       confirmLabel: "Archive",
     }))) return;
     setSaving(true);
+    setSaveError("");
     try {
-      const endpoint = asset.archivedAt ? `/assets/${assetId}/unarchive` : `/assets/${assetId}/archive`;
-      const res = await api.post(endpoint);
+      // Account-scoped, like the PUT above. This posted to /assets/:id/archive,
+      // which does not exist, and the silent catch hid the 404 — so Archive and
+      // Unarchive on this page never did anything.
+      const base = `/accounts/${accountId}/assets/${assetId}`;
+      const res = await api.post(asset.archivedAt ? `${base}/unarchive` : `${base}/archive`);
       setAsset(res.data);
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setSaveError(e?.response?.data?.error ?? (asset.archivedAt ? "Could not unarchive this asset." : "Could not archive this asset."));
     } finally {
       setSaving(false);
     }
@@ -793,7 +798,9 @@ export default function AssetDetailPage() {
           parent="assets"
           parentId={asset.id}
           canUpload
-          canDelete
+          // Staff only, as the API enforces: a client may add a photo but not
+          // remove one, and the removed-files list is staff's to restore from.
+          canDelete={writable}
           coverId={asset.cover?.id ?? null}
           onSetCover={writable && !asset.archivedAt ? (id) => updateAsset({ coverAttachmentId: id }) : undefined}
           onUploaded={refreshAsset}

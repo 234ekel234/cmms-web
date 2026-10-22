@@ -2818,6 +2818,25 @@ figure:hover .tu-attachment-remove,
 }
 .tu-cover-set:hover { text-decoration: underline; }
 .tu-cover-set:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+/* "Show archived" under a list (components/ArchivedList.tsx). */
+.tu-archived { margin-top: 20px; }
+.tu-archived-toggle {
+  padding: 0; border: none; background: none; cursor: pointer;
+  font-size: 13px; font-weight: 600; color: var(--tu-text-subtle);
+}
+.tu-archived-toggle:hover { color: var(--tu-text-brand); text-decoration: underline; }
+.tu-archived-toggle:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-archived-body {
+  margin-top: 10px; border: 1px dashed var(--tu-border-strong); border-radius: var(--tu-radius-md);
+  padding: 8px 14px; background: var(--tu-bg-secondary);
+}
+.tu-archived-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.tu-archived-row + .tu-archived-row { border-top: 1px solid var(--tu-border); }
+.tu-archived-title { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--tu-text-body); }
+.tu-archived-detail { margin: 2px 0 0; font-size: 12px; color: var(--tu-text-subtle); }
+.tu-archived-empty { margin: 6px 0; font-size: 13px; color: var(--tu-text-subtle); }
+.tu-archived-error { margin: 6px 0; font-size: 12.5px; color: var(--tu-on-danger); }
+
 /* Capacity unit manager (components/CapacityUnitSelect.tsx). */
 .tu-unit-add { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
 @media (max-width: 480px) { .tu-unit-add { grid-template-columns: 1fr; } }

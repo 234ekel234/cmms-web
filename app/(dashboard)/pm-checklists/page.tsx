@@ -5,6 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
+import ArchivedList from "@/components/ArchivedList";
 import { FREQUENCIES, frequencyMeta } from "@/lib/maintenancePlans";
 
 type PMChecklist = {
@@ -25,6 +26,8 @@ export default function PMChecklistsPage() {
   const [formError, setFormError] = useState("");
 
   const canCreate = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
+  // Bumped after a restore, to refetch the library.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,7 +42,7 @@ export default function PMChecklistsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
   async function createChecklist() {
     if (!form.name.trim()) { setFormError("Name is required."); return; }
@@ -213,6 +216,15 @@ export default function PMChecklistsPage() {
           })}
         </div>
       )}
+      <ArchivedList<PMChecklist>
+        noun="archived templates"
+        load={async () => (await api.get("/pm-checklists?archived=true")).data}
+        title={(c) => c.name}
+        detail={(c) => frequencyMeta(c.frequency).label}
+        restore={async (c) => { await api.post(`/pm-checklists/${c.id}/restore`); }}
+        canRestore={canCreate}
+        onRestored={() => setReloadKey((k) => k + 1)}
+      />
     </div>
   );
 }

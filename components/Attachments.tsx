@@ -11,6 +11,7 @@ import {
   type BaseAttachment,
 } from "@/lib/attachments";
 import { useConfirm } from "@/components/ConfirmDialog";
+import ArchivedList from "@/components/ArchivedList";
 
 /**
  * Photos and documents on a work order or an asset.
@@ -125,8 +126,9 @@ export default function Attachments({
 
   async function remove(a: Attachment) {
     if (!(await confirm({
-      title: "Delete this file?",
-      message: `“${a.filename}” will be permanently deleted. This can't be undone.`,
+      title: "Remove this file?",
+      message: `“${a.filename}” will be hidden from this list. It isn't erased — staff can restore it from “Show removed files”.`,
+      confirmLabel: "Remove",
     }))) return;
     setDeletingId(a.id);
     setError("");
@@ -272,6 +274,20 @@ export default function Attachments({
             </ul>
           )}
         </>
+      )}
+      {/* Staff only — the same people who may remove a file. */}
+      {canDelete && (
+        <ArchivedList<Attachment & { archivedByName?: string | null }>
+          noun="removed files"
+          load={async () => (await api.get(`/${parent}/${parentId}/attachments?archived=true`)).data}
+          title={(a) => a.filename}
+          detail={(a) => [formatSize(a.sizeBytes), a.archivedByName ? `removed by ${a.archivedByName}` : null].filter(Boolean).join(" · ")}
+          restore={async (a) => {
+            const res = await api.post(`/attachments/${a.id}/restore`);
+            setItems((prev) => [res.data, ...prev]);
+          }}
+          canRestore
+        />
       )}
     </div>
   );

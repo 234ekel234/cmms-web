@@ -85,7 +85,7 @@ export default function TrainingDetailPage() {
     const who = assignments.find((a) => a.employeeId === employeeId)?.employee.name ?? "This person";
     if (!(await confirm({
       title: "Remove this assignment?",
-      message: `${who} will no longer be assigned this training, and any completion recorded for it is removed.`,
+      message: `${who} will no longer be assigned this training. If they completed it, the completion stays on their record and comes back if it is assigned again.`,
       confirmLabel: "Remove",
     }))) return;
     setRemovingId(employeeId);

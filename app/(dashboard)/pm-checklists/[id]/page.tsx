@@ -43,6 +43,8 @@ export default function EditChecklistPage() {
   const [saved, setSaved] = useState(false);
   // Any edit since load or the last save. Leaving asks first while it holds.
   const [dirty, setDirty] = useState(false);
+  // Set when this template is archived — reachable by URL, not from the library.
+  const [archivedAt, setArchivedAt] = useState<string | null>(null);
   const confirm = useConfirm();
   useUnsavedChanges(dirty, "Your changes to this template since the last save will be lost.");
 
@@ -53,6 +55,7 @@ export default function EditChecklistPage() {
       const res = await api.get(`/pm-checklists/${id}`);
       const data = res.data;
       setName(data.name);
+      setArchivedAt(data.archivedAt ?? null);
       setFrequency(data.frequency);
       setSections(
         (data.sections ?? []).map((s: PMSection) => ({
@@ -197,8 +200,8 @@ export default function EditChecklistPage() {
 
   async function handleDelete() {
     if (!(await confirm({
-      title: "Delete this template?",
-      message: `“${name}” and all its sections and questions will be permanently deleted. A template assigned at any site can't be deleted — the API will say so.`,
+      title: "Remove this template?",
+      message: `If any site has used “${name}”, it is archived instead: it leaves the library and can't be assigned again, sites already using it carry on, and it can be restored. A template never assigned is deleted.`,
     }))) return;
     setDeleting(true);
     try {
@@ -228,6 +231,13 @@ export default function EditChecklistPage() {
           { label: name || "Checklist" },
         ]}
       />
+
+      {archivedAt && (
+        <div className="tu-error-banner" role="status" style={{ marginBottom: 16 }}>
+          This template is archived — it isn&apos;t in the library and can&apos;t be assigned to a site. Restore it from
+          “Show archived templates” on the PM Checklists page.
+        </div>
+      )}
 
       {/* Name + frequency */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-5 mb-5">
@@ -376,7 +386,7 @@ export default function EditChecklistPage() {
             disabled={deleting}
             className="text-sm text-[var(--tu-on-danger)] hover:text-[var(--tu-on-danger)] font-semibold transition-colors cursor-pointer"
           >
-            Delete template
+            Remove template
           </button>
           <button
             onClick={handleSave}

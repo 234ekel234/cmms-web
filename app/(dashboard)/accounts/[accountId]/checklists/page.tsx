@@ -9,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, canManage, hasRole } from "@/lib/rbac";
 import { frequencyMeta } from "@/lib/maintenancePlans";
 import { useConfirm } from "@/components/ConfirmDialog";
+import ArchivedList from "@/components/ArchivedList";
 
 type PMLog = {
   id: string;
@@ -97,6 +98,9 @@ export default function ChecklistsPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
 
+  // Bumped after a restore, to refetch the live list.
+  const [reloadKey, setReloadKey] = useState(0);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -115,15 +119,16 @@ export default function ChecklistsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, reloadKey]);
 
   async function handleRemove(assignmentId: string) {
     const a = assignments.find((x) => x.id === assignmentId);
     if (!(await confirm({
       title: "Remove this checklist?",
-      // The API cascades: the assignment's PMLogs go with it.
-      message: `“${a?.checklist.name ?? "This checklist"}” will no longer be scheduled at this site, and every round already filed for it here is deleted with it. This can't be undone.`,
-      confirmLabel: "Remove and delete rounds",
+      // Rounds are kept: the API switches an assignment with rounds off
+      // rather than deleting it, and it can be restored from below the list.
+      message: `“${a?.checklist.name ?? "This checklist"}” will no longer be scheduled at this site. Rounds already filed for it are kept, and you can restore it from “Show removed checklists”.`,
+      confirmLabel: "Remove",
     }))) return;
     try {
       await api.delete(`/accounts/${accountId}/pm-checklists/${assignmentId}`);
@@ -178,7 +183,9 @@ export default function ChecklistsPage() {
             </span>
             {canSchedule && (
               <button
-                onClick={() => handleRemove(a.id)}
+                // The card is a link to the fill-in form; without this the
+                // click opened the checklist as well as asking to remove it.
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleRemove(a.id); }}
                 className="text-xs text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] transition-colors cursor-pointer"
               >
                 Remove
@@ -289,6 +296,20 @@ export default function ChecklistsPage() {
             </div>
           )}
         </div>
+      )}
+      {canSchedule && (
+        <ArchivedList<Assignment & { _count?: { logs: number } }>
+          noun="removed checklists"
+          load={async () => (await api.get(`/accounts/${accountId}/pm-checklists?inactive=true`)).data}
+          title={(a) => a.checklist.name + (a.asset ? ` › ${a.asset.name}` : "")}
+          detail={(a) => {
+            const n = a._count?.logs ?? 0;
+            return `${n} filed round${n === 1 ? "" : "s"} kept`;
+          }}
+          restore={async (a) => { await api.post(`/accounts/${accountId}/pm-checklists/${a.id}/restore`); }}
+          canRestore
+          onRestored={() => setReloadKey((k) => k + 1)}
+        />
       )}
     </div>
   );
