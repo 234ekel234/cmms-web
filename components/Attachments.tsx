@@ -34,9 +34,24 @@ type Props = {
   canDelete?: boolean;
   /** Hides the upload control on terminal or read-only records. */
   canUpload?: boolean;
+  /** Assets only: the photo currently shown as the asset's cover. */
+  coverId?: string | null;
+  /** Assets only, staff only: offered as "Make cover" on each photo. */
+  onSetCover?: (id: string | null) => void;
+  onUploaded?: (a: Attachment) => void;
+  onRemoved?: (id: string) => void;
 };
 
-export default function Attachments({ parent, parentId, canDelete = false, canUpload = true }: Props) {
+export default function Attachments({
+  parent,
+  parentId,
+  canDelete = false,
+  canUpload = true,
+  coverId = null,
+  onSetCover,
+  onUploaded,
+  onRemoved,
+}: Props) {
   const confirm = useConfirm();
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +113,7 @@ export default function Attachments({ parent, parentId, canDelete = false, canUp
     try {
       const res = await api.post(`/${parent}/${parentId}/attachments`, form);
       setItems((prev) => [res.data, ...prev]);
+      onUploaded?.(res.data);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number; data?: { error?: string } } })?.response;
       setError(status?.data?.error ?? "Upload failed. Please try again.");
@@ -117,6 +133,7 @@ export default function Attachments({ parent, parentId, canDelete = false, canUp
     try {
       await api.delete(`/attachments/${a.id}`);
       setItems((prev) => prev.filter((x) => x.id !== a.id));
+      onRemoved?.(a.id);
     } catch {
       setError(`Could not remove "${a.filename}".`);
     } finally {
@@ -198,6 +215,12 @@ export default function Attachments({ parent, parentId, canDelete = false, canUp
                       className="tu-attachment-remove"
                     >
                       ×
+                    </button>
+                  )}
+                  {a.id === coverId && <span className="tu-cover-badge">Cover</span>}
+                  {onSetCover && a.id !== coverId && (
+                    <button type="button" className="tu-cover-set" onClick={() => onSetCover(a.id)}>
+                      Make cover
                     </button>
                   )}
                   {a.caption && (

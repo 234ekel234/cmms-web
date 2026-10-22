@@ -4,6 +4,7 @@ import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 import { workOrderPriorityMeta, workOrderStatusMeta, type WorkOrderStatus } from "@/lib/statuses";
 import { needsClientApproval, workOrderRef } from "@/lib/workOrders";
 import { Cell, SheetHeader, Sign, printedStamp } from "@/components/print/SheetParts";
+import { formatCapacity } from "@/lib/assetCapacity";
 
 /**
  * The printed job sheet: one work order on one sheet of A4, carried to the job
@@ -38,6 +39,8 @@ type Asset = {
   brand: string | null;
   model: string | null;
   serialNumber: string | null;
+  capacity?: number | null;
+  capacityUnit?: string | null;
   location: AssetLocationRef | null;
 };
 
@@ -143,9 +146,11 @@ export default function WorkOrderSheet({
             <Cell label="Name" value={asset.name} wide />
             <Cell label="Asset code" value={asset.assetCode ?? "—"} mono />
             <Cell label="Category" value={asset.category ?? "—"} />
-            <Cell label="Location" value={location || "—"} wide />
+            {/* Location gave up its double width to capacity, keeping two full rows of four. */}
+            <Cell label="Location" value={location || "—"} />
             <Cell label="Make / model" value={makeModel || "—"} />
             <Cell label="Serial no." value={asset.serialNumber ?? "—"} mono />
+            <Cell label="Capacity" value={formatCapacity(asset.capacity, asset.capacityUnit) ?? "—"} />
           </div>
         </section>
       )}

@@ -17,6 +17,9 @@ import {
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
+import CapacityUnitSelect from "@/components/CapacityUnitSelect";
+import { MAX_FINDINGS, formatCapacity } from "@/lib/assetCapacity";
+import { contentUrl, type BaseAttachment } from "@/lib/attachments";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -30,6 +33,10 @@ type Asset = {
   brand: string | null;
   model: string | null;
   location: AssetLocationRef | null;
+  capacity: number | null;
+  capacityUnit: string | null;
+  findings: string | null;
+  cover: BaseAttachment | null;
   openWorkOrders: number;
   lastCompletedAt: string | null;
   archivedAt: string | null;
@@ -48,6 +55,7 @@ const BLANK_FORM = {
   name: "", category: "", assetCode: "", brand: "", model: "", status: "",
   serialNumber: "", manufacturedDate: "", purchaseDate: "",
   purchaseCost: "", warrantyExpiry: "",
+  capacity: "", capacityUnit: "", findings: "",
   health: "FUNCTIONAL" as AssetHealth,
   // The one field that is an id rather than text: a location has to already
   // exist (or be created through the picker) before an asset can point at it.
@@ -141,6 +149,15 @@ export default function AssetsPage() {
     if (form.purchaseCost.trim() && !Number.isFinite(Number(form.purchaseCost))) {
       setFormError("Purchase cost must be a number."); return;
     }
+    if (form.capacity.trim() && !(Number(form.capacity) > 0)) {
+      setFormError("Capacity must be a number greater than zero."); return;
+    }
+    if (form.capacity.trim() && !form.capacityUnit) {
+      setFormError("Pick a unit for the capacity."); return;
+    }
+    if (form.health !== "FUNCTIONAL" && !form.findings.trim()) {
+      setFormError("Describe what was found."); return;
+    }
     setFormError("");
     setSaving(true);
     try {
@@ -160,7 +177,10 @@ export default function AssetsPage() {
         purchaseDate: form.purchaseDate || null,
         purchaseCost: form.purchaseCost.trim() ? Number(form.purchaseCost) : null,
         warrantyExpiry: form.warrantyExpiry || null,
+        capacity: form.capacity.trim() ? Number(form.capacity) : null,
+        capacityUnit: form.capacity.trim() ? form.capacityUnit : null,
         health: form.health,
+        findings: form.health !== "FUNCTIONAL" ? form.findings.trim() : null,
       });
       setAssets((prev) => [...prev, res.data]);
       setShowForm(false);
@@ -391,6 +411,27 @@ export default function AssetsPage() {
                 onChange={(e) => setForm((f) => ({ ...f, warrantyExpiry: e.target.value }))}
               />
             </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1" htmlFor="new-asset-capacity">Capacity</label>
+              <div className="flex gap-1.5">
+                <input
+                  id="new-asset-capacity"
+                  type="number"
+                  min="0"
+                  step="any"
+                  className={INPUT_CLS}
+                  value={form.capacity}
+                  onChange={(e) => setForm((f) => ({ ...f, capacity: e.target.value }))}
+                  placeholder="e.g. 250"
+                />
+                <CapacityUnitSelect
+                  className={INPUT_CLS}
+                  style={{ width: 104, flexShrink: 0 }}
+                  value={form.capacityUnit}
+                  onChange={(unit) => setForm((f) => ({ ...f, capacityUnit: unit }))}
+                />
+              </div>
+            </div>
             <div className="col-span-2">
               <LocationPicker
                 accountId={accountId}
@@ -418,6 +459,22 @@ export default function AssetsPage() {
                   </button>
                 ))}
               </div>
+              {form.health !== "FUNCTIONAL" && (
+                <div className="mt-3">
+                  <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1" htmlFor="new-asset-findings">
+                    What was found? *
+                  </label>
+                  <textarea
+                    id="new-asset-findings"
+                    className={INPUT_CLS}
+                    rows={3}
+                    maxLength={MAX_FINDINGS}
+                    value={form.findings}
+                    onChange={(e) => setForm((f) => ({ ...f, findings: e.target.value }))}
+                    placeholder="e.g. Condenser coil fouled; vibration on fan motor."
+                  />
+                </div>
+              )}
             </div>
           </div>
           {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
@@ -481,13 +538,34 @@ export default function AssetsPage() {
                 return (
                   <tr key={asset.id} className={`hover:bg-[var(--tu-bg-secondary)] transition-colors ${isArchived ? "opacity-60" : ""}`}>
                     <td className="px-6 py-4">
-                      <Link
-                        href={`/accounts/${accountId}/assets/${asset.id}`}
-                        className="font-semibold text-[var(--tu-text-heading)] hover:text-[var(--tu-text-brand)] transition-colors"
-                      >
-                        {asset.name}
-                      </Link>
-                      {isArchived && <span className="ml-2 text-xs bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)] rounded-full px-2 py-0.5">Archived</span>}
+                      <div className="flex items-center gap-3">
+                        {asset.cover ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={contentUrl(asset.cover)}
+                            alt=""
+                            loading="lazy"
+                            className="tu-asset-thumb"
+                            // The view token in the URL expires; a register left
+                            // open shows an empty tile rather than a broken image.
+                            onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+                          />
+                        ) : (
+                          <span className="tu-asset-thumb" aria-hidden="true" />
+                        )}
+                        <div className="min-w-0">
+                          <Link
+                            href={`/accounts/${accountId}/assets/${asset.id}`}
+                            className="font-semibold text-[var(--tu-text-heading)] hover:text-[var(--tu-text-brand)] transition-colors"
+                          >
+                            {asset.name}
+                          </Link>
+                          {isArchived && <span className="ml-2 text-xs bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)] rounded-full px-2 py-0.5">Archived</span>}
+                          {formatCapacity(asset.capacity, asset.capacityUnit) && (
+                            <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">{formatCapacity(asset.capacity, asset.capacityUnit)}</p>
+                          )}
+                        </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)]">{asset.category}</td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)] text-xs">
@@ -495,7 +573,10 @@ export default function AssetsPage() {
                     </td>
                     <td className="px-6 py-4">
                       {!isArchived && (
-                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${hCfg.cls}`}>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-semibold ${hCfg.cls}`}
+                          title={asset.findings ?? undefined}
+                        >
                           {hCfg.label}
                         </span>
                       )}

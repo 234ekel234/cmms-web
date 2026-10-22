@@ -20,12 +20,16 @@ type Row = {
   purchaseCost: string;
   warrantyExpiry: string;
   manufacturedDate: string;
+  capacity: string;
+  capacityUnit: string;
+  findings: string;
   error?: string;
 };
 
 const COLUMNS = [
   "name", "category", "assetCode", "brand", "model", "status", "health", "serialNumber",
   "location", "purchaseDate", "purchaseCost", "warrantyExpiry", "manufacturedDate",
+  "capacity", "capacityUnit", "findings",
 ] as const;
 
 // Only health is checked against a list. `status` is free text in the database
@@ -86,17 +90,26 @@ function toRows(text: string): Row[] {
       purchaseCost: get("purchaseCost"),
       warrantyExpiry: get("warrantyExpiry"),
       manufacturedDate: get("manufacturedDate"),
+      capacity: get("capacity"),
+      capacityUnit: get("capacityUnit"),
+      findings: get("findings"),
     };
     if (!row.name) row.error = "Name is required";
     else if (!row.category) row.error = "Category is required";
     else if (row.health && !HEALTH_VALUES.includes(row.health as Health)) row.error = `Invalid health "${row.health}"`;
+    else if (row.capacity && !row.capacityUnit) row.error = "Capacity needs a capacityUnit";
+    // Whether the unit is on the list is the API's call — the list is edited
+    // in the app — and it answers per row.
+    else if (row.findings && (row.health || "FUNCTIONAL") === "FUNCTIONAL") {
+      row.error = "Findings need a health other than FUNCTIONAL";
+    }
     return row;
   });
 }
 
 function downloadTemplate() {
   const header = COLUMNS.join(",");
-  const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01"].join(",");
+  const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01", "150", "kVA", ""].join(",");
   // Through lib/csv for the byte-order mark: a template that opens in Excel as
   // UTF-8 is saved back as UTF-8, so an "ñ" typed into it survives the import.
   downloadCsv([header, example], "cmms-asset-import-template.csv");
@@ -144,9 +157,13 @@ export default function AssetImportModal({
     try {
       const res = await api.post(`/accounts/${accountId}/assets/bulk`, {
         assets: validRows.map((r) => ({
-          name: r.name, category: r.category, status: r.status, health: r.health,
+          // assetCode, brand and model were parsed but never sent, so every
+          // import silently dropped them.
+          name: r.name, category: r.category, assetCode: r.assetCode, brand: r.brand, model: r.model,
+          status: r.status, health: r.health,
           serialNumber: r.serialNumber, location: r.location, purchaseDate: r.purchaseDate,
           purchaseCost: r.purchaseCost, warrantyExpiry: r.warrantyExpiry, manufacturedDate: r.manufacturedDate,
+          capacity: r.capacity, capacityUnit: r.capacityUnit, findings: r.findings,
         })),
       });
       setResult({ created: res.data.created.length, errors: res.data.errors });

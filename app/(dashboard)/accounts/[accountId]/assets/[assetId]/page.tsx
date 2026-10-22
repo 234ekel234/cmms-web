@@ -20,6 +20,9 @@ import {
 } from "@/lib/assetLocations";
 import { frequencyMeta } from "@/lib/maintenancePlans";
 import { useConfirm } from "@/components/ConfirmDialog";
+import CapacityUnitSelect from "@/components/CapacityUnitSelect";
+import { MAX_FINDINGS, formatCapacity } from "@/lib/assetCapacity";
+import { contentUrl, type BaseAttachment } from "@/lib/attachments";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -38,6 +41,12 @@ type Asset = {
   purchaseCost: number | null;
   warrantyExpiry: string | null;
   manufacturedDate: string | null;
+  /** What was found. Only ever set while health is not FUNCTIONAL. */
+  findings: string | null;
+  capacity: number | null;
+  capacityUnit: string | null;
+  /** The cover photo, as an attachment DTO; null when none is chosen. */
+  cover: BaseAttachment | null;
   archivedAt: string | null;
   createdAt: string;
 };
@@ -146,6 +155,7 @@ const DETAIL_FIELDS = [
   { key: "purchaseDate",     label: "Purchase Date", kind: "date" },
   { key: "purchaseCost",     label: "Purchase Cost", kind: "cost" },
   { key: "warrantyExpiry",   label: "Warranty Expiry", kind: "date" },
+  { key: "capacity",         label: "Capacity",      kind: "capacity" },
 ] as const;
 
 type DetailKey = (typeof DETAIL_FIELDS)[number]["key"];
@@ -157,7 +167,10 @@ type DetailsDraft = Record<DetailKey, string>;
  * should point at. Typing this as `Partial<Asset>` let `locationId` through as
  * an unchecked extra property in one direction and rejected it in the other.
  */
-type AssetUpdate = Partial<Omit<Asset, "location">> & { locationId?: string | null };
+type AssetUpdate = Partial<Omit<Asset, "location" | "cover">> & {
+  locationId?: string | null;
+  coverAttachmentId?: string | null;
+};
 
 // Stored dates are UTC midnight, so slicing the ISO string is what a
 // <input type="date"> wants — going through a Date first would shift the day
@@ -171,6 +184,7 @@ const draftFromAsset = (a: Asset): DetailsDraft => ({
   purchaseDate: a.purchaseDate?.slice(0, 10) ?? "",
   purchaseCost: a.purchaseCost != null ? String(a.purchaseCost) : "",
   warrantyExpiry: a.warrantyExpiry?.slice(0, 10) ?? "",
+  capacity: a.capacity != null ? String(a.capacity) : "",
 });
 
 // Warranty coverage relative to `now`, or null when no expiry is on file.
@@ -205,6 +219,12 @@ export default function AssetDetailPage() {
   // Held apart from `detailsDraft`, which is all strings: this one is an id.
   const [locationDraft, setLocationDraft] = useState<string | null>(null);
   const [locations, setLocations] = useState<AssetLocationNode[]>([]);
+  // Capacity's unit is a pick from a list, held apart from the all-string
+  // `detailsDraft` like the location id above.
+  const [capacityUnitDraft, setCapacityUnitDraft] = useState("");
+  // Choosing a health other than Functional asks what was found before it saves.
+  const [healthChoice, setHealthChoice] = useState<AssetHealth | null>(null);
+  const [findingsDraft, setFindingsDraft] = useState("");
   const [saveError, setSaveError] = useState("");
   const [saving, setSaving] = useState(false);
   // Captured once at mount so warranty/age math stays pure across re-renders.
@@ -267,6 +287,7 @@ export default function AssetDetailPage() {
       const res = await api.put(`/accounts/${accountId}/assets/${assetId}`, updates);
       setAsset(res.data);
       setEditHealth(false);
+      setHealthChoice(null);
       setEditStatus(false);
       setEditDetails(false);
     } catch (err: unknown) {
@@ -286,6 +307,15 @@ export default function AssetDetailPage() {
       setSaveError("Purchase cost must be a number.");
       return;
     }
+    const capacity = detailsDraft.capacity.trim();
+    if (capacity && !(Number(capacity) > 0)) {
+      setSaveError("Capacity must be a number greater than zero.");
+      return;
+    }
+    if (capacity && !capacityUnitDraft) {
+      setSaveError("Pick a unit for the capacity.");
+      return;
+    }
     await updateAsset({
       assetCode: detailsDraft.assetCode.trim() || null,
       brand: detailsDraft.brand.trim() || null,
@@ -296,7 +326,42 @@ export default function AssetDetailPage() {
       purchaseDate: detailsDraft.purchaseDate || null,
       purchaseCost: detailsDraft.purchaseCost.trim() ? Number(detailsDraft.purchaseCost) : null,
       warrantyExpiry: detailsDraft.warrantyExpiry || null,
+      capacity: capacity ? Number(capacity) : null,
+      capacityUnit: capacity ? capacityUnitDraft : null,
     });
+  }
+
+  // Functional saves at once — the API clears any findings with it. Anything
+  // else opens the findings box first: "it has findings" with no findings
+  // written down is the gap this field exists to close.
+  function chooseHealth(h: AssetHealth) {
+    if (h === "FUNCTIONAL") {
+      updateAsset({ health: h });
+      return;
+    }
+    setHealthChoice(h);
+    setFindingsDraft(asset?.findings ?? "");
+    setSaveError("");
+  }
+
+  async function saveHealthWithFindings() {
+    if (!healthChoice) return;
+    if (!findingsDraft.trim()) {
+      setSaveError("Describe what was found.");
+      return;
+    }
+    await updateAsset({ health: healthChoice, findings: findingsDraft.trim() });
+  }
+
+  // Re-read after an upload: the API makes a staff member's first photo the
+  // cover, and this page should show it without a reload.
+  async function refreshAsset() {
+    try {
+      const res = await api.get(`/assets/${assetId}`);
+      setAsset(res.data);
+    } catch {
+      // The upload itself succeeded; a stale cover is not worth an error.
+    }
   }
 
   async function toggleArchive() {
@@ -359,12 +424,24 @@ export default function AssetDetailPage() {
       {/* Main info card */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
         <div className="flex items-start justify-between gap-4 mb-4">
-          <div>
+          <div className="flex items-start gap-4 min-w-0">
+          {asset.cover && (
+            <a href={contentUrl(asset.cover)} target="_blank" rel="noopener noreferrer" className="shrink-0" title="Open the full photo">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={contentUrl(asset.cover)}
+                alt={`Photo of ${asset.name}`}
+                className="tu-asset-cover"
+              />
+            </a>
+          )}
+          <div className="min-w-0">
             <h1 className="text-xl font-bold text-[var(--tu-text-heading)]">{asset.name}</h1>
             <p className="text-sm text-[var(--tu-text-subtle)] mt-0.5">{asset.category}</p>
             {asset.archivedAt && (
               <span className="inline-block mt-1 text-xs bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)] rounded-full px-2 py-0.5">Archived</span>
             )}
+          </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {!asset.archivedAt && (
@@ -408,18 +485,50 @@ export default function AssetDetailPage() {
               {(Object.keys(ASSET_HEALTH) as AssetHealth[]).map((h) => (
                 <button
                   key={h}
-                  onClick={() => updateAsset({ health: h })}
+                  onClick={() => chooseHealth(h)}
                   disabled={saving}
+                  aria-pressed={(healthChoice ?? asset.health) === h}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                    asset.health === h ? ASSET_HEALTH_CLS[h] + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                    (healthChoice ?? asset.health) === h ? ASSET_HEALTH_CLS[h] + " border-current" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                   }`}
                 >
                   {ASSET_HEALTH[h].label}
                 </button>
               ))}
-              <button onClick={() => setEditHealth(false)} className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer">Cancel</button>
+              <button
+                onClick={() => { setEditHealth(false); setHealthChoice(null); setSaveError(""); }}
+                className="px-3 py-1.5 text-xs text-[var(--tu-text-subtle)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              {healthChoice && (
+                <div className="w-full mt-1">
+                  <label htmlFor="asset-findings" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">
+                    What was found?
+                  </label>
+                  <textarea
+                    id="asset-findings"
+                    className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-xs text-[var(--tu-text-body)] bg-[var(--tu-bg-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                    rows={3}
+                    maxLength={MAX_FINDINGS}
+                    value={findingsDraft}
+                    onChange={(e) => setFindingsDraft(e.target.value)}
+                    placeholder={healthChoice === "BREAKDOWN" ? "e.g. Compressor tripped on overload, will not restart." : "e.g. Condenser coil fouled; vibration on fan motor."}
+                    autoFocus
+                  />
+                  <div className="flex justify-end mt-2">
+                    <button
+                      onClick={saveHealthWithFindings}
+                      disabled={saving || !findingsDraft.trim()}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                    >
+                      {saving ? "Saving…" : `Save as ${ASSET_HEALTH[healthChoice].label}`}
+                    </button>
+                  </div>
+                </div>
+              )}
               <p className="w-full text-[11px] text-[var(--tu-text-subtle)] mt-1">
-                {ASSET_HEALTH_HINT[asset.health]}. Marking an asset as a breakdown starts its downtime clock; moving it off stops it.
+                {ASSET_HEALTH_HINT[healthChoice ?? asset.health]}. Marking an asset as a breakdown starts its downtime clock; moving it off stops it. Setting it back to Functional clears the findings.
               </p>
             </div>
           ) : (
@@ -428,6 +537,24 @@ export default function AssetDetailPage() {
               {writable && !asset.archivedAt && (
                 <button onClick={() => setEditHealth(true)} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
               )}
+            </div>
+          )}
+          {!editHealth && asset.health !== "FUNCTIONAL" && (
+            <div className="mt-2 rounded-lg border border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] px-3 py-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-[11px] font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Findings</p>
+                {writable && !asset.archivedAt && (
+                  <button
+                    onClick={() => { setEditHealth(true); chooseHealth(asset.health); }}
+                    className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
+                  >
+                    {asset.findings ? "Edit" : "Add"}
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-[var(--tu-text-body)] mt-1 whitespace-pre-wrap">
+                {asset.findings ?? <span className="text-[var(--tu-text-disabled)]">Nothing written down yet.</span>}
+              </p>
             </div>
           )}
         </div>
@@ -486,6 +613,7 @@ export default function AssetDetailPage() {
                 onClick={() => {
                   setDetailsDraft(draftFromAsset(asset));
                   setLocationDraft(asset.location?.id ?? null);
+                  setCapacityUnitDraft(asset.capacityUnit ?? "");
                   setSaveError("");
                   setEditDetails(true);
                 }}
@@ -507,7 +635,28 @@ export default function AssetDetailPage() {
                 />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
-                {DETAIL_FIELDS.map((f) => (
+                {DETAIL_FIELDS.map((f) => f.kind === "capacity" ? (
+                  <div key={f.key}>
+                    <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1" htmlFor="asset-capacity">{f.label}</label>
+                    <div className="flex gap-1.5">
+                      <input
+                        id="asset-capacity"
+                        className={INPUT_CLS}
+                        type="number"
+                        min="0"
+                        step="any"
+                        value={detailsDraft.capacity}
+                        onChange={(e) => setDetailsDraft((d) => (d ? { ...d, capacity: e.target.value } : d))}
+                      />
+                      <CapacityUnitSelect
+                        className={INPUT_CLS}
+                        style={{ width: 96, flexShrink: 0 }}
+                        value={capacityUnitDraft}
+                        onChange={(unit) => setCapacityUnitDraft(unit)}
+                      />
+                    </div>
+                  </div>
+                ) : (
                   <div key={f.key}>
                     <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">{f.label}</label>
                     <input
@@ -543,6 +692,7 @@ export default function AssetDetailPage() {
                 { label: "Brand", value: asset.brand },
                 { label: "Model", value: asset.model },
                 { label: "Serial No.", value: asset.serialNumber },
+                { label: "Capacity", value: formatCapacity(asset.capacity, asset.capacityUnit) },
                 { label: "Location", value: locationPath(asset.location) || null },
                 { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
                 { label: "Purchased", value: asset.purchaseDate ? fmtDate(asset.purchaseDate) : null },
@@ -639,7 +789,16 @@ export default function AssetDetailPage() {
 
       {/* Documents — manuals, warranty scans, nameplate photos */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mb-6">
-        <Attachments parent="assets" parentId={asset.id} canUpload canDelete />
+        <Attachments
+          parent="assets"
+          parentId={asset.id}
+          canUpload
+          canDelete
+          coverId={asset.cover?.id ?? null}
+          onSetCover={writable && !asset.archivedAt ? (id) => updateAsset({ coverAttachmentId: id }) : undefined}
+          onUploaded={refreshAsset}
+          onRemoved={(id) => { if (id === asset.cover?.id) setAsset((a) => (a ? { ...a, cover: null } : a)); }}
+        />
       </div>
 
       {/* PM checklists */}
