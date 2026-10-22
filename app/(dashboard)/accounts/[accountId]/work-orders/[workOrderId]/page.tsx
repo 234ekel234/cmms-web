@@ -12,6 +12,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
 import { canManage as canAdministerAccount } from "@/lib/rbac";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
 
@@ -148,6 +149,7 @@ function formatQty(qty: number) {
 type AccountEmployee = { id: string; name: string; position: string | null };
 
 export default function WorkOrderDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const workOrderId = params.workOrderId as string;
@@ -318,6 +320,12 @@ export default function WorkOrderDetailPage() {
 
   async function removeAssignment(empId: string) {
     if (!order) return;
+    const who = order.assignments.find((a) => a.employeeId === empId)?.employee.name ?? "This person";
+    if (!(await confirm({
+      title: "Unassign from this job?",
+      message: `${who} will be taken off this work order.`,
+      confirmLabel: "Unassign",
+    }))) return;
     setRemovingId(empId);
     try {
       await api.delete(`/work-orders/${order.id}/assignments/${empId}`);
@@ -404,6 +412,11 @@ export default function WorkOrderDetailPage() {
 
   async function updateStatus(status: WorkOrderStatus, opts: { reason?: string } = {}) {
     if (!order) return;
+    if (status === "REJECTED" && !(await confirm({
+      title: "Reject this work order?",
+      message: "It will be closed without any work done. A rejected order can't be reopened.",
+      confirmLabel: "Reject",
+    }))) return;
     setUpdatingStatus(true);
     try {
       const body: { status: WorkOrderStatus; remarks?: string; reason?: string } = { status };
@@ -534,6 +547,14 @@ export default function WorkOrderDetailPage() {
 
   async function removePart(partId: string) {
     if (!order) return;
+    const line = (order.parts ?? []).find((p) => p.id === partId);
+    if (!(await confirm({
+      title: "Remove this part?",
+      message: line?.partId
+        ? `“${line.description}” will be removed from this job and its quantity returned to stock.`
+        : `“${line?.description ?? "This line"}” will be removed from this job.`,
+      confirmLabel: "Remove",
+    }))) return;
     setRemovingPartId(partId);
     try {
       await api.delete(`/work-orders/${order.id}/parts/${partId}`);
@@ -600,6 +621,10 @@ export default function WorkOrderDetailPage() {
     // DELETEs and the second 404s, painting "Checklist item not found" under a
     // list from which the step was in fact removed perfectly well.
     if (!order || savingSteps.has(item.id)) return;
+    if (!(await confirm({
+      title: "Delete this step?",
+      message: `“${item.description}” will be removed from this job's steps.`,
+    }))) return;
     setSavingSteps((prev) => new Set(prev).add(item.id));
     setStepError("");
     try {

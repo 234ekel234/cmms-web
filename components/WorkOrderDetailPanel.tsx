@@ -17,6 +17,7 @@ import {
   workOrderRef,
   type StageFacts,
 } from "@/lib/workOrders";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 /**
  * The right half of the split view: one work order, beside the queue.
@@ -112,6 +113,7 @@ export default function WorkOrderDetailPanel({
   /** Only shown on narrow screens, where the panel covers the queue. */
   onClose?: () => void;
 }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
@@ -173,6 +175,11 @@ export default function WorkOrderDetailPanel({
 
   async function move(to: WorkOrderStatus) {
     if (to === "COMPLETED" && !confirmComplete) { setConfirmComplete(true); return; }
+    if (to === "REJECTED" && !(await confirm({
+      title: "Reject this work order?",
+      message: "It will be closed without any work done. A rejected order can't be reopened.",
+      confirmLabel: "Reject",
+    }))) return;
     const body: Record<string, unknown> = { status: to };
     if (to === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
     if (await patch(body)) { setConfirmComplete(false); setRemarks(""); }
@@ -218,6 +225,12 @@ export default function WorkOrderDetailPanel({
   }
 
   async function unassign(empId: string) {
+    const who = order.assignments.find((a) => a.employee.id === empId)?.employee.name ?? "This person";
+    if (!(await confirm({
+      title: "Unassign from this job?",
+      message: `${who} will be taken off this work order.`,
+      confirmLabel: "Unassign",
+    }))) return;
     setBusy(true);
     try {
       await api.delete(`/work-orders/${order.id}/assignments/${empId}`);

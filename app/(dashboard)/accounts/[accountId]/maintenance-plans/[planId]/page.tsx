@@ -23,11 +23,13 @@ import {
   type PlanOccurrence,
 } from "@/lib/maintenancePlans";
 import { workOrderRef } from "@/lib/workOrders";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Asset = { id: string; name: string };
 type Employee = { id: string; name: string; position: string | null };
 
 export default function MaintenancePlanDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const router = useRouter();
   const accountId = params.accountId as string;
@@ -130,6 +132,10 @@ export default function MaintenancePlanDetailPage() {
   }
 
   async function remove() {
+    if (!(await confirm({
+      title: "Delete this plan?",
+      message: `${plan?.title ? `“${plan.title}”` : "This plan"} will stop raising work orders. If it has already raised some, it is paused instead so their history stays intact.`,
+    }))) return;
     try {
       const res = await api.delete(`/maintenance-plans/${planId}`);
       if (res.data?.paused) {

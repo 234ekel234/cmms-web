@@ -15,6 +15,7 @@ import {
   type Credential,
   type CredentialStatus,
 } from "@/lib/attachments";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 /**
  * An employee's credentials: licences, clearances, training certificates.
@@ -57,6 +58,7 @@ export default function Credentials({
   employeeId: string;
   canEdit?: boolean;
 }) {
+  const confirm = useConfirm();
   const [items, setItems] = useState<Credential[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -150,6 +152,10 @@ export default function Credentials({
   }
 
   async function remove(c: Credential) {
+    if (!(await confirm({
+      title: "Delete this credential?",
+      message: `“${c.label ?? c.filename}” and its scan will be permanently deleted. This can't be undone.`,
+    }))) return;
     setBusy(true);
     setError("");
     try {

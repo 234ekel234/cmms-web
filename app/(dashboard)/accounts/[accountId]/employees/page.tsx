@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Employee = {
   id: string;
@@ -34,6 +35,7 @@ function attColor(rate: number | null) {
 }
 
 export default function EmployeesPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const { user } = useAuth();
@@ -144,6 +146,11 @@ export default function EmployeesPage() {
   });
 
   async function unassign(emp: Employee) {
+    if (!(await confirm({
+      title: "Remove from this account?",
+      message: `${emp.name} will no longer be on this site's roster. Their employee record stays, and they can be added back.`,
+      confirmLabel: "Remove",
+    }))) return;
     setUnassigning(emp.id);
     try {
       await api.delete(`/accounts/${accountId}/employees/${emp.id}`);

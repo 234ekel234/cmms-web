@@ -17,6 +17,7 @@ import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialo
 import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -118,6 +119,7 @@ function formatTimer(totalSeconds: number) {
 }
 
 export default function WorkOrdersPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const searchParams = useSearchParams();
@@ -332,6 +334,11 @@ export default function WorkOrdersPage() {
   }
 
   async function updateStatus(id: string, status: WorkOrderStatus) {
+    if (status === "REJECTED" && !(await confirm({
+      title: "Reject this work order?",
+      message: "It will be closed without any work done. A rejected order can't be reopened.",
+      confirmLabel: "Reject",
+    }))) return;
     try {
       const res = await api.patch(`/work-orders/${id}`, { status });
       // Merged, not replaced. PATCH returns the row with `asset` and

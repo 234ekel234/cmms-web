@@ -4,6 +4,7 @@ import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import CommandPalette from "@/components/CommandPalette";
+import { ConfirmProvider } from "@/components/ConfirmDialog";
 
 /**
  * Chrome for every signed-in page: navigation rail, top bar, and content column.
@@ -15,13 +16,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   return (
-    <div className="tu-shell">
-      <Sidebar drawerOpen={drawerOpen} onCloseDrawer={() => setDrawerOpen(false)} />
-      <div className="tu-shell-main">
-        <Topbar onOpenNav={() => setDrawerOpen(true)} />
-        <main className="tu-shell-content">{children}</main>
+    <ConfirmProvider>
+      <div className="tu-shell">
+        <Sidebar drawerOpen={drawerOpen} onCloseDrawer={() => setDrawerOpen(false)} />
+        <div className="tu-shell-main">
+          <Topbar onOpenNav={() => setDrawerOpen(true)} />
+          <main className="tu-shell-content">{children}</main>
+        </div>
+        <CommandPalette />
       </div>
-      <CommandPalette />
-    </div>
+    </ConfirmProvider>
   );
 }

@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, canManage, hasRole } from "@/lib/rbac";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type PMLog = {
   id: string;
@@ -78,6 +79,7 @@ function fmtDate(iso: string) {
 }
 
 export default function ChecklistsPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const { user } = useAuth();
@@ -116,6 +118,13 @@ export default function ChecklistsPage() {
   }, [accountId]);
 
   async function handleRemove(assignmentId: string) {
+    const a = assignments.find((x) => x.id === assignmentId);
+    if (!(await confirm({
+      title: "Remove this checklist?",
+      // The API cascades: the assignment's PMLogs go with it.
+      message: `“${a?.checklist.name ?? "This checklist"}” will no longer be scheduled at this site, and every round already filed for it here is deleted with it. This can't be undone.`,
+      confirmLabel: "Remove and delete rounds",
+    }))) return;
     try {
       await api.delete(`/accounts/${accountId}/pm-checklists/${assignmentId}`);
       setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));

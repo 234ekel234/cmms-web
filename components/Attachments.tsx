@@ -10,6 +10,7 @@ import {
   formatSize,
   type BaseAttachment,
 } from "@/lib/attachments";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 /**
  * Photos and documents on a work order or an asset.
@@ -36,6 +37,7 @@ type Props = {
 };
 
 export default function Attachments({ parent, parentId, canDelete = false, canUpload = true }: Props) {
+  const confirm = useConfirm();
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -106,6 +108,10 @@ export default function Attachments({ parent, parentId, canDelete = false, canUp
   }
 
   async function remove(a: Attachment) {
+    if (!(await confirm({
+      title: "Delete this file?",
+      message: `“${a.filename}” will be permanently deleted. This can't be undone.`,
+    }))) return;
     setDeletingId(a.id);
     setError("");
     try {

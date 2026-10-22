@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { EmptyRow } from "@/components/EmptyState";
 import { EMPLOYEE_CATEGORIES, orderSkills, skillLabel } from "@/lib/employeeCategories";
 import GiveLoginModal, { type LoginTarget } from "@/components/GiveLoginModal";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type EmployeeType = "REGULAR" | "RELIEVER";
 
@@ -54,6 +55,7 @@ function SkeletonRows({ count }: { count: number }) {
 }
 
 export default function EmployeesPage() {
+  const confirm = useConfirm();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -145,6 +147,11 @@ export default function EmployeesPage() {
   }
 
   async function deleteEmployee(id: string) {
+    const emp = employees.find((e) => e.id === id);
+    if (!(await confirm({
+      title: "Delete this employee?",
+      message: `${emp?.name ?? "This employee"} will be removed from the registry and every site's roster, and their credential scans deleted. This can't be undone. Someone with work or shift history can't be deleted — remove them from their accounts instead.`,
+    }))) return;
     setDeletingId(id);
     try {
       await api.delete(`/employees/${id}`);

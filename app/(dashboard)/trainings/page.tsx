@@ -5,6 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Training = {
   id: string;
@@ -31,6 +32,7 @@ function SkeletonRows({ count }: { count: number }) {
 }
 
 export default function TrainingsPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const [trainings, setTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
@@ -107,6 +109,11 @@ export default function TrainingsPage() {
   }
 
   async function deleteTraining(id: string) {
+    const t = trainings.find((x) => x.id === id);
+    if (!(await confirm({
+      title: "Delete this training?",
+      message: `“${t?.title ?? "This training"}” will be removed from the library. This can't be undone.`,
+    }))) return;
     setDeletingId(id);
     try {
       await api.delete(`/trainings/${id}`);

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import api from "@/lib/api";
 import { type AssetLocationNode, PATH_SEPARATOR } from "@/lib/assetLocations";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 /**
  * Adds, renames, moves and removes the locations on one account.
@@ -30,6 +31,7 @@ export default function LocationManagerModal({
   /** Refetches the tree after any successful write. */
   onChanged: () => Promise<void>;
 }) {
+  const confirm = useConfirm();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -67,8 +69,14 @@ export default function LocationManagerModal({
     run(() => api.put(`/accounts/${accountId}/asset-locations/${id}`, { name }));
   };
 
-  const remove = (id: string) =>
+  const remove = async (id: string) => {
+    const node = tree.find((r) => r.id === id) ?? tree.flatMap((r) => r.children).find((c) => c.id === id);
+    if (!(await confirm({
+      title: "Delete this location?",
+      message: `“${node?.name ?? "This location"}” will be deleted. A location with assets or floors under it can't be deleted — move them first.`,
+    }))) return;
     run(() => api.delete(`/accounts/${accountId}/asset-locations/${id}`));
+  };
 
   function row(node: AssetLocationNode, depth: number, parentName?: string) {
     // Archived assets count too. The figure beside the name deliberately shows

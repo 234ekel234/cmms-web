@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel, roleCls } from "@/lib/statuses";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -26,6 +27,7 @@ type UserRecord = {
 };
 
 export default function MembersPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const { user } = useAuth();
@@ -79,6 +81,11 @@ export default function MembersPage() {
   }
 
   async function remove(member: Member) {
+    if (!(await confirm({
+      title: "Remove access?",
+      message: `${member.name} will lose access to this account. Their login stays, and they can be added back.`,
+      confirmLabel: "Remove",
+    }))) return;
     setRemovingId(member.id);
     try {
       await api.delete(`/accounts/${accountId}/members/${member.id}`);

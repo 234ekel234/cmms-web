@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type Training = {
   id: string;
@@ -28,6 +29,7 @@ function fmtDate(iso: string) {
 }
 
 export default function TrainingDetailPage() {
+  const confirm = useConfirm();
   const { user } = useAuth();
   const params = useParams();
   const trainingId = params.id as string;
@@ -80,6 +82,12 @@ export default function TrainingDetailPage() {
   }
 
   async function remove(employeeId: string) {
+    const who = assignments.find((a) => a.employeeId === employeeId)?.employee.name ?? "This person";
+    if (!(await confirm({
+      title: "Remove this assignment?",
+      message: `${who} will no longer be assigned this training, and any completion recorded for it is removed.`,
+      confirmLabel: "Remove",
+    }))) return;
     setRemovingId(employeeId);
     try {
       await api.delete(`/employees/${employeeId}/trainings/${trainingId}`);

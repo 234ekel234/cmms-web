@@ -15,6 +15,7 @@ import {
   type PartTransaction,
   type PartTransactionType,
 } from "@/lib/parts";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type PartDetail = Part & {
   assets: { id: string; asset: { id: string; name: string; category: string } }[];
@@ -26,6 +27,7 @@ const inputCls = "w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 t
 const labelCls = "block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1";
 
 export default function PartDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const partId = params.partId as string;
@@ -151,6 +153,12 @@ export default function PartDetailPage() {
 
   async function toggleArchive() {
     if (!part) return;
+    // Restoring needs no question; archiving takes the part off every picker.
+    if (!part.archivedAt && !(await confirm({
+      title: "Archive this part?",
+      message: `${part.name} will be hidden from the catalogue and can't be picked on new work orders. Its stock history is kept, and you can restore it.`,
+      confirmLabel: "Archive",
+    }))) return;
     setSaving(true);
     try {
       if (part.archivedAt) await api.patch(`/parts/${partId}`, { archived: false });

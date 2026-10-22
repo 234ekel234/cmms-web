@@ -19,6 +19,7 @@ import {
   locationPath,
 } from "@/lib/assetLocations";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { useConfirm } from "@/components/ConfirmDialog";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -182,6 +183,7 @@ function warrantyStatus(expiry: string | null, now: number) {
 }
 
 export default function AssetDetailPage() {
+  const confirm = useConfirm();
   const params = useParams();
   const { user } = useAuth();
   // A client reads their own site's equipment — the API already withholds
@@ -299,6 +301,11 @@ export default function AssetDetailPage() {
 
   async function toggleArchive() {
     if (!asset) return;
+    if (!asset.archivedAt && !(await confirm({
+      title: "Archive this asset?",
+      message: `${asset.name} will be hidden from the register and can't be picked on new work orders. Its history is kept, and you can unarchive it.`,
+      confirmLabel: "Archive",
+    }))) return;
     setSaving(true);
     try {
       const endpoint = asset.archivedAt ? `/assets/${assetId}/unarchive` : `/assets/${assetId}/archive`;
