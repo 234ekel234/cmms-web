@@ -2245,6 +2245,12 @@ button {
 .tu-figure-zero    { color: var(--tu-text-disabled); }
 /* Stats load after the list, so cells hold their shape with a dimmed dash. */
 .tu-figure-pending { color: var(--tu-border-strong); }
+/* A figure that opens the list behind it (Accounts page). The cell is the hit
+   area; the underline on hover says where the click goes. */
+.tu-figure-cell { cursor: pointer; }
+.tu-figure-link { text-decoration: none; text-underline-offset: 3px; }
+.tu-figure-cell:hover .tu-figure-link,
+.tu-figure-link:focus-visible { text-decoration: underline; }
 
 /* Secondary line under a table row's primary cell. */
 .tu-row-sub {

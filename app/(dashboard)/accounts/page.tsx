@@ -7,7 +7,8 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RowMenu from "@/components/RowMenu";
 import EmptyState from "@/components/EmptyState";
-import { NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
+import { NEEDS_ATTENTION_LABEL, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { isClosed } from "@/lib/workOrders";
 
 type Account = {
   id: string;
@@ -26,6 +27,24 @@ type AccountStats = {
   checklistsDone: number;
   checklistsTotal: number;
 };
+
+// "Open" on this page is the dashboard's count: every status outside
+// CLOSED_STATUSES. Derived from isClosed so the link lands on exactly the
+// orders the figure counted.
+const OPEN_STATUS_PARAM = (Object.keys(WORK_ORDER_STATUS) as WorkOrderStatus[])
+  .filter((status) => !isClosed({ status }))
+  .join(",");
+
+/** Where each figure column leads: the list behind the number, not the account's front page. */
+function figureHrefs(accountId: string) {
+  const base = `/accounts/${accountId}`;
+  return {
+    open: `${base}/work-orders?status=${OPEN_STATUS_PARAM}`,
+    overdue: `${base}/work-orders?flag=OVERDUE`,
+    attention: `${base}/assets?health=attention`,
+    pm: `${base}/checklists`,
+  };
+}
 
 type ShiftInput = { name: string; startTime: string; endTime: string };
 
@@ -240,11 +259,35 @@ export default function AccountsPage() {
     };
   }, [accounts, stats]);
 
-  /** Renders a figure, or a placeholder while stats are still loading. */
-  function Figure({ value, tone }: { value: number; tone?: "danger" | "warning" }) {
+  /**
+   * Renders a figure, or a placeholder while stats are still loading. A
+   * non-zero figure is a real link to the list it counts, so it is reachable by
+   * keyboard; the cell's own onClick (see figureCell) covers the rest of the cell.
+   */
+  function Figure({ value, tone, href, label }: { value: number; tone?: "danger" | "warning"; href: string; label: string }) {
     if (!stats) return <span className="tu-figure-pending" aria-hidden="true">—</span>;
     if (value === 0) return <span className="tu-figure-zero">—</span>;
-    return <span className={tone ? `tu-figure tu-figure-${tone}` : "tu-figure"}>{value}</span>;
+    return (
+      <Link
+        href={href}
+        className={`tu-figure tu-figure-link${tone ? ` tu-figure-${tone}` : ""}`}
+        title={`View ${value} ${label}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {value}
+      </Link>
+    );
+  }
+
+  /** A figure cell clicks through to its list rather than to the account. */
+  function figureCell(href: string) {
+    return {
+      className: "tu-center tu-figure-cell",
+      onClick: (e: React.MouseEvent) => {
+        e.stopPropagation();
+        router.push(href);
+      },
+    };
   }
 
   return (
@@ -356,6 +399,7 @@ export default function AccountsPage() {
               <tbody>
                 {visible.map((acc) => {
                   const s = stats?.[acc.id];
+                  const href = figureHrefs(acc.id);
                   return (
                     <tr key={acc.id} onClick={() => router.push(`/accounts/${acc.id}`)}>
                       <td className="tu-strong">
@@ -366,23 +410,33 @@ export default function AccountsPage() {
                         </Link>
                         {acc.description && <span className="tu-row-sub">{acc.description}</span>}
                       </td>
-                      <td className="tu-center"><Figure value={s?.openWorkOrders ?? 0} /></td>
-                      <td className="tu-center"><Figure value={s?.overdueWorkOrders ?? 0} tone="danger" /></td>
-                      <td className="tu-center"><Figure value={s?.poorHealthAssets ?? 0} tone="warning" /></td>
-                      <td className="tu-center">
+                      <td {...figureCell(href.open)}>
+                        <Figure value={s?.openWorkOrders ?? 0} href={href.open} label="open work orders" />
+                      </td>
+                      <td {...figureCell(href.overdue)}>
+                        <Figure value={s?.overdueWorkOrders ?? 0} tone="danger" href={href.overdue} label="overdue work orders" />
+                      </td>
+                      <td {...figureCell(href.attention)}>
+                        <Figure value={s?.poorHealthAssets ?? 0} tone="warning" href={href.attention} label="assets needing attention" />
+                      </td>
+                      <td {...figureCell(href.pm)}>
                         {!stats ? (
                           <span className="tu-figure-pending" aria-hidden="true">—</span>
                         ) : !s || s.checklistsTotal === 0 ? (
                           <span className="tu-figure-zero">—</span>
                         ) : (
-                          <span
+                          <Link
+                            href={href.pm}
                             className={
-                              s.checklistsDone >= s.checklistsTotal ? "tu-figure tu-figure-success" : "tu-figure"
+                              s.checklistsDone >= s.checklistsTotal
+                                ? "tu-figure tu-figure-link tu-figure-success"
+                                : "tu-figure tu-figure-link"
                             }
                             title={`${s.checklistsDone} of ${s.checklistsTotal} active checklists completed today`}
+                            onClick={(e) => e.stopPropagation()}
                           >
                             {s.checklistsDone}/{s.checklistsTotal}
-                          </span>
+                          </Link>
                         )}
                       </td>
                       <td className="tu-menu-cell">
@@ -391,6 +445,7 @@ export default function AccountsPage() {
                           actions={[
                             { label: "Open workspace", onSelect: () => router.push(`/accounts/${acc.id}`) },
                             { label: "Work orders", onSelect: () => router.push(`/accounts/${acc.id}/work-orders`) },
+                            { label: "Assets", onSelect: () => router.push(`/accounts/${acc.id}/assets`) },
                             { label: "Reports", onSelect: () => router.push(`/accounts/${acc.id}/reports`) },
                             ...(canManage ? [{ label: "Edit details", onSelect: () => openEdit(acc) }] : []),
                           ]}

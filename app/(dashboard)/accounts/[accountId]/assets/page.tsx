@@ -2,12 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import AssetImportModal from "@/components/AssetImportModal";
 import LocationPicker from "@/components/LocationPicker";
 import LocationManagerModal from "@/components/LocationManagerModal";
-import { ASSET_HEALTH, ASSET_HEALTH_CLS } from "@/lib/statuses";
+import { ASSET_HEALTH, ASSET_HEALTH_CLS, NEEDS_ATTENTION_HEALTH, NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
 import {
   type AssetLocationNode,
   type AssetLocationRef,
@@ -75,6 +75,10 @@ export default function AssetsPage() {
   const [showLocations, setShowLocations] = useState(false);
   // "" is every location; otherwise the id of the node being filtered on.
   const [locationFilter, setLocationFilter] = useState("");
+  // `?health=attention` is how the Accounts page's "Needs attention" figure
+  // lands here: the same set the dashboard counted, nothing else.
+  const searchParams = useSearchParams();
+  const [attentionOnly, setAttentionOnly] = useState(() => searchParams.get("health") === "attention");
 
   // Kept as a callable rather than folded into the effect below: the picker and
   // the manager both have to refresh the tree after writing to it, and awaiting
@@ -173,14 +177,15 @@ export default function AssetsPage() {
   // alone would return only the assets filed at the building itself and quietly
   // hide the rest — which is the failure the free-text column had, one level up.
   const visible = useMemo(() => {
-    if (!locationFilter) return assets;
+    const byHealth = attentionOnly ? assets.filter((a) => NEEDS_ATTENTION_HEALTH.includes(a.health)) : assets;
+    if (!locationFilter) return byHealth;
     const node =
       locations.find((r) => r.id === locationFilter) ??
       locations.flatMap((r) => r.children).find((c) => c.id === locationFilter);
-    if (!node) return assets;
+    if (!node) return byHealth;
     const scope = new Set(locationScopeIds(node));
-    return assets.filter((a) => a.location && scope.has(a.location.id));
-  }, [assets, locations, locationFilter]);
+    return byHealth.filter((a) => a.location && scope.has(a.location.id));
+  }, [assets, locations, locationFilter, attentionOnly]);
 
   const sorted = [...visible].sort((a, b) => {
     if (!!a.archivedAt !== !!b.archivedAt) return a.archivedAt ? 1 : -1;
@@ -234,6 +239,15 @@ export default function AssetsPage() {
             {k === "name" ? "Name" : "Condition"}
           </button>
         ))}
+        <button
+          onClick={() => setAttentionOnly((v) => !v)}
+          aria-pressed={attentionOnly}
+          className={`ml-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+            attentionOnly ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+          }`}
+        >
+          {NEEDS_ATTENTION_LABEL}
+        </button>
         <span className="text-xs text-[var(--tu-text-subtle)] ml-2">Location:</span>
         <select
           className="tu-select"
@@ -428,11 +442,20 @@ export default function AssetsPage() {
         </div>
       ) : sorted.length === 0 ? (
         <div className="tu-card">
-          <EmptyState
-            icon="asset"
-            title="No assets yet"
-            hint="Register the equipment at this site to track its health and maintenance history."
-          />
+          {/* A filter that matches nothing is good news, not an empty register. */}
+          {assets.length > 0 && (attentionOnly || locationFilter) ? (
+            <EmptyState
+              icon="asset"
+              title={attentionOnly ? "Nothing needs attention" : "No assets here"}
+              hint={attentionOnly ? "Every asset in view is functional." : "No assets are filed at this location."}
+            />
+          ) : (
+            <EmptyState
+              icon="asset"
+              title="No assets yet"
+              hint="Register the equipment at this site to track its health and maintenance history."
+            />
+          )}
         </div>
       ) : (
         <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">
