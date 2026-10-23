@@ -214,6 +214,9 @@ export default function ReportsPage() {
               ↓ Export CSV
             </button>
           )}
+          <Link href="/reports/response-times" className="tu-btn-secondary">
+            Response times
+          </Link>
           <Link href="/reports/client-satisfaction" className="tu-btn-secondary">
             Client satisfaction
           </Link>
