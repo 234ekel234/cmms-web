@@ -43,6 +43,8 @@ export type BaseAttachment = {
   uploadedByName: string | null;
   createdAt: string;
   isImage: boolean;
+  /** A small preview exists — see `thumbUrl`. */
+  hasThumb?: boolean;
   viewToken: string;
   viewTokenExpiresIn: number;
 };
@@ -71,6 +73,14 @@ export function formatSize(bytes: number) {
  */
 export function contentUrl(a: Pick<BaseAttachment, "id" | "viewToken">) {
   return `${API_BASE_URL}/attachments/${a.id}/content?token=${encodeURIComponent(a.viewToken)}`;
+}
+
+/**
+ * For an <img> drawn small: the 400px WebP preview when there is one, else the
+ * file itself. Links that open the photo keep `contentUrl` — full size there.
+ */
+export function thumbUrl(a: Pick<BaseAttachment, "id" | "viewToken" | "hasThumb">) {
+  return a.hasThumb ? `${contentUrl(a)}&size=thumb` : contentUrl(a);
 }
 
 /**

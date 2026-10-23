@@ -19,7 +19,7 @@ import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import CapacityUnitSelect from "@/components/CapacityUnitSelect";
 import { MAX_FINDINGS, formatCapacity } from "@/lib/assetCapacity";
-import { contentUrl, type BaseAttachment } from "@/lib/attachments";
+import { thumbUrl, type BaseAttachment } from "@/lib/attachments";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -542,7 +542,7 @@ export default function AssetsPage() {
                         {asset.cover ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img
-                            src={contentUrl(asset.cover)}
+                            src={thumbUrl(asset.cover)}
                             alt=""
                             loading="lazy"
                             className="tu-asset-thumb"

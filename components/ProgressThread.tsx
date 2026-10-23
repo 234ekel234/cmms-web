@@ -21,6 +21,7 @@ export type ProgressAttachment = {
   sizeBytes: number;
   caption: string | null;
   isImage: boolean;
+  hasThumb?: boolean;
   viewToken: string;
   createdAt: string;
 };
@@ -127,7 +128,7 @@ export default function ProgressThread({
                         <a key={a.id} href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={contentUrl(a)}
+                            src={a.hasThumb ? `${contentUrl(a)}&size=thumb` : contentUrl(a)}
                             alt={a.caption || a.filename}
                             loading="lazy"
                             style={{

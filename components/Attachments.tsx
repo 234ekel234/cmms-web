@@ -8,8 +8,7 @@ import {
   MAX_MB,
   contentUrl,
   formatSize,
-  type BaseAttachment,
-} from "@/lib/attachments";
+  type BaseAttachment, thumbUrl } from "@/lib/attachments";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ArchivedList from "@/components/ArchivedList";
 
@@ -198,7 +197,7 @@ export default function Attachments({
                   <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
-                      src={contentUrl(a)}
+                      src={thumbUrl(a)}
                       alt={a.caption || a.filename}
                       loading="lazy"
                       style={{

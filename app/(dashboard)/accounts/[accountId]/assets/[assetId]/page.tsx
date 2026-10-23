@@ -22,7 +22,7 @@ import { frequencyMeta } from "@/lib/maintenancePlans";
 import { useConfirm } from "@/components/ConfirmDialog";
 import CapacityUnitSelect from "@/components/CapacityUnitSelect";
 import { MAX_FINDINGS, formatCapacity } from "@/lib/assetCapacity";
-import { contentUrl, type BaseAttachment } from "@/lib/attachments";
+import { contentUrl, thumbUrl, type BaseAttachment } from "@/lib/attachments";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -447,7 +447,7 @@ export default function AssetDetailPage() {
             <a href={contentUrl(asset.cover)} target="_blank" rel="noopener noreferrer" className="shrink-0" title="Open the full photo">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={contentUrl(asset.cover)}
+                src={thumbUrl(asset.cover)}
                 alt={`Photo of ${asset.name}`}
                 className="tu-asset-cover"
               />
