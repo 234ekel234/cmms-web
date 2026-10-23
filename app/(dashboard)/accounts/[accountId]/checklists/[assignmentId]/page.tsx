@@ -281,12 +281,17 @@ export default function ChecklistFormPage() {
     // answers are the record, and the API refuses to rewrite them.
     if (!isDraft) {
       setSubmitting(false);
+      // Editing a round already submitted (to answer a section the template
+      // gained since) is a save, not a first submission.
+      const resubmit = !!periodLog && !periodLog.isDraft;
       const ok = await confirm({
-        title: "Submit this round?",
-        message: incompleteTitles.length > 0
+        title: resubmit ? "Save changes to this submitted round?" : "Submit this round?",
+        message: resubmit
+          ? "The new answers become part of the record and can't be changed afterwards."
+          : incompleteTitles.length > 0
           ? `Answers can't be changed after submitting. ${incompleteTitles.length} partly answered section${incompleteTitles.length === 1 ? " is" : "s are"} not included: ${incompleteTitles.join(", ")}.`
           : "Answers can't be changed after submitting.",
-        confirmLabel: "Submit",
+        confirmLabel: resubmit ? "Save" : "Submit",
         destructive: false,
       });
       if (!ok) return;

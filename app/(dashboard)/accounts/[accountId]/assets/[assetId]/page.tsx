@@ -353,6 +353,19 @@ export default function AssetDetailPage() {
     await updateAsset({ health: healthChoice, findings: findingsDraft.trim() });
   }
 
+  // The cover's link carries a view token that expires (minutes), so a page left
+  // open would end up linking to a 404. Re-read the asset shortly before it
+  // lapses, as the file list below does for its own links.
+  const coverTtl = asset?.cover?.viewTokenExpiresIn;
+  const coverId = asset?.cover?.id;
+  useEffect(() => {
+    if (!coverId) return;
+    const timer = setTimeout(() => { refreshAsset(); }, Math.max(30, (coverTtl ?? 600) - 60) * 1000);
+    return () => clearTimeout(timer);
+    // refreshAsset is stable in behaviour; re-arming on each new token is the point.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coverId, coverTtl, asset?.cover?.viewToken]);
+
   // Re-read after an upload: the API makes a staff member's first photo the
   // cover, and this page should show it without a reload.
   async function refreshAsset() {
