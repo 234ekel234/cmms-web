@@ -21,7 +21,11 @@ import api from "@/lib/api";
 import { isClosed } from "@/lib/workOrders";
 import DashboardGrid from "@/components/dashboard/DashboardGrid";
 import DashboardEditBar from "@/components/dashboard/DashboardEditBar";
-import { CATALOGUE } from "@/components/dashboard/widgets";
+import { catalogueFor } from "@/components/dashboard/widgets";
+import { getUser } from "@/lib/auth";
+
+// The cards this person may place — a client is not offered staff-only ones.
+const myCatalogue = () => catalogueFor(getUser()?.role);
 import {
   defaultLayout,
   reconcile,
@@ -97,7 +101,7 @@ export default function DashboardPage() {
     api
       .get("/dashboard/layout")
       .then((res) => {
-        const stored = reconcile(res.data?.widgets, CATALOGUE);
+        const stored = reconcile(res.data?.widgets, myCatalogue());
         setLayout(stored);
         setSaved(stored);
       })
@@ -105,7 +109,7 @@ export default function DashboardPage() {
       // the defaults are a complete, correct arrangement, and the only thing
       // lost is their customisation until the next successful request.
       .catch(() => {
-        const fallback = defaultLayout(CATALOGUE);
+        const fallback = defaultLayout(myCatalogue());
         setLayout(fallback);
         setSaved(fallback);
       });
@@ -213,7 +217,7 @@ export default function DashboardPage() {
       // so the row does not freeze today's catalogue into somebody's account:
       // a widget added next month appears for them, which is the whole point of
       // the reset button meaning "defaults" rather than "these eleven cards".
-      if (sameLayout(layout, defaultLayout(CATALOGUE))) {
+      if (sameLayout(layout, defaultLayout(myCatalogue()))) {
         await api.delete("/dashboard/layout");
       } else {
         await api.put("/dashboard/layout", { widgets: layout });
@@ -240,7 +244,7 @@ export default function DashboardPage() {
    */
   function resetLayout() {
     setLayoutError("");
-    setLayout(defaultLayout(CATALOGUE));
+    setLayout(defaultLayout(myCatalogue()));
     setAnnouncement("Layout reset to the defaults. Save to keep it.");
   }
 

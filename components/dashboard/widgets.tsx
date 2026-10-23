@@ -226,6 +226,30 @@ function kpiDefs(m: DashboardModel): Record<string, KpiDef> {
       value: loading ? "—" : m.attendanceRate === null ? "—" : `${m.attendanceRate}%`,
       sub: loading ? " " : m.attendanceTotal > 0 ? `${m.present} present · ${m.absent} absent` : "no shifts logged",
     },
+    "kpi-awaiting-review": {
+      label: "Awaiting Review",
+      accent: "var(--tu-status-completed)",
+      icon: <IconCheck />,
+      value: loading || m.data?.awaitingReview == null ? "—" : String(m.data.awaitingReview),
+      valueClass: (m.data?.awaitingReview ?? 0) > 0 ? "tu-stat-warning" : "",
+      sub: "completed work a supervisor hasn't checked",
+      href: `${m.woHref}?flag=REVIEW`,
+      cta: (m.data?.awaitingReview ?? 0) > 0 ? "Review work" : undefined,
+    },
+    "kpi-client-rating": {
+      label: "Client Rating",
+      accent: "var(--tu-status-approved)",
+      icon: <IconCheck />,
+      value: loading || m.data?.satisfaction?.overall == null ? "—" : `${m.data.satisfaction.overall.toFixed(1)} / 5`,
+      valueClass: (m.data?.satisfaction?.low ?? 0) > 0 ? "tu-stat-warning" : "",
+      sub: loading || !m.data?.satisfaction
+        ? " "
+        : m.data.satisfaction.responses === 0
+          ? `no ratings in ${m.data.satisfaction.days} days`
+          : `${m.data.satisfaction.responses} rating${m.data.satisfaction.responses === 1 ? "" : "s"} · ${m.data.satisfaction.low} low · ${m.data.satisfaction.days} days`,
+      href: "/reports/client-satisfaction",
+      cta: "Open report",
+    },
     "kpi-pm-checklists": {
       label: "PM Checklists",
       accent: "var(--tu-health-poor)",
@@ -781,6 +805,8 @@ function RecentActivity({ model: m, limit }: { model: DashboardModel; limit: num
 // ── The catalogue ────────────────────────────────────────
 
 export type DashboardWidget = WidgetMeta & {
+  /** Offered to supervisors and above only — see `catalogueFor`. */
+  staffOnly?: boolean;
   render: (model: DashboardModel, options: WidgetOptions) => React.ReactNode;
   /**
    * Whether this widget has nothing worth showing right now.
@@ -817,9 +843,13 @@ export const CATALOGUE: DashboardWidget[] = [
       ["kpi-low-stock", "Low Stock"],
       ["kpi-attendance", "Attendance rate"],
       ["kpi-pm-checklists", "PM Checklists"],
+      ["kpi-awaiting-review", "Awaiting Review"],
+      ["kpi-client-rating", "Client Rating"],
     ] as const
   ).map(([key, title]): DashboardWidget => ({
     key,
+    // Supervisors' and managers' figures — the API sends clients neither.
+    staffOnly: key === "kpi-awaiting-review" || key === "kpi-client-rating",
     title,
     group: "Key figures",
     defaultSpan: 2,
@@ -1021,6 +1051,16 @@ export const CATALOGUE: DashboardWidget[] = [
 ];
 
 export const CATALOGUE_BY_KEY = new Map(CATALOGUE.map((w) => [w.key, w]));
+
+/**
+ * The catalogue as one role sees it. A staff-only card is left out of a
+ * client's catalogue altogether, so `reconcile` drops it from their layout and
+ * the defaults never place it — rather than drawing a tile of dashes.
+ */
+export function catalogueFor(role: string | undefined): DashboardWidget[] {
+  const staff = role === "GENERAL_MANAGER" || role === "MANAGER" || role === "SUPERVISOR";
+  return staff ? CATALOGUE : CATALOGUE.filter((w) => !w.staffOnly);
+}
 
 /** "Stalled Work · 30+ days" — what distinguishes one instance from another. */
 export function instanceTitle(meta: DashboardWidget, options: WidgetOptions): string {
