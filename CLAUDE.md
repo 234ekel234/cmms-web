@@ -112,6 +112,25 @@ silently ignores — `priority` is non-nullable with `@default(MEDIUM)`, so ther
 Status and priority pills come from `lib/statuses.ts`. Both lists once kept private copies
 and had already drifted on `REQUESTED`.
 
+Three things the full record and the pane share:
+
+- **Review and sign-off.** `awaitingReview` (completed, not yet verified) drives the
+  **Awaiting review** filter, the Verified step in the pipeline and "Verify work"; a client is
+  offered Approve / Send back only on *verified* work (`awaitingClient`) — offering it before
+  review draws a button the API answers 403.
+- **History** (`/work-orders/:id/history`) renders at the foot of the full page and collapsed in
+  the pane; the API has already filtered it for the caller, so the page draws what it is given.
+- **Survey.** `components/ClientSurvey.tsx` — `SurveyForm` for a client on `surveyable()` work
+  (portal, job page, pane), `SurveyResult` for staff. `survey` is optional in the type on
+  purpose: only staff receive scores; everyone gets `surveyDone`. Reports → Client
+  satisfaction (`reports/client-satisfaction`) lays out `GET /reports/client-satisfaction`
+  and computes nothing itself.
+
+The full page's **Edit** form (staff, unsettled jobs) covers title, description and asset as
+well as priority, due date, category and estimate. It loads the site's live assets on first
+open and keeps the current asset offered even if it has since been archived; save errors are
+shown, not swallowed.
+
 ## Auth Flow
 
 1. User logs in via `POST /api/auth/login`
