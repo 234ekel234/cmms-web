@@ -6,6 +6,7 @@ import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import ResetPasswordButton from "@/components/ResetPasswordButton";
+import LoginAccessButton from "@/components/LoginAccessButton";
 import { useAuth } from "@/context/AuthContext";
 import { canResetPassword } from "@/lib/rbac";
 
@@ -24,6 +25,8 @@ type UserDetail = {
   email: string;
   role: string;
   createdAt: string;
+  disabledAt?: string | null;
+  disabledByName?: string | null;
   employee: { id: string; name: string; position: string | null; archivedAt: string | null } | null;
   accounts: { id: string; name: string; role: string }[];
   /** Sites they belong to that the viewer does not manage — counted, not named. */
@@ -95,6 +98,13 @@ export default function UserPage() {
         </div>
       </div>
 
+      {user.disabledAt && (
+        <div className="tu-error-banner" role="status">
+          This login is disabled{user.disabledByName ? ` — by ${user.disabledByName}` : ""}, since {fmtDate(user.disabledAt)}.
+          They can&apos;t sign in. Their history below is kept.
+        </div>
+      )}
+
       <div className="tu-person-grid">
         <section className="tu-card">
           <div className="tu-card-header"><h2 className="tu-card-title">Details</h2></div>
@@ -122,10 +132,25 @@ export default function UserPage() {
               <dd>{fmtDate(user.createdAt)}</dd>
             </div>
             {me && me.id !== user.id && canResetPassword(me.role, user.role) && (
-              <div>
-                <dt>Password</dt>
-                <dd><ResetPasswordButton userId={user.id} name={user.name} /></dd>
-              </div>
+              <>
+                {!user.disabledAt && (
+                  <div>
+                    <dt>Password</dt>
+                    <dd><ResetPasswordButton userId={user.id} name={user.name} /></dd>
+                  </div>
+                )}
+                <div>
+                  <dt>Access</dt>
+                  <dd>
+                    <LoginAccessButton
+                      userId={user.id}
+                      name={user.name}
+                      disabledAt={user.disabledAt}
+                      onChange={(disabledAt) => setUser({ ...user, disabledAt, disabledByName: disabledAt ? me.name : null })}
+                    />
+                  </dd>
+                </div>
+              </>
             )}
           </dl>
         </section>

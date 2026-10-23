@@ -14,6 +14,7 @@ type User = {
   name: string;
   email: string;
   role: Role;
+  disabledAt?: string | null;
 };
 
 function SkeletonRows({ count, cols }: { count: number; cols: number }) {
@@ -362,6 +363,7 @@ export default function UsersPage() {
                             (you)
                           </span>
                         )}
+                        {u.disabledAt && <span className="tu-badge tu-badge-neutral" style={{ marginLeft: 8 }}>Disabled</span>}
                       </td>
                       <td style={{ color: "var(--tu-text-body)" }}>{u.email}</td>
                       <td>

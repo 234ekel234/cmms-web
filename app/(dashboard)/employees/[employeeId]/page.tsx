@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { MANAGERS, hasRole, canResetPassword } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import ResetPasswordButton from "@/components/ResetPasswordButton";
+import LoginAccessButton from "@/components/LoginAccessButton";
 import Credentials from "@/components/Credentials";
 import EmptyState from "@/components/EmptyState";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
@@ -33,7 +34,7 @@ type Employee = {
   archivedAt: string | null;
   createdAt: string;
   accounts: { id: string; name: string }[];
-  login: { id: string; email: string; role: string } | null;
+  login: { id: string; email: string; role: string; disabledAt?: string | null } | null;
 };
 
 type Summary = {
@@ -200,9 +201,16 @@ export default function EmployeePage() {
                       employee.login.email
                     )}
                     <span className="tu-person-muted"> · {ROLE_LABEL[employee.login.role] ?? employee.login.role}</span>
+                    {employee.login.disabledAt && <span className="tu-person-muted"> · disabled</span>}
                     {user && user.id !== employee.login.id && canResetPassword(user.role, employee.login.role) && (
-                      <div style={{ marginTop: 8 }}>
-                        <ResetPasswordButton userId={employee.login.id} name={employee.name} />
+                      <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+                        {!employee.login.disabledAt && <ResetPasswordButton userId={employee.login.id} name={employee.name} />}
+                        <LoginAccessButton
+                          userId={employee.login.id}
+                          name={employee.name}
+                          disabledAt={employee.login.disabledAt}
+                          onChange={(disabledAt) => setEmployee({ ...employee, login: { ...employee.login!, disabledAt } })}
+                        />
                       </div>
                     )}
                   </>

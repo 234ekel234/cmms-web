@@ -3588,3 +3588,4 @@ figure:hover .tu-attachment-remove,
 .tu-reset-pw-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .tu-reset-pw-row .tu-input { flex: 1; min-width: 160px; }
 .tu-reset-pw-note { font-size: 12px; color: var(--tu-text-subtle); max-width: 48ch; }
+.tu-text-danger { color: var(--tu-on-danger); }
