@@ -2818,6 +2818,29 @@ figure:hover .tu-attachment-remove,
 }
 .tu-cover-set:hover { text-decoration: underline; }
 .tu-cover-set:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+/* Staff-only notes on a work order's thread (components/ProgressThread.tsx):
+   tinted and badged so nobody mistakes one for something the client reads. */
+.tu-thread-internal {
+  background: color-mix(in srgb, var(--tu-status-on-hold, var(--tu-text-subtle)) 8%, transparent);
+  border-radius: var(--tu-radius-md);
+  padding: 8px 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+}
+.tu-internal-badge {
+  font-size: 10.5px; font-weight: 650; letter-spacing: 0.02em;
+  padding: 1px 7px; border-radius: 999px;
+  color: var(--tu-text-heading);
+  background: var(--tu-bg-secondary-strong);
+  border: 1px dashed var(--tu-border-strong);
+}
+.tu-internal-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 8px; font-size: 12.5px; font-weight: 600;
+  color: var(--tu-text-body); cursor: pointer;
+}
+.tu-internal-input { border-style: dashed !important; background: var(--tu-bg-secondary); }
+
 /* A one-line explanation under a form control in the work-order pane. */
 .tu-detail-hint { margin: 0; font-size: 12px; color: var(--tu-text-subtle); }
 

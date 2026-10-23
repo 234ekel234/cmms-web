@@ -29,6 +29,15 @@ export type SheetOptions = {
   showPauses: boolean;
 };
 
+/**
+ * The progress notes that may go on paper: never a staff-only note. A sheet is
+ * handed around a site and cannot be recalled — the same reason cost stays off
+ * it — so an internal note is left out even when staff print it.
+ */
+export function printableNotes(order: Pick<PrintableWorkOrder, "comments">) {
+  return order.comments.filter((c) => !c.isInternal);
+}
+
 export const DEFAULT_SHEET_OPTIONS: SheetOptions = { showProgress: true, showNotes: false, showPauses: false };
 
 type Asset = {
@@ -67,7 +76,7 @@ export type PrintableWorkOrder = {
   asset: Asset | null;
   assignments: { id: string; employee: { id: string; name: string; position: string | null } }[];
   checklistItems: { id: string; description: string; isDone: boolean; order: number }[];
-  comments: { id: string; body: string; authorName: string; createdAt: string }[];
+  comments: { id: string; body: string; authorName: string; createdAt: string; isInternal?: boolean }[];
   plan?: { id: string; title: string; frequency: string } | null;
   parts?: { id: string; description: string; quantity: number; part?: { unit: string | null } | null }[];
   pauses?: { id: string; kind?: "CLOCK" | "HOLD" | "SENT_BACK"; reason: string; pausedByName: string; pausedAt: string; resumedAt: string | null }[];
@@ -238,12 +247,12 @@ export default function WorkOrderSheet({
         </div>
       </section>
 
-      {showNotes && order.comments.length > 0 && (
+      {showNotes && printableNotes(order).length > 0 && (
         <section className="ps-section">
           <h2>Progress notes</h2>
           <table className="ps-table">
             <tbody>
-              {order.comments.map((c) => (
+              {printableNotes(order).map((c) => (
                 <tr key={c.id}>
                   <td style={{ width: 150 }} className="ps-muted">{c.authorName}<br />{fmtDateTime(c.createdAt)}</td>
                   <td className="ps-text">{c.body}</td>

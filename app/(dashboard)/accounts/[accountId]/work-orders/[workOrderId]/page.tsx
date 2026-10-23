@@ -653,6 +653,10 @@ export default function WorkOrderDetailPage() {
     }
   }
 
+  // Staff only: whether the next update is an internal note. Sticky by design —
+  // see ProgressThread.
+  const [internalNote, setInternalNote] = useState(false);
+
   async function addComment() {
     const text = commentText.trim();
     // Either alone is a valid update: a set of photos needs no caption, and a
@@ -667,10 +671,11 @@ export default function WorkOrderDetailPage() {
       if (staged.length > 0) {
         const form = new FormData();
         if (text) form.append("body", text);
+        if (internalNote && !isClient) form.append("internal", "true");
         for (const f of staged) form.append("files", f);
         res = await api.post(`/work-orders/${order.id}/comments`, form);
       } else {
-        res = await api.post(`/work-orders/${order.id}/comments`, { body: text });
+        res = await api.post(`/work-orders/${order.id}/comments`, { body: text, internal: internalNote && !isClient });
       }
       setOrder((prev) => prev ? { ...prev, comments: [...prev.comments, res.data] } : prev);
       setCommentText("");
@@ -1695,6 +1700,7 @@ export default function WorkOrderDetailPage() {
         onPost={addComment}
         posting={submittingComment}
         error={progressError}
+        {...(isClient ? {} : { internal: internalNote, onInternalChange: setInternalNote })}
       />
     </div>
   );

@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import api from "@/lib/api";
 import { MAX_BATCH_PRINT } from "@/lib/workOrders";
 import { useAuth } from "@/context/AuthContext";
-import WorkOrderSheet, { DEFAULT_SHEET_OPTIONS, type PrintableWorkOrder } from "@/components/print/WorkOrderSheet";
+import WorkOrderSheet, { DEFAULT_SHEET_OPTIONS, type PrintableWorkOrder, printableNotes } from "@/components/print/WorkOrderSheet";
 import SheetOptionsBar from "@/components/print/SheetOptionsBar";
 
 /**
@@ -72,7 +72,7 @@ function BatchPrint() {
         }
         options={options}
         onChange={setOptions}
-        hasNotes={found.some((o) => o.comments.length > 0)}
+        hasNotes={found.some((o) => printableNotes(o).length > 0)}
         hasPauses={found.some((o) => (o.pauses ?? []).length > 0)}
       />
       {found.map((o) => (

@@ -30,6 +30,8 @@ export type ProgressEntry = {
   body: string;
   authorName: string;
   createdAt: string;
+  /** Staff-only: the API never sends these to a client. */
+  isInternal?: boolean;
   attachments?: ProgressAttachment[];
 };
 
@@ -44,6 +46,14 @@ type Props = {
   onPost: () => void;
   posting: boolean;
   error?: string;
+  /**
+   * Staff only: whether the next update is an internal note. Omit both for a
+   * client, who gets no such control. Deliberately sticky — it stays as left
+   * after posting, because posting a second internal note publicly by accident
+   * is the mistake that matters.
+   */
+  internal?: boolean;
+  onInternalChange?: (v: boolean) => void;
 };
 
 function contentUrl(a: ProgressAttachment) {
@@ -71,7 +81,7 @@ function initials(name: string) {
 
 export default function ProgressThread({
   entries, text, onTextChange, staged, onStageFiles, onUnstage,
-  fileInputRef, onPost, posting, error,
+  fileInputRef, onPost, posting, error, internal = false, onInternalChange,
 }: Props) {
   const canPost = (text.trim().length > 0 || staged.length > 0) && !posting;
 
@@ -94,7 +104,7 @@ export default function ProgressThread({
             const photos = (e.attachments ?? []).filter((a) => a.isImage);
             const files = (e.attachments ?? []).filter((a) => !a.isImage);
             return (
-              <li key={e.id} className="tu-thread-item">
+              <li key={e.id} className={`tu-thread-item${e.isInternal ? " tu-thread-internal" : ""}`}>
                 <span className="tu-thread-avatar" aria-hidden="true">{initials(e.authorName)}</span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="flex items-baseline gap-2 flex-wrap">
@@ -102,6 +112,7 @@ export default function ProgressThread({
                     <time dateTime={e.createdAt} className="text-xs text-[var(--tu-text-subtle)]">
                       {stamp(e.createdAt)}
                     </time>
+                    {e.isInternal && <span className="tu-internal-badge">Staff only</span>}
                   </div>
 
                   {e.body && (
@@ -171,13 +182,21 @@ export default function ProgressThread({
 
         {error && <p className="tu-danger-text" style={{ fontSize: 12.5, marginBottom: 8 }}>{error}</p>}
 
+        {onInternalChange && (
+          <label className="tu-internal-toggle">
+            <input type="checkbox" checked={internal} onChange={(ev) => onInternalChange(ev.target.checked)} />
+            Staff only — hidden from the client
+          </label>
+        )}
+
         <div className="flex gap-2 items-start">
           <textarea
-            className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+            className={`flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]${internal ? " tu-internal-input" : ""}`}
             rows={2}
             value={text}
             onChange={(ev) => onTextChange(ev.target.value)}
-            placeholder="What was found, what was done…"
+            placeholder={internal ? "A note for staff only — the client won't see it" : "What was found, what was done…"}
+            aria-label={internal ? "Internal note" : "Update"}
             // Enter posts; Shift+Enter starts a new line, since these run long.
             onKeyDown={(ev) => {
               if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); if (canPost) onPost(); }
@@ -201,7 +220,7 @@ export default function ProgressThread({
             className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             style={{ whiteSpace: "nowrap" }}
           >
-            {posting ? "Posting…" : "Post"}
+            {posting ? "Posting…" : internal ? "Post internal note" : "Post"}
           </button>
         </div>
       </div>

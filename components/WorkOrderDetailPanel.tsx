@@ -252,6 +252,12 @@ export default function WorkOrderDetailPanel({
     }
   }
 
+  // Staff only: the next update is an internal note. Tied to the order it was
+  // set on, so moving to another job in the queue starts back at public —
+  // without an effect resetting it.
+  const [internalFor, setInternalFor] = useState<string | null>(null);
+  const internalNote = internalFor === order.id;
+
   async function postComment() {
     const text = commentText.trim();
     if ((!text && staged.length === 0) || posting) return;
@@ -264,10 +270,11 @@ export default function WorkOrderDetailPanel({
       if (staged.length > 0) {
         const form = new FormData();
         if (text) form.append("body", text);
+        if (internalNote && !isClient) form.append("internal", "true");
         for (const f of staged) form.append("files", f);
         res = await api.post(`/work-orders/${order.id}/comments`, form);
       } else {
-        res = await api.post(`/work-orders/${order.id}/comments`, { body: text });
+        res = await api.post(`/work-orders/${order.id}/comments`, { body: text, internal: internalNote && !isClient });
       }
       setComments((prev) => [...prev, res.data]);
       setCommentText("");
@@ -562,6 +569,7 @@ export default function WorkOrderDetailPanel({
             onPost={postComment}
             posting={posting}
             error={threadError}
+            {...(isClient ? {} : { internal: internalNote, onInternalChange: (v: boolean) => setInternalFor(v ? order.id : null) })}
           />
         </div>
       </div>

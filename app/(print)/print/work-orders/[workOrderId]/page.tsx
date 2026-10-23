@@ -6,7 +6,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { workOrderRef } from "@/lib/workOrders";
-import WorkOrderSheet, { DEFAULT_SHEET_OPTIONS, type PrintableWorkOrder } from "@/components/print/WorkOrderSheet";
+import WorkOrderSheet, { DEFAULT_SHEET_OPTIONS, type PrintableWorkOrder, printableNotes } from "@/components/print/WorkOrderSheet";
 import SheetOptionsBar from "@/components/print/SheetOptionsBar";
 
 /** One work order's job sheet. The sheet itself is components/print/WorkOrderSheet. */
@@ -44,7 +44,7 @@ export default function PrintWorkOrderPage() {
         back={<Link href={backHref}>← Back to {workOrderRef(order.number)}</Link>}
         options={options}
         onChange={setOptions}
-        hasNotes={order.comments.length > 0}
+        hasNotes={printableNotes(order).length > 0}
         hasPauses={(order.pauses ?? []).length > 0}
       />
       <WorkOrderSheet order={order} options={options} printedBy={user?.name} />
