@@ -8,7 +8,8 @@ import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 import type { WorkOrderStatus } from "@/lib/statuses";
-import { awaitingClient, isDone, needsClientApproval, signOffCue, workOrderRef } from "@/lib/workOrders";
+import { awaitingClient, isDone, needsClientApproval, signOffCue, surveyable, workOrderRef } from "@/lib/workOrders";
+import { SurveyForm } from "@/components/ClientSurvey";
 
 // ── Types ────────────────────────────────────────────────
 // Imported, not re-declared. A local copy of this union is what crashed this
@@ -29,6 +30,8 @@ type WorkOrder = {
   number: number;
   /** Null on COMPLETED work the team has not checked yet. */
   verifiedAt?: string | null;
+  /** Whether the client has rated it — see the survey under sign-off. */
+  surveyDone?: boolean;
   title: string;
   description: string | null;
   status: Status;
@@ -109,11 +112,13 @@ function RequestCard({
   isClient,
   onAddComment,
   onSignOff,
+  onSurveyed,
 }: {
   order: WorkOrder;
   isClient: boolean;
   onAddComment: (body: string) => Promise<void>;
-  onSignOff: (status: "APPROVED" | "IN_PROGRESS", reason?: string) => Promise<void>;
+  onSignOff: (status: "APPROVED" | "ON_HOLD", reason?: string) => Promise<void>;
+  onSurveyed: () => void;
 }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -134,7 +139,7 @@ function RequestCard({
   const isTerminal = (isDeclined || isCompleted) && !awaiting;
   const cue = signOffCue(order, isClient);
 
-  async function handleSignOff(status: "APPROVED" | "IN_PROGRESS", reason?: string) {
+  async function handleSignOff(status: "APPROVED" | "ON_HOLD", reason?: string) {
     if (signingOff) return;
     setSigningOff(true);
     setSignOffError("");
@@ -217,6 +222,15 @@ function RequestCard({
         </div>
       )}
 
+      {/* Once signed off, the client is asked how it went — once. */}
+      {isClient && surveyable(order) && (
+        <div className="rounded-lg border border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] p-3 my-2.5">
+          {order.surveyDone
+            ? <p className="tu-survey-thanks">Thanks for your feedback.</p>
+            : <SurveyForm workOrderId={order.id} onDone={onSurveyed} />}
+        </div>
+      )}
+
       {/* Sign-off. Wording mirrors the detail page's panel deliberately: a client
           who reaches the same decision from either place should not have to work
           out that they are the same decision. */}
@@ -255,7 +269,7 @@ function RequestCard({
                     <button
                       type="button"
                       disabled={signingOff || !sendBackReason.trim()}
-                      onClick={() => handleSignOff("IN_PROGRESS", sendBackReason.trim())}
+                      onClick={() => handleSignOff("ON_HOLD", sendBackReason.trim())}
                       className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
                     >
                       {signingOff ? "Sending\u2026" : "Send back"}
@@ -421,7 +435,7 @@ export default function ClientPortalPage() {
   // the row it gets back rather than guessing the resulting state. A send-back
   // also writes a comment server-side, which is why the whole row is replaced
   // and the comment list re-read from the response.
-  async function signOff(workOrderId: string, status: "APPROVED" | "IN_PROGRESS", reason?: string) {
+  async function signOff(workOrderId: string, status: "APPROVED" | "ON_HOLD", reason?: string) {
     const res = await api.patch(`/work-orders/${workOrderId}`, reason ? { status, reason } : { status });
     setOrders((prev) =>
       prev.map((o) => (o.id === workOrderId ? { ...o, ...res.data, comments: res.data.comments ?? o.comments } : o))
@@ -624,6 +638,7 @@ export default function ClientPortalPage() {
               isClient={isClient}
               onAddComment={(body) => addComment(order.id, body)}
               onSignOff={(status, reason) => signOff(order.id, status, reason)}
+              onSurveyed={() => setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, surveyDone: true } : o)))}
             />
           ))}
         </div>

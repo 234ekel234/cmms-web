@@ -6,9 +6,10 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, canSendBack, isReviewer, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
 import ReasonDialog from "@/components/ReasonDialog";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
+import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
@@ -194,7 +195,13 @@ export default function WorkOrderDetailPage() {
 
   // Edit mode for non-status fields
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "" });
+  const [editForm, setEditForm] = useState({
+    priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "",
+    title: "", description: "", assetId: "",
+  });
+  // The site's assets, loaded when the edit form first opens.
+  const [editAssets, setEditAssets] = useState<{ id: string; name: string; assetCode?: string | null }[]>([]);
+  const [editError, setEditError] = useState("");
   const [savingBreakdown, setSavingBreakdown] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -348,16 +355,29 @@ export default function WorkOrderDetailPage() {
       dueDate: order.dueDate ? order.dueDate.slice(0, 10) : "",
       category: order.category ?? "",
       estimatedMinutes: order.estimatedMinutes != null ? String(order.estimatedMinutes) : "",
+      title: order.title,
+      description: order.description ?? "",
+      assetId: order.asset?.id ?? "",
     });
+    setEditError("");
     setEditing(true);
+    // Live assets only: the API refuses an archived one.
+    if (editAssets.length === 0) {
+      api.get(`/accounts/${accountId}/assets`).then((res) => setEditAssets(res.data)).catch(() => {});
+    }
   }
 
   async function saveEdit() {
     if (!order) return;
+    if (!editForm.title.trim()) { setEditError("A work order needs a title."); return; }
     setSavingEdit(true);
+    setEditError("");
     try {
       const estMin = editForm.estimatedMinutes.trim();
       const res = await api.patch(`/work-orders/${order.id}`, {
+        title: editForm.title.trim(),
+        description: editForm.description.trim() || null,
+        assetId: editForm.assetId || null,
         priority: editForm.priority,
         dueDate: editForm.dueDate || null,
         category: editForm.category.trim() || null,
@@ -375,8 +395,9 @@ export default function WorkOrderDetailPage() {
           }
         : res.data);
       setEditing(false);
-    } catch {
-      // silent
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setEditError(e?.response?.data?.error ?? "Couldn't save the changes.");
     } finally {
       setSavingEdit(false);
     }
@@ -865,6 +886,49 @@ export default function WorkOrderDetailPage() {
         {/* Inline edit form */}
         {editing && (
           <div className="bg-[var(--tu-bg-secondary)] rounded-xl p-4 mb-4 border border-[var(--tu-border)]">
+            {/* What the job is — correctable while it is open. Every change is
+                recorded in the History with before → after. */}
+            <div className="flex flex-col gap-3 mb-3">
+              <div>
+                <label htmlFor="edit-title" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Title</label>
+                <input
+                  id="edit-title"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                  value={editForm.title}
+                  maxLength={200}
+                  onChange={(e) => setEditForm((f) => ({ ...f, title: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-description" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Description</label>
+                <textarea
+                  id="edit-description"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-y"
+                  rows={3}
+                  maxLength={5000}
+                  value={editForm.description}
+                  onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label htmlFor="edit-asset" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Asset</label>
+                <select
+                  id="edit-asset"
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                  value={editForm.assetId}
+                  onChange={(e) => setEditForm((f) => ({ ...f, assetId: e.target.value }))}
+                >
+                  <option value="">No asset</option>
+                  {/* The current asset stays offered even before the list loads. */}
+                  {order.asset && !editAssets.some((a) => a.id === order.asset!.id) && (
+                    <option value={order.asset.id}>{order.asset.name}</option>
+                  )}
+                  {editAssets.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}{a.assetCode ? ` (${a.assetCode})` : ""}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Priority</label>
@@ -908,6 +972,7 @@ export default function WorkOrderDetailPage() {
                 />
               </div>
             </div>
+            {editError && <p role="alert" className="text-xs font-semibold text-[var(--tu-on-danger)] mb-2">{editError}</p>}
             <div className="flex gap-2 justify-end">
               <button
                 onClick={() => setEditing(false)}
@@ -1240,6 +1305,27 @@ export default function WorkOrderDetailPage() {
                   ? `Approved by ${order.approvedByName}${order.approvedAt ? ` on ${formatDate(order.approvedAt)}` : ""}`
                   : `Closed automatically — no client response${order.approvedAt ? ` by ${formatDate(order.approvedAt)}` : ""}`}
               </p>
+            )}
+          </div>
+        )}
+
+        {/* The client survey on signed-off client-facing work: the client is
+            asked once; supervisors and above read the answer. */}
+        {surveyable(order) && isClient && (
+          <div className="bg-[var(--tu-bg-secondary)] border border-[var(--tu-border)] rounded-lg p-3.5 mb-4">
+            {order.surveyDone ? (
+              <p className="tu-survey-thanks">Thanks for your feedback.</p>
+            ) : (
+              <SurveyForm workOrderId={order.id} onDone={() => setOrder((prev) => (prev ? { ...prev, surveyDone: true } : prev))} />
+            )}
+          </div>
+        )}
+        {surveyable(order) && isReviewer(user?.role) && (
+          <div className="bg-[var(--tu-bg-secondary)] border border-[var(--tu-border)] rounded-lg p-3.5 mb-4">
+            {order.survey ? (
+              <SurveyResult survey={order.survey} />
+            ) : (
+              <p className="text-xs text-[var(--tu-text-subtle)]">No client rating yet.</p>
             )}
           </div>
         )}

@@ -214,6 +214,9 @@ export default function ReportsPage() {
               ↓ Export CSV
             </button>
           )}
+          <Link href="/reports/client-satisfaction" className="tu-btn-secondary">
+            Client satisfaction
+          </Link>
           <button type="button" onClick={() => setShowPmExport(true)} className="tu-btn-primary">
             PM analytics (Excel)
           </button>

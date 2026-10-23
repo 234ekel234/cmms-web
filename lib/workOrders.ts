@@ -121,7 +121,26 @@ export type StageFacts = {
   /** Supervisor review. Null on COMPLETED work means it still awaits review. */
   verifiedAt?: string | null;
   verifiedByName?: string | null;
+  /** Whether the client has rated it. Everyone gets this. */
+  surveyDone?: boolean;
+  /** The rating itself — sent to supervisors and above only. */
+  survey?: SurveyScores;
 };
+
+export type SurveyScores = {
+  overall: number;
+  quality: number | null;
+  timeliness: number | null;
+  communication: number | null;
+  comment: string | null;
+  submittedByName: string;
+  createdAt: string;
+};
+
+/** A signed-off client-facing job, which the client may rate. */
+export function surveyable(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
+  return wo.status === "APPROVED" && needsClientApproval(wo);
+}
 
 /** What `stageNote` reads. Every field beyond status is optional so any list's row will do. */
 export type StageShape = ApprovalShape & StageFacts & {

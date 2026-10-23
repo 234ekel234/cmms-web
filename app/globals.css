@@ -2877,6 +2877,27 @@ figure:hover .tu-attachment-remove,
 .tu-person-empty { margin: 0; padding: 16px 20px; font-size: 13.5px; color: var(--tu-text-subtle); }
 .tu-person-note { margin: -8px 0 20px; font-size: 13px; color: var(--tu-text-subtle); }
 
+/* Client survey (components/ClientSurvey.tsx): the client's "How did we do?"
+   and the rating staff read. Stars take the priority-high amber; unlit ones
+   the disabled grey, so a 3/5 reads at a glance in both themes. */
+.tu-survey, .tu-survey-result { display: flex; flex-direction: column; gap: 8px; }
+.tu-survey-title { margin: 0; font-size: 14px; font-weight: 650; color: var(--tu-text-heading); }
+.tu-survey-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tu-survey-label { min-width: 150px; font-size: 13px; color: var(--tu-text-body); }
+.tu-survey-score { font-size: 13px; font-weight: 650; color: var(--tu-text-heading); }
+.tu-survey-aspects, .tu-survey-meta { margin: 0; font-size: 12.5px; color: var(--tu-text-subtle); }
+.tu-survey-comment { margin: 0; font-size: 13.5px; color: var(--tu-text-body); white-space: pre-wrap; }
+.tu-survey-error { margin: 0; font-size: 12.5px; color: var(--tu-on-danger); }
+.tu-survey-thanks { margin: 0; font-size: 13.5px; color: var(--tu-on-success); font-weight: 600; }
+.tu-stars { display: inline-flex; gap: 2px; line-height: 1; }
+.tu-stars-md { font-size: 22px; }
+.tu-stars-sm { font-size: 17px; }
+.tu-star-on { color: var(--tu-priority-high); }
+.tu-star-off { color: var(--tu-text-disabled); }
+.tu-star-btn { padding: 0 1px; border: none; background: none; cursor: pointer; font: inherit; line-height: 1; }
+.tu-star-btn:hover { transform: scale(1.12); }
+.tu-star-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 1px; border-radius: 3px; }
+
 /* A one-line explanation under a form control in the work-order pane. */
 .tu-detail-hint { margin: 0; font-size: 12px; color: var(--tu-text-subtle); }
 

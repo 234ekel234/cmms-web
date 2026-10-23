@@ -21,10 +21,13 @@ import {
   awaitingReview,
   awaitingClient,
   isReviewer,
+  surveyable,
+  type SurveyScores,
 } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
+import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
 
 /**
  * The right half of the split view: one work order, beside the queue.
@@ -133,6 +136,10 @@ export default function WorkOrderDetailPanel({
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [showPicker, setShowPicker] = useState(false);
 
+  // The client's rating, from the single-order fetch, for this order only.
+  const [fetchedSurvey, setFetchedSurvey] = useState<{ id: string; survey?: SurveyScores } | null>(null);
+  const survey = fetchedSurvey?.id === order.id ? fetchedSurvey.survey : order.survey;
+
   // The thread is not on the list row — it arrives with the fetch below.
   const [comments, setComments] = useState<ProgressEntry[]>(order.comments ?? []);
   const [commentText, setCommentText] = useState("");
@@ -155,6 +162,9 @@ export default function WorkOrderDetailPanel({
       try {
         const res = await api.get(`/work-orders/${order.id}`);
         if (!cancelled) setComments(res.data.comments ?? []);
+        // The rating is on the single order only — list rows say whether one
+        // exists, not what it was.
+        if (!cancelled) setFetchedSurvey({ id: order.id, survey: res.data.survey });
       } catch {
         // The facts above are already on screen from the list row; a failed
         // thread fetch should not blank them.
@@ -377,6 +387,21 @@ export default function WorkOrderDetailPanel({
             />
           )}
         </div>
+
+        {/* ── Client survey ── on signed-off client-facing work. */}
+        {surveyable(order) && (isClient || isReviewer(user?.role)) && (
+          <div className="tu-detail-section">
+            {isClient ? (
+              order.surveyDone
+                ? <p className="tu-survey-thanks">Thanks for your feedback.</p>
+                : <SurveyForm workOrderId={order.id} onDone={() => onChanged({ id: order.id, surveyDone: true })} />
+            ) : survey ? (
+              <SurveyResult survey={survey} />
+            ) : (
+              <p className="tu-detail-hint">No client rating yet.</p>
+            )}
+          </div>
+        )}
 
         {/* ── Transitions ── */}
         {(nexts.length > 0 || clientDecision || staffSendBack || canVerify) && (
