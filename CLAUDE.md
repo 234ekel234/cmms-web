@@ -2,14 +2,14 @@
 
 ## Project Overview
 
-This is the **web frontend** for the CMMS (Computerized Maintenance Management System). It is a Next.js 15 app with Tailwind CSS, targeting managers, supervisors, technicians and
+This is the **web frontend** for the CMMS (Computerized Maintenance Management System). It is a Next.js 16 app with Tailwind CSS, targeting managers, supervisors, technicians and
 clients on desktop browsers. It talks to the shared Express REST API.
 
 ## Development Commands
 
 ```bash
 npm install
-npm run dev       # Start dev server (port 3001 — change in package.json if needed)
+npm run dev       # Start dev server (port 3001)
 npm run build     # Production build
 npm run lint      # ESLint check
 ```
@@ -24,7 +24,7 @@ NEXT_PUBLIC_API_URL=http://localhost:3000/api   # dev
 
 ## Architecture
 
-- **Framework:** Next.js 15 (App Router)
+- **Framework:** Next.js 16 (App Router), React 19
 - **Styling:** Tailwind CSS
 - **HTTP:** Axios via `lib/api.ts` — attaches JWT from localStorage automatically
 - **Auth:** JWT stored in localStorage; `lib/auth.ts` handles session helpers

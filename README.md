@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CMMS — Web Client
 
-## Getting Started
+The primary client of the CMMS: a Next.js app for managers, supervisors, technicians and
+clients, live at **https://cmms.servicemasterph.com**. It talks to the Express API in
+`../backend` and holds no data of its own.
 
-First, run the development server:
+## Stack
+
+Next.js 16 (App Router), React 19, TypeScript, Tailwind CSS, Axios. Excel exports use
+`exceljs`; QR labels are drawn locally.
+
+## Development
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev        # http://localhost:3001
+npm run lint
+npx tsc --noEmit   # type check
+npm run build      # production build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Create `.env.local`:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```env
+NEXT_PUBLIC_API_URL=http://localhost:3000/api   # defaults to this when unset
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run the backend alongside it (`cd ../backend && npm run dev`). The demo logins are in the
+backend seeds.
 
-## Learn More
+## Layout
 
-To learn more about Next.js, take a look at the following resources:
+```
+app/
+  (auth)/        login
+  (dashboard)/   every signed-in page — dashboard, accounts, work orders, assets,
+                 employees, reports, users …
+  (print)/       printable sheets: job sheets, PM checklist forms, asset QR labels
+components/      shared UI (work-order queue and pane, dashboard widgets, print parts)
+lib/             API client, auth, role rules (rbac.ts), work-order rules
+                 (workOrders.ts, statuses.ts), dashboard model and layout
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+`lib/rbac.ts` and `lib/workOrders.ts` mirror the backend's role and transition rules. They
+decide what to **offer**; the API decides what is **allowed**. See `CLAUDE.md` for the rules
+that must stay in step with the backend.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Deployment
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Vercel deploys on push. Deploy the backend first when a change needs both.
+`../backend/DEPLOY.md` §13 covers the domain.
