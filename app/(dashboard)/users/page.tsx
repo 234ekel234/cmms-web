@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
@@ -352,7 +353,7 @@ export default function UsersPage() {
                   return (
                     <tr key={u.id}>
                       <td>
-                        <span className="tu-strong">{u.name}</span>
+                        <Link href={`/users/${u.id}`} className="tu-strong tu-row-link">{u.name}</Link>
                         {isMe && (
                           <span
                             style={{ marginLeft: 6, fontSize: 11, color: "var(--tu-text-subtle)" }}

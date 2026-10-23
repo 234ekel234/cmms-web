@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { EmptyRow } from "@/components/EmptyState";
@@ -500,7 +501,9 @@ export default function EmployeesPage() {
                   const ty = TYPE_CONFIG[empType(emp)];
                   return (
                     <tr key={emp.id}>
-                      <td className="tu-strong">{emp.name}</td>
+                      <td className="tu-strong">
+                        <Link href={`/employees/${emp.id}`} className="tu-row-link">{emp.name}</Link>
+                      </td>
                       <td style={{ color: "var(--tu-text-body)" }}>
                         {emp.position ?? <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
                       </td>
