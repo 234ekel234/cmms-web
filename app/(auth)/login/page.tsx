@@ -28,7 +28,7 @@ export default function LoginPage() {
       });
       const { token, user } = res.data;
       saveSession(token, user);
-      router.push("/accounts");
+      router.push(user.mustChangePassword ? "/change-password" : "/accounts");
     } catch (err) {
       setError((isAxiosError(err) && err.response?.data?.error) || "Incorrect email or password.");
     } finally {

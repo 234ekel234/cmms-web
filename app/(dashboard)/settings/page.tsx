@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import PasswordChangeForm from "@/components/PasswordChangeForm";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle, { ThemeHint } from "@/components/ThemeToggle";
@@ -31,6 +32,7 @@ export default function SettingsPage() {
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
+  const [pwChanged, setPwChanged] = useState(false);
 
   useEffect(() => { fetchPrefs(); }, []);
 
@@ -137,8 +139,26 @@ export default function SettingsPage() {
             </div>
           </div>
           <p style={{ fontSize: 12, color: "var(--tu-text-subtle)" }}>
-            To update your name, email, or password, contact your system administrator.
+            To update your name or email, contact your system administrator.
           </p>
+        </div>
+      </div>
+
+      {/* Password */}
+      <div className="tu-card" style={{ marginBottom: 24 }}>
+        <div className="tu-card-header">
+          <h2 className="tu-card-title">Password</h2>
+        </div>
+        <div style={{ padding: "0 24px 24px" }}>
+          <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+            Changing it signs you out on every other device.
+          </p>
+          {pwChanged && (
+            <p role="status" style={{ fontSize: 13, fontWeight: 600, color: "var(--tu-on-success)", marginBottom: 12 }}>
+              Password changed.
+            </p>
+          )}
+          <PasswordChangeForm onDone={() => setPwChanged(true)} />
         </div>
       </div>
 

@@ -42,6 +42,16 @@ api.interceptors.response.use(
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
+    // A password someone else chose must be replaced first; the API refuses
+    // everything else until it is (backend withCurrentRole).
+    if (
+      err.response?.status === 403 &&
+      err.response?.data?.code === "PASSWORD_CHANGE_REQUIRED" &&
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/change-password"
+    ) {
+      window.location.href = "/change-password";
+    }
     return Promise.reject(err);
   }
 );

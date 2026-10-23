@@ -134,7 +134,7 @@ export default function GiveLoginModal({
               onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
             />
             <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
-              They can be given a new one later from the Users page.
+              They&apos;ll choose their own the first time they sign in. If it&apos;s lost, reset it from their employee page.
             </p>
           </div>
 

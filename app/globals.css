@@ -3573,3 +3573,10 @@ figure:hover .tu-attachment-remove,
   color: var(--tu-text-brand);
   background: var(--tu-bg-secondary);
 }
+
+/* ── Passwords: own change (Settings, first sign-in) and staff reset ── */
+.tu-field-error { margin-top: 6px; font-size: 12px; font-weight: 600; color: var(--tu-on-danger); }
+.tu-reset-pw { display: flex; flex-direction: column; gap: 6px; }
+.tu-reset-pw-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.tu-reset-pw-row .tu-input { flex: 1; min-width: 160px; }
+.tu-reset-pw-note { font-size: 12px; color: var(--tu-text-subtle); max-width: 48ch; }

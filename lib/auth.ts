@@ -3,6 +3,8 @@ export type User = {
   name: string;
   role: "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
   email: string;
+  /** Set when someone else chose the password; the API refuses all else until it changes. */
+  mustChangePassword?: boolean;
 };
 
 export function getUser(): User | null {

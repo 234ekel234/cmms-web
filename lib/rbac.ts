@@ -10,6 +10,18 @@ export const ALL_ROLES: Role[] = ["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "T
 export const STAFF: Role[] = ["GENERAL_MANAGER", "MANAGER", "SUPERVISOR"];
 // Manager-level — account/user administration.
 export const MANAGERS: Role[] = ["GENERAL_MANAGER", "MANAGER"];
+
+/**
+ * Whose password a role may reset: anyone it could have created
+ * (`creatableRoles` in backend/routes/userRoutes.js). The API also requires a
+ * shared site; this only decides whether to offer the button.
+ */
+export function canResetPassword(caller: Role | undefined, target: string): boolean {
+  if (caller === "GENERAL_MANAGER") return true;
+  if (caller === "MANAGER") return ["SUPERVISOR", "CLIENT", "TECHNICIAN"].includes(target);
+  if (caller === "SUPERVISOR") return target === "TECHNICIAN";
+  return false;
+}
 // Everyone who does or directs the work on the ground. The opt-in tier: a
 // technician reaches a page only where it names this, so a page nobody has
 // thought about stays shut rather than opening by default.

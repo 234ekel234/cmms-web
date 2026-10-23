@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
-import { MANAGERS, hasRole } from "@/lib/rbac";
+import { MANAGERS, hasRole, canResetPassword } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import ResetPasswordButton from "@/components/ResetPasswordButton";
 import Credentials from "@/components/Credentials";
 import EmptyState from "@/components/EmptyState";
 import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
@@ -199,6 +200,11 @@ export default function EmployeePage() {
                       employee.login.email
                     )}
                     <span className="tu-person-muted"> · {ROLE_LABEL[employee.login.role] ?? employee.login.role}</span>
+                    {user && user.id !== employee.login.id && canResetPassword(user.role, employee.login.role) && (
+                      <div style={{ marginTop: 8 }}>
+                        <ResetPasswordButton userId={employee.login.id} name={employee.name} />
+                      </div>
+                    )}
                   </>
                 ) : (
                   <span className="tu-person-muted">No login</span>

@@ -30,6 +30,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // including via direct URL navigation. Re-runs on every path change.
   useEffect(() => {
     if (!user) return;
+    if (user.mustChangePassword) {
+      router.replace("/change-password");
+      return;
+    }
     if (!canAccessRoute(user.role, pathname)) {
       router.replace(ROLE_HOME[user.role]);
     }
@@ -40,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.replace("/login");
   }
 
-  if (!user) return null;
+  if (!user || user.mustChangePassword) return null;
   // Don't flash protected content while the redirect above is in flight.
   if (!canAccessRoute(user.role, pathname)) return null;
 

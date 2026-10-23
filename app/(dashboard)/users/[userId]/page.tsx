@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import api from "@/lib/api";
 import Breadcrumbs from "@/components/Breadcrumbs";
+import ResetPasswordButton from "@/components/ResetPasswordButton";
+import { useAuth } from "@/context/AuthContext";
+import { canResetPassword } from "@/lib/rbac";
 
 /**
  * One login: who they are, the sites they belong to and in what role, the
@@ -50,6 +53,7 @@ export default function UserPage() {
   const { userId } = useParams<{ userId: string }>();
   const [user, setUser] = useState<UserDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { user: me } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -117,6 +121,12 @@ export default function UserPage() {
               <dt>Login created</dt>
               <dd>{fmtDate(user.createdAt)}</dd>
             </div>
+            {me && me.id !== user.id && canResetPassword(me.role, user.role) && (
+              <div>
+                <dt>Password</dt>
+                <dd><ResetPasswordButton userId={user.id} name={user.name} /></dd>
+              </div>
+            )}
           </dl>
         </section>
 
