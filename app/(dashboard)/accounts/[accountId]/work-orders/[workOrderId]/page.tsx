@@ -6,7 +6,8 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, canSendBack, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import ReasonDialog from "@/components/ReasonDialog";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
@@ -162,6 +163,8 @@ export default function WorkOrderDetailPage() {
   // Client review of finished work.
   const [sendingBack, setSendingBack] = useState(false);
   const [sendBackReason, setSendBackReason] = useState("");
+  // Putting a job on hold, or a supervisor sending finished work back: both ask why.
+  const [reasonDialog, setReasonDialog] = useState<null | "HOLD" | "SEND_BACK">(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -410,18 +413,19 @@ export default function WorkOrderDetailPage() {
     }
   }
 
-  async function updateStatus(status: WorkOrderStatus, opts: { reason?: string } = {}) {
-    if (!order) return;
+  // Returns the API's refusal, or null — the reason dialog shows the refusal.
+  async function updateStatus(status: WorkOrderStatus, opts: { reason?: string } = {}): Promise<string | null> {
+    if (!order) return null;
     if (status === "REJECTED" && !(await confirm({
       title: "Reject this work order?",
       message: "It will be closed without any work done. A rejected order can't be reopened.",
       confirmLabel: "Reject",
-    }))) return;
+    }))) return null;
     setUpdatingStatus(true);
     try {
       const body: { status: WorkOrderStatus; remarks?: string; reason?: string } = { status };
       if (status === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
-      // Required by the API when a client sends completed work back.
+      // Required by the API to go on hold, and to send completed work back.
       if (opts.reason) body.reason = opts.reason;
       const res = await api.patch(`/work-orders/${order.id}`, body);
       // PATCH responses omit comments (and other relations); merge so we don't
@@ -444,8 +448,10 @@ export default function WorkOrderDetailPage() {
       setRemarks("");
       setSendingBack(false);
       setSendBackReason("");
-    } catch {
-      // silent
+      return null;
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      return e?.response?.data?.error ?? "Couldn't change the status. Try again.";
     } finally {
       setUpdatingStatus(false);
     }
@@ -1239,7 +1245,7 @@ export default function WorkOrderDetailPage() {
                         type="button"
                         className="tu-btn-primary tu-btn-sm"
                         disabled={updatingStatus || !sendBackReason.trim()}
-                        onClick={() => updateStatus("IN_PROGRESS", { reason: sendBackReason.trim() })}
+                        onClick={() => updateStatus("ON_HOLD", { reason: sendBackReason.trim() })}
                       >
                         {updatingStatus ? "Sending…" : "Send back"}
                       </button>
@@ -1314,6 +1320,7 @@ export default function WorkOrderDetailPage() {
                     key={ns}
                     onClick={() => {
                       if (ns === "COMPLETED") { setShowCompleteForm(true); return; }
+                      if (ns === "ON_HOLD") { setReasonDialog("HOLD"); return; }
                       updateStatus(ns);
                     }}
                     disabled={updatingStatus}
@@ -1339,6 +1346,36 @@ export default function WorkOrderDetailPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Quality control: a supervisor or above may send any completed job
+            back, before or after the client sees it. Lands On Hold, with why. */}
+        {!isClient && canSendBack(user?.role, order) && (
+          <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
+            <button
+              type="button"
+              onClick={() => setReasonDialog("SEND_BACK")}
+              disabled={updatingStatus}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]"
+            >
+              Send back for rework
+            </button>
+          </div>
+        )}
+
+        {reasonDialog && (
+          <ReasonDialog
+            title={reasonDialog === "SEND_BACK" ? "Send back for rework" : "Put on hold"}
+            subtitle={`${workOrderRef(order.number)} · ${order.title}`}
+            label={reasonDialog === "SEND_BACK" ? "What still needs doing?" : "Why is it going on hold?"}
+            placeholder={reasonDialog === "SEND_BACK" ? "The drain still backs up under load." : "Waiting for the replacement compressor."}
+            hint={reasonDialog === "SEND_BACK"
+              ? "It goes back On Hold, and the reason is posted to the job's updates for the technician."
+              : "Shown to staff as the job's status line. Clients don't see the reason."}
+            confirmLabel={reasonDialog === "SEND_BACK" ? "Send back" : "Put on hold"}
+            onSubmit={(reason) => updateStatus("ON_HOLD", { reason })}
+            onClose={() => setReasonDialog(null)}
+          />
         )}
 
         {order.isSpecialProject && order.status === "REQUESTED" && !isManager && !isClient && (

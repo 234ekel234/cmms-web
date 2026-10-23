@@ -14,6 +14,7 @@ import WorkOrderQueue from "@/components/WorkOrderQueue";
 import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDetailPanel";
 import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
+import ReasonDialog from "@/components/ReasonDialog";
 import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
@@ -207,6 +208,8 @@ export default function WorkOrdersPage() {
   const [timerBusyId, setTimerBusyId] = useState<string | null>(null);
   // The order whose Pause was pressed — the dialog asks why before stopping it.
   const [pauseTarget, setPauseTarget] = useState<WorkOrder | null>(null);
+  // The order being put on hold, while the reason dialog is open.
+  const [holdTarget, setHoldTarget] = useState<WorkOrder | null>(null);
   const [timerError, setTimerError] = useState<string | null>(null);
 
   // Ticks once a second so running work-order timers stay live — but only while
@@ -333,14 +336,17 @@ export default function WorkOrdersPage() {
     }
   }
 
-  async function updateStatus(id: string, status: WorkOrderStatus) {
+  // Returns the API's refusal, or null. Going on hold asks why first, through
+  // the dialog below, which calls back in with the reason.
+  async function updateStatus(id: string, status: WorkOrderStatus, reason?: string): Promise<string | null> {
+    if (status === "ON_HOLD" && !reason) { setHoldTarget(orders.find((o) => o.id === id) ?? null); return null; }
     if (status === "REJECTED" && !(await confirm({
       title: "Reject this work order?",
       message: "It will be closed without any work done. A rejected order can't be reopened.",
       confirmLabel: "Reject",
-    }))) return;
+    }))) return null;
     try {
-      const res = await api.patch(`/work-orders/${id}`, { status });
+      const res = await api.patch(`/work-orders/${id}`, reason ? { status, reason } : { status });
       // Merged, not replaced. PATCH returns the row with `asset` and
       // `assignments` only — no `checklistItems` — so assigning the response
       // wholesale dropped the array the card's "3/6" counter reads, and the
@@ -348,8 +354,10 @@ export default function WorkOrdersPage() {
       setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, ...res.data } : o)));
       setFlashId(id);
       window.setTimeout(() => setFlashId((cur) => (cur === id ? null : cur)), 1500);
-    } catch {
-      // silent
+      return null;
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      return e?.response?.data?.error ?? "Couldn't change the status. Try again.";
     }
   }
 
@@ -671,6 +679,18 @@ export default function WorkOrdersPage() {
         </div>
       )}
       {timerError && <div className="tu-error-banner" role="alert">{timerError}</div>}
+      {holdTarget && (
+        <ReasonDialog
+          title="Put on hold"
+          subtitle={`${workOrderRef(holdTarget.number)} · ${holdTarget.title}`}
+          label="Why is it going on hold?"
+          placeholder="Waiting for the replacement compressor."
+          hint="Shown to staff as the job's status line. Clients don't see the reason."
+          confirmLabel="Put on hold"
+          onSubmit={(reason) => updateStatus(holdTarget.id, "ON_HOLD", reason)}
+          onClose={() => setHoldTarget(null)}
+        />
+      )}
       {pauseTarget && (
         <PauseTimerDialog
           order={pauseTarget}

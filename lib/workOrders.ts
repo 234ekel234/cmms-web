@@ -100,7 +100,8 @@ export function signOffCue(
  */
 export type StageFacts = {
   /** The pause the clock is stopped on; always null for a client. */
-  openPause?: { reason: string; pausedAt?: string; pausedByName?: string } | null;
+  /** CLOCK: the clock was paused. HOLD: put On Hold. SENT_BACK: completed work returned. */
+  openPause?: { reason: string; kind?: "CLOCK" | "HOLD" | "SENT_BACK"; pausedAt?: string; pausedByName?: string } | null;
   /** When an unanswered sign-off closes itself — the API alone knows the grace period. */
   autoApproveAt?: string | null;
   /** Null on approved work means the nightly sweep closed it, not the client. */
@@ -150,7 +151,10 @@ export function stageNote(wo: StageShape, isClient: boolean, now = Date.now()): 
       if (wo.openPause) return note(`Paused — ${wo.openPause.reason}`, true);
       return note("Started — clock not running", true);
     case "ON_HOLD":
-      return note("On hold — resume it to continue", !isClient);
+      if (isClient) return note("On hold — the team will resume it");
+      if (wo.openPause?.kind === "SENT_BACK") return note(`Sent back — ${wo.openPause.reason}`, true);
+      if (wo.openPause) return note(`On hold — ${wo.openPause.reason}`, true);
+      return note("On hold — resume it to continue", true);
     case "COMPLETED": {
       if (!needsClientApproval(wo)) return note("Done");
       const who = isClient ? "Waiting for your sign-off" : "Waiting for client sign-off";
@@ -224,9 +228,10 @@ export function passesFilters(
  * side sheet offers the same buttons. Two copies of a transition table is how
  * one of them ends up drawing a control the API refuses.
  *
- * Staff transitions only. The two moves out of COMPLETED — approve, or send
- * back for rework — belong to the client and are offered by their own controls,
- * so a manager is never shown an Approve button that would 403.
+ * Staff transitions only, and none out of COMPLETED. Approving is the
+ * client's alone, and sending back is role-gated and always asks why, so both
+ * are offered by their own controls (see canSendBack) — a manager is never
+ * shown an Approve button that would 403.
  */
 export const STAFF_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   REQUESTED:   ["PENDING", "REJECTED"],
@@ -237,6 +242,25 @@ export const STAFF_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   APPROVED:    [],
   REJECTED:    [],
 };
+
+/**
+ * Who may send completed work back for rework, landing it On Hold with a
+ * reason. Mirrors transitionDenialReason in backend/helpers/workOrderApproval.js:
+ * a supervisor or above on any completed job (quality control is theirs), the
+ * client only on work awaiting their sign-off, a technician never. Offered by
+ * its own control rather than STAFF_TRANSITIONS, because it is role-gated and
+ * always asks why.
+ */
+export function canSendBack(role: string | undefined, wo: { status: WorkOrderStatus; type?: string; isSpecialProject?: boolean }): boolean {
+  if (wo.status !== "COMPLETED") return false;
+  if (role === "CLIENT") return needsClientApproval(wo);
+  return role === "SUPERVISOR" || role === "MANAGER" || role === "GENERAL_MANAGER";
+}
+
+/** Moves that must say why — the same rule as pausing the clock. */
+export function needsReason(to: WorkOrderStatus): boolean {
+  return to === "ON_HOLD";
+}
 
 /**
  * What to call a transition, given where the order is coming from.

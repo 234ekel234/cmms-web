@@ -70,7 +70,7 @@ export type PrintableWorkOrder = {
   comments: { id: string; body: string; authorName: string; createdAt: string }[];
   plan?: { id: string; title: string; frequency: string } | null;
   parts?: { id: string; description: string; quantity: number; part?: { unit: string | null } | null }[];
-  pauses?: { id: string; reason: string; pausedByName: string; pausedAt: string; resumedAt: string | null }[];
+  pauses?: { id: string; kind?: "CLOCK" | "HOLD" | "SENT_BACK"; reason: string; pausedByName: string; pausedAt: string; resumedAt: string | null }[];
 };
 
 const fmtDate = (iso: string | null) =>
@@ -256,15 +256,17 @@ export default function WorkOrderSheet({
 
       {showPauses && pauses.length > 0 && (
         <section className="ps-section">
-          <h2>Pause log</h2>
+          <h2>Pauses, holds and send-backs</h2>
           <table className="ps-table">
             <tbody>
               {[...pauses].reverse().map((p) => (
                 <tr key={p.id}>
                   <td style={{ width: 150 }} className="ps-muted">{p.pausedByName}<br />{fmtDateTime(p.pausedAt)}</td>
                   <td className="ps-text">
+                    {p.kind === "HOLD" && <strong>On hold: </strong>}
+                    {p.kind === "SENT_BACK" && <strong>Sent back: </strong>}
                     {p.reason}
-                    <span className="ps-muted">{p.resumedAt ? ` — resumed ${fmtDateTime(p.resumedAt)}` : " — still paused"}</span>
+                    <span className="ps-muted">{p.resumedAt ? ` — resumed ${fmtDateTime(p.resumedAt)}` : " — still stopped"}</span>
                   </td>
                 </tr>
               ))}

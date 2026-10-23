@@ -16,8 +16,11 @@ import {
   transitionTone,
   workOrderRef,
   type StageFacts,
+  canSendBack,
+  needsReason,
 } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * The right half of the split view: one work order, beside the queue.
@@ -118,8 +121,10 @@ export default function WorkOrderDetailPanel({
   const [error, setError] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
   const [confirmComplete, setConfirmComplete] = useState(false);
-  const [sendBackReason, setSendBackReason] = useState("");
-  const [sendingBack, setSendingBack] = useState(false);
+  // Holding a job and sending one back both ask why, in the same box.
+  const [reasonFor, setReasonFor] = useState<null | "HOLD" | "SEND_BACK">(null);
+  const [reasonText, setReasonText] = useState("");
+  const { user } = useAuth();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [showPicker, setShowPicker] = useState(false);
@@ -175,6 +180,7 @@ export default function WorkOrderDetailPanel({
 
   async function move(to: WorkOrderStatus) {
     if (to === "COMPLETED" && !confirmComplete) { setConfirmComplete(true); return; }
+    if (needsReason(to)) { setReasonFor("HOLD"); setReasonText(""); return; }
     if (to === "REJECTED" && !(await confirm({
       title: "Reject this work order?",
       message: "It will be closed without any work done. A rejected order can't be reopened.",
@@ -185,17 +191,21 @@ export default function WorkOrderDetailPanel({
     if (await patch(body)) { setConfirmComplete(false); setRemarks(""); }
   }
 
-  async function sendBack() {
-    const reason = sendBackReason.trim();
-    if (!reason) return;
-    if (await patch({ status: "IN_PROGRESS", reason })) {
-      setSendingBack(false);
-      setSendBackReason("");
-      // The server writes the reason into the thread, so pull it back in.
-      try {
-        const res = await api.get(`/work-orders/${order.id}`);
-        setComments(res.data.comments ?? []);
-      } catch { /* the status change already landed */ }
+  // Both land the job On Hold with the reason; a send-back also posts the
+  // reason to the thread, so that is pulled back in.
+  async function submitReason() {
+    const reason = reasonText.trim();
+    if (!reason || !reasonFor) return;
+    const sendingBack = reasonFor === "SEND_BACK";
+    if (await patch({ status: "ON_HOLD", reason })) {
+      setReasonFor(null);
+      setReasonText("");
+      if (sendingBack) {
+        try {
+          const res = await api.get(`/work-orders/${order.id}`);
+          setComments(res.data.comments ?? []);
+        } catch { /* the status change already landed */ }
+      }
     }
   }
 
@@ -283,6 +293,8 @@ export default function WorkOrderDetailPanel({
   // STAFF_TRANSITIONS, which deliberately omits them so staff are never shown
   // an Approve button the API refuses.
   const clientDecision = isClient && order.status === "COMPLETED" && needsClientApproval(order);
+  // Quality control: a supervisor or above may send any completed job back.
+  const staffSendBack = !isClient && canSendBack(user?.role, order);
 
   return (
     <div className="tu-detail">
@@ -329,7 +341,7 @@ export default function WorkOrderDetailPanel({
         </div>
 
         {/* ── Transitions ── */}
-        {(nexts.length > 0 || clientDecision) && (
+        {(nexts.length > 0 || clientDecision || staffSendBack) && (
           <div className="tu-detail-section">
             <span className="tu-detail-label">Change status</span>
 
@@ -352,22 +364,27 @@ export default function WorkOrderDetailPanel({
                   </button>
                 </div>
               </div>
-            ) : sendingBack ? (
+            ) : reasonFor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <textarea
                   className="tu-input"
                   rows={3}
-                  value={sendBackReason}
-                  onChange={(e) => setSendBackReason(e.target.value)}
-                  placeholder="What still needs doing? (required)"
-                  aria-label="Reason for sending back"
+                  maxLength={500}
+                  value={reasonText}
+                  onChange={(e) => setReasonText(e.target.value)}
+                  placeholder={reasonFor === "SEND_BACK" ? "What still needs doing? (required)" : "Why is it going on hold? (required)"}
+                  aria-label={reasonFor === "SEND_BACK" ? "Reason for sending back" : "Reason for putting on hold"}
+                  autoFocus
                 />
+                {reasonFor === "SEND_BACK" && (
+                  <p className="tu-detail-hint">It goes back On Hold, and the reason is posted to the job&apos;s updates for the technician.</p>
+                )}
                 <div className="tu-detail-actions">
-                  <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setSendingBack(false)} disabled={busy}>
+                  <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setReasonFor(null)} disabled={busy}>
                     Cancel
                   </button>
-                  <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={sendBack} disabled={busy || !sendBackReason.trim()}>
-                    {busy ? "Sending…" : "Send back"}
+                  <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={submitReason} disabled={busy || !reasonText.trim()}>
+                    {busy ? "Saving…" : reasonFor === "SEND_BACK" ? "Send back" : "Put on hold"}
                   </button>
                 </div>
               </div>
@@ -376,12 +393,17 @@ export default function WorkOrderDetailPanel({
                 <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={() => patch({ status: "APPROVED" })} disabled={busy}>
                   {busy ? "Saving…" : "Approve"}
                 </button>
-                <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setSendingBack(true)} disabled={busy}>
+                <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => { setReasonFor("SEND_BACK"); setReasonText(""); }} disabled={busy}>
                   Send back for rework
                 </button>
               </div>
             ) : (
               <div className="tu-detail-actions">
+                {staffSendBack && (
+                  <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => { setReasonFor("SEND_BACK"); setReasonText(""); }} disabled={busy}>
+                    Send back for rework
+                  </button>
+                )}
                 {nexts.map((ns) => (
                   <button
                     key={ns}

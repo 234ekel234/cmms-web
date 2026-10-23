@@ -40,7 +40,7 @@ export default function SheetOptionsBar({
       {hasPauses && (
         <label>
           <input type="checkbox" checked={options.showPauses} onChange={toggle("showPauses")} />
-          Pause log
+          Pauses &amp; holds
         </label>
       )}
       <button type="button" className="ps-print-btn" onClick={() => window.print()}>
