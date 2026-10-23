@@ -23,6 +23,8 @@ type UserDetail = {
   createdAt: string;
   employee: { id: string; name: string; position: string | null; archivedAt: string | null } | null;
   accounts: { id: string; name: string; role: string }[];
+  /** Sites they belong to that the viewer does not manage — counted, not named. */
+  otherSites?: number;
   activity: {
     id: string;
     action: string;
@@ -120,9 +122,13 @@ export default function UserPage() {
 
         <section className="tu-card">
           <div className="tu-card-header"><h2 className="tu-card-title">Sites</h2></div>
-          {user.accounts.length === 0 ? (
+          {user.accounts.length === 0 && !user.otherSites ? (
             <p className="tu-person-empty">
               {user.role === "GENERAL_MANAGER" ? "A general manager reaches every site." : "Not a member of any site yet."}
+            </p>
+          ) : user.accounts.length === 0 ? (
+            <p className="tu-person-empty">
+              Works on {user.otherSites} site{user.otherSites === 1 ? "" : "s"} you don&apos;t manage.
             </p>
           ) : (
             <ul role="list" className="tu-person-list">
@@ -132,6 +138,9 @@ export default function UserPage() {
                   <span className="tu-person-muted"> · {ROLE_LABEL[a.role] ?? a.role}</span>
                 </li>
               ))}
+              {!!user.otherSites && (
+                <li className="tu-person-muted">…and {user.otherSites} other site{user.otherSites === 1 ? "" : "s"} you don&apos;t manage</li>
+              )}
             </ul>
           )}
         </section>
