@@ -211,6 +211,7 @@ function RequestCard({
           status={order.status}
           steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
           verified={!!order.verifiedAt}
+          times={order}
           ariaLabel={`Status: ${cfg.label}`}
         />
       )}

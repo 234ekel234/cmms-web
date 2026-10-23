@@ -383,6 +383,7 @@ export default function WorkOrderDetailPanel({
               status={order.status}
               steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
               verified={!!order.verifiedAt}
+              times={order}
               ariaLabel={`Progress: ${WORK_ORDER_STATUS[order.status].label}`}
             />
           )}

@@ -1757,6 +1757,14 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 }
 .tu-pipe-label.tu-done { color: var(--tu-text-brand); }
 .tu-pipe-label.tu-paused { color: var(--tu-status-on-hold); }
+.tu-pipe-time {
+  margin-top: 2px;
+  font-size: 10px;
+  line-height: 1.3;
+  text-align: center;
+  color: var(--tu-text-subtle);
+  font-variant-numeric: tabular-nums;
+}
 
 /* ── Breadcrumbs ─────────────────────────────────────────── */
 .tu-crumbs {

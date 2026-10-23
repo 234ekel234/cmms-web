@@ -876,7 +876,7 @@ export default function WorkOrderDetailPage() {
           </div>
         ) : (
           <>
-            <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} verified={!!order.verifiedAt} ariaLabel={`Status: ${cfg.label}`} />
+            <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} verified={!!order.verifiedAt} times={order} ariaLabel={`Status: ${cfg.label}`} />
             {/* Where it stands and whose move it is — the same line as the queue.
                 It absorbed the old On Hold banner, which said this for one stage. */}
             <p className={`tu-stage-note${note.attention ? " tu-attention" : ""}`} style={{ textAlign: "center" }}>{note.text}</p>
