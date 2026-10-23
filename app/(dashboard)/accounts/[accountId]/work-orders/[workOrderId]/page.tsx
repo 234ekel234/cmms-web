@@ -1323,7 +1323,7 @@ export default function WorkOrderDetailPage() {
         {surveyable(order) && isReviewer(user?.role) && (
           <div className="bg-[var(--tu-bg-secondary)] border border-[var(--tu-border)] rounded-lg p-3.5 mb-4">
             {order.survey ? (
-              <SurveyResult survey={order.survey} />
+              <SurveyResult survey={order.survey} workOrderId={order.id} />
             ) : (
               <p className="text-xs text-[var(--tu-text-subtle)]">No client rating yet.</p>
             )}

@@ -135,7 +135,14 @@ export type SurveyScores = {
   comment: string | null;
   submittedByName: string;
   createdAt: string;
+  /** What the team did about it — expected on a low rating (overall <= 2). */
+  followUpNote?: string | null;
+  followedUpAt?: string | null;
+  followedUpByName?: string | null;
 };
+
+/** A low rating: the one that alerts managers and wants a follow-up. */
+export const isLowRating = (overall: number) => overall <= 2;
 
 /** A signed-off client-facing job, which the client may rate. */
 export function surveyable(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {

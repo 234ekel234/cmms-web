@@ -27,7 +27,13 @@ type Block = {
 };
 
 type Scorecard = {
-  totals: Block & { eligible: number; responseRatePct: number | null; low: number };
+  totals: Block & { eligible: number; responseRatePct: number | null; low: number; lowAwaitingFollowUp: number };
+  lowRatings: {
+    id: string; overall: number; comment: string | null; createdAt: string; by: string;
+    account: { id: string; name: string };
+    workOrder: { id: string; number: number; title: string };
+    followUpNote: string | null; followedUpAt: string | null; followedUpByName: string | null;
+  }[];
   distribution: { stars: number; count: number }[];
   bySite: (Block & { account: { id: string; name: string }; eligible: number; responseRatePct: number | null; low: number })[];
   byMonth: (Block & { month: string })[];
@@ -148,12 +154,42 @@ export default function ClientSatisfactionPage() {
             </div>
             <div className="tu-stat-card">
               <p className="tu-stat-label">Low ratings (1–2)</p>
-              <p className={`tu-stat-value${t!.low ? " tu-stat-danger" : ""}`}>{t!.low}</p>
+              <p className={`tu-stat-value${t!.lowAwaitingFollowUp ? " tu-stat-danger" : ""}`}>{t!.low}</p>
               <p className="tu-stat-sub">
+                {t!.low ? `${t!.lowAwaitingFollowUp} awaiting follow-up · ` : ""}
                 {data.distribution.slice().reverse().map((d) => `${d.stars}★ ${d.count}`).join(" · ")}
               </p>
             </div>
           </div>
+
+          {data.lowRatings.length > 0 && (
+            <section className="tu-card" style={{ marginBottom: 24 }}>
+              <div className="tu-card-header"><h2 className="tu-card-title">Low ratings</h2></div>
+              <p className="tu-person-muted" style={{ padding: "0 24px", fontSize: 12 }}>
+                Ratings of 1 or 2, the ones nobody has followed up first. Open the job to record what was done.
+              </p>
+              <ul role="list" className="tu-person-list">
+                {data.lowRatings.map((r) => (
+                  <li key={r.id}>
+                    <Stars value={r.overall} label="Rating" size="sm" />{" "}
+                    <Link href={`/accounts/${r.account.id}/work-orders/${r.workOrder.id}`} className="tu-link">
+                      {workOrderRef(r.workOrder.number)} · {r.workOrder.title}
+                    </Link>
+                    <span className="tu-person-muted"> — {r.account.name}</span>
+                    {r.comment && <span> · “{r.comment}”</span>}
+                    <br />
+                    {r.followedUpAt ? (
+                      <span className="tu-person-ok">
+                        Followed up by {r.followedUpByName}: {r.followUpNote}
+                      </span>
+                    ) : (
+                      <span className="tu-person-bad">Not followed up yet</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <section className="tu-card" style={{ marginBottom: 24 }}>
             <div className="tu-card-header"><h2 className="tu-card-title">By site</h2></div>

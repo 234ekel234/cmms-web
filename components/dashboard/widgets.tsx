@@ -241,12 +241,13 @@ function kpiDefs(m: DashboardModel): Record<string, KpiDef> {
       accent: "var(--tu-status-approved)",
       icon: <IconCheck />,
       value: loading || m.data?.satisfaction?.overall == null ? "—" : `${m.data.satisfaction.overall.toFixed(1)} / 5`,
-      valueClass: (m.data?.satisfaction?.low ?? 0) > 0 ? "tu-stat-warning" : "",
+      valueClass: (m.data?.satisfaction?.toFollowUp ?? 0) > 0 ? "tu-stat-warning" : "",
       sub: loading || !m.data?.satisfaction
         ? " "
         : m.data.satisfaction.responses === 0
           ? `no ratings in ${m.data.satisfaction.days} days`
-          : `${m.data.satisfaction.responses} rating${m.data.satisfaction.responses === 1 ? "" : "s"} · ${m.data.satisfaction.low} low · ${m.data.satisfaction.days} days`,
+          : `${m.data.satisfaction.responses} rating${m.data.satisfaction.responses === 1 ? "" : "s"} · ${m.data.satisfaction.days} days` +
+            (m.data.satisfaction.toFollowUp ? ` · ${m.data.satisfaction.toFollowUp} low to follow up` : ""),
       href: "/reports/client-satisfaction",
       cta: "Open report",
     },

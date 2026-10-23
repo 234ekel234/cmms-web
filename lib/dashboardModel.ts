@@ -65,7 +65,7 @@ export type DashboardData = {
   poorHealthAssets: number;
   /** Supervisors and above only; null for anyone else. */
   awaitingReview?: number | null;
-  satisfaction?: { days: number; responses: number; overall: number | null; low: number } | null;
+  satisfaction?: { days: number; responses: number; overall: number | null; low: number; toFollowUp: number } | null;
   attendance: { present: number; absent: number };
   checklists: { completed: number; total: number };
   accounts: AccountSummary[];

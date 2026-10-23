@@ -397,7 +397,7 @@ export default function WorkOrderDetailPanel({
                 ? <p className="tu-survey-thanks">Thanks for your feedback.</p>
                 : <SurveyForm workOrderId={order.id} onDone={() => onChanged({ id: order.id, surveyDone: true })} />
             ) : survey ? (
-              <SurveyResult survey={survey} />
+              <SurveyResult key={order.id} survey={survey} workOrderId={order.id} />
             ) : (
               <p className="tu-detail-hint">No client rating yet.</p>
             )}

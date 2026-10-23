@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import api from "@/lib/api";
-import type { SurveyScores } from "@/lib/workOrders";
+import { isLowRating, type SurveyScores } from "@/lib/workOrders";
 
 /**
  * The client side of the survey: "How did we do?" on a signed-off job, and the
@@ -120,8 +120,78 @@ export function SurveyForm({ workOrderId, onDone }: { workOrderId: string; onDon
   );
 }
 
+/**
+ * What the team did about a rating. Offered on every rating and asked for on a
+ * low one: the low-rating alert is only useful if it gets an answer. May be
+ * rewritten — the latest account is the one worth keeping.
+ */
+function FollowUp({ workOrderId, survey }: { workOrderId: string; survey: SurveyScores }) {
+  const [saved, setSaved] = useState({
+    note: survey.followUpNote ?? null, at: survey.followedUpAt ?? null, by: survey.followedUpByName ?? null,
+  });
+  const [editing, setEditing] = useState(false);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const low = isLowRating(survey.overall);
+
+  async function save() {
+    if (!note.trim() || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api.post(`/work-orders/${workOrderId}/survey/follow-up`, { note: note.trim() });
+      setSaved({ note: res.data.followUpNote, at: res.data.followedUpAt, by: res.data.followedUpByName });
+      setEditing(false);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error ?? "Couldn't save the follow-up.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div className="tu-survey-follow">
+        <label className="tu-survey-label" htmlFor={`follow-${workOrderId}`}>What was done about it?</label>
+        <textarea id={`follow-${workOrderId}`} className="tu-input" rows={2} maxLength={1000} autoFocus
+          value={note} onChange={(e) => setNote(e.target.value)}
+          placeholder="e.g. Called the client, resealed the valve, offered a revisit" />
+        {error && <p role="alert" className="tu-survey-error">{error}</p>}
+        <div className="tu-survey-follow-actions">
+          <button type="button" className="tu-btn-primary tu-btn-sm" onClick={save} disabled={!note.trim() || busy}>
+            {busy ? "Saving…" : "Save follow-up"}
+          </button>
+          <button type="button" className="tu-btn-ghost tu-btn-sm" onClick={() => setEditing(false)}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+  if (saved.note) {
+    return (
+      <div className="tu-survey-follow">
+        <p className="tu-survey-label">Follow-up</p>
+        <p className="tu-survey-comment">{saved.note}</p>
+        <p className="tu-survey-meta">
+          {saved.by}{saved.at ? ` · ${new Date(saved.at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : ""}{" "}
+          · <button type="button" className="tu-link-button" onClick={() => { setNote(saved.note ?? ""); setEditing(true); }}>Edit</button>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="tu-survey-follow">
+      {low && <p className="tu-survey-attention">A low rating — record what was done about it.</p>}
+      <button type="button" className={low ? "tu-btn-primary tu-btn-sm" : "tu-btn-ghost tu-btn-sm"} onClick={() => setEditing(true)}>
+        Add follow-up
+      </button>
+    </div>
+  );
+}
+
 /** What a supervisor or manager sees on the job. */
-export function SurveyResult({ survey }: { survey: SurveyScores }) {
+export function SurveyResult({ survey, workOrderId }: { survey: SurveyScores; workOrderId: string }) {
   return (
     <div className="tu-survey-result">
       <div className="tu-survey-row">
@@ -136,6 +206,7 @@ export function SurveyResult({ survey }: { survey: SurveyScores }) {
       <p className="tu-survey-meta">
         {survey.submittedByName} · {new Date(survey.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
       </p>
+      <FollowUp workOrderId={workOrderId} survey={survey} />
     </div>
   );
 }
