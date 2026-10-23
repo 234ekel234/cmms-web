@@ -6,8 +6,9 @@ import Link from "next/link";
 import api, { getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, canSendBack, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, canSendBack, isReviewer, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
 import ReasonDialog from "@/components/ReasonDialog";
+import WorkOrderHistory from "@/components/WorkOrderHistory";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
@@ -15,7 +16,7 @@ import ProgressThread, { type ProgressAttachment } from "@/components/ProgressTh
 import { canManage as canAdministerAccount } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
 
-const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
+const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed", "Verified"];
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -410,6 +411,22 @@ export default function WorkOrderDetailPage() {
       // silent
     } finally {
       setSavingBreakdown(false);
+    }
+  }
+
+  // Supervisor review of a technician's completed work.
+  async function verifyWork() {
+    if (!order) return;
+    setUpdatingStatus(true);
+    try {
+      const res = await api.post(`/work-orders/${order.id}/verify`);
+      setOrder((prev) => (prev ? { ...prev, ...res.data, comments: prev.comments, parts: prev.parts, checklistItems: prev.checklistItems } : prev));
+    } catch {
+      // The button stays; a refusal (already verified, sent back meanwhile) is
+      // resolved by the refetch.
+      await fetchOrder();
+    } finally {
+      setUpdatingStatus(false);
     }
   }
 
@@ -838,7 +855,7 @@ export default function WorkOrderDetailPage() {
           </div>
         ) : (
           <>
-            <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} ariaLabel={`Status: ${cfg.label}`} />
+            <StatusPipeline status={order.status} steps={needsClientApproval(order) ? APPROVAL_STEPS : PIPELINE_STEPS} verified={!!order.verifiedAt} ariaLabel={`Status: ${cfg.label}`} />
             {/* Where it stands and whose move it is — the same line as the queue.
                 It absorbed the old On Hold banner, which said this for one stage. */}
             <p className={`tu-stage-note${note.attention ? " tu-attention" : ""}`} style={{ textAlign: "center" }}>{note.text}</p>
@@ -1205,6 +1222,15 @@ export default function WorkOrderDetailPage() {
             {order.completedAt && (
               <p className="text-xs text-[var(--tu-text-subtle)]">Completed {formatDate(order.completedAt)}</p>
             )}
+            {order.verifiedAt && (
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
+                {/* No verifier recorded means the job was finished before review
+                    existed and was marked verified when it was introduced. */}
+                {order.verifiedByName
+                  ? `Verified by ${order.verifiedByName} on ${formatDate(order.verifiedAt)}`
+                  : "Verified (finished before supervisor review was introduced)"}
+              </p>
+            )}
             {order.status === "APPROVED" && (
               <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
                 {/* An auto-approval carries no approver, and must not be dressed
@@ -1302,6 +1328,11 @@ export default function WorkOrderDetailPage() {
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Add closing remarks (optional)"
                 />
+                {isReviewer(user?.role) && (
+                  <p className="text-xs text-[var(--tu-text-subtle)] -mt-2 mb-3">
+                    You&apos;re completing this as a supervisor, so it&apos;s verified too — no separate review.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button
                     onClick={() => setShowCompleteForm(false)}
@@ -1314,7 +1345,7 @@ export default function WorkOrderDetailPage() {
                     disabled={updatingStatus}
                     className="px-3 py-1.5 text-xs text-white bg-[var(--tu-status-completed)] rounded-lg hover:bg-[var(--tu-status-completed)] disabled:opacity-50 cursor-pointer"
                   >
-                    {updatingStatus ? "Saving…" : "Confirm complete"}
+                    {updatingStatus ? "Saving…" : isReviewer(user?.role) ? "Complete & verify" : "Confirm complete"}
                   </button>
                 </div>
               </div>
@@ -1353,10 +1384,21 @@ export default function WorkOrderDetailPage() {
           </div>
         )}
 
-        {/* Quality control: a supervisor or above may send any completed job
-            back, before or after the client sees it. Lands On Hold, with why. */}
+        {/* Quality control: a supervisor or above verifies a technician's
+            completed work, or sends any completed job back — before or after
+            the client sees it. A send-back lands On Hold, with why. */}
         {!isClient && canSendBack(user?.role, order) && (
-          <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
+          <div className="mt-4 pt-4 border-t border-[var(--tu-border)] flex gap-2 flex-wrap">
+            {isReviewer(user?.role) && awaitingReview(order) && (
+              <button
+                type="button"
+                onClick={verifyWork}
+                disabled={updatingStatus}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"
+              >
+                Verify work
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setReasonDialog("SEND_BACK")}
@@ -1702,6 +1744,16 @@ export default function WorkOrderDetailPage() {
         error={progressError}
         {...(isClient ? {} : { internal: internalNote, onInternalChange: setInternalNote })}
       />
+
+      {/* History — every action on the job, oldest first, with who and when.
+          Reloaded when the job changes so the latest move shows up. */}
+      <section id="history" className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6 mt-6">
+        <h2 className="text-sm font-semibold text-[var(--tu-text-body)] mb-4">History</h2>
+        <WorkOrderHistory
+          workOrderId={order.id}
+          refreshKey={[order.status, order.priority, order.dueDate, order.verifiedAt, order.comments.length, order.assignments.length, order.timerStartedAt].join("|")}
+        />
+      </section>
     </div>
   );
 }

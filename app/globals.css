@@ -2841,6 +2841,29 @@ figure:hover .tu-attachment-remove,
 }
 .tu-internal-input { border-style: dashed !important; background: var(--tu-bg-secondary); }
 
+/* One job's history (components/WorkOrderHistory.tsx): a timeline, oldest
+   first. The marker colour says what kind of thing happened; the text says what. */
+.tu-history { list-style: none; margin: 0; padding: 0; }
+.tu-history-row { position: relative; display: flex; gap: 10px; padding: 0 0 12px; }
+.tu-history-row:not(:last-child)::after {
+  content: ""; position: absolute; left: 4px; top: 14px; bottom: 0;
+  width: 1px; background: var(--tu-border);
+}
+.tu-history-dot {
+  flex-shrink: 0; width: 9px; height: 9px; margin-top: 5px; border-radius: 50%;
+  background: var(--tu-text-disabled);
+}
+.tu-history-event .tu-history-dot { background: var(--tu-status-in-progress); }
+.tu-history-done .tu-history-dot { background: var(--tu-status-completed); }
+.tu-history-stop .tu-history-dot { background: var(--tu-status-on-hold); }
+.tu-history-update .tu-history-dot { background: var(--tu-text-brand); }
+.tu-history-internal .tu-history-dot { background: transparent; border: 1.5px dashed var(--tu-border-strong); }
+.tu-history-body { min-width: 0; }
+.tu-history-text { margin: 0; font-size: 13.5px; color: var(--tu-text-body); line-height: 1.45; }
+.tu-history-quote { display: block; margin-top: 2px; color: var(--tu-text-subtle); white-space: pre-wrap; }
+.tu-history-meta { margin: 2px 0 0; font-size: 12px; color: var(--tu-text-subtle); }
+.tu-history-empty { margin: 0; font-size: 13px; color: var(--tu-text-subtle); }
+
 /* A one-line explanation under a form control in the work-order pane. */
 .tu-detail-hint { margin: 0; font-size: 12px; color: var(--tu-text-subtle); }
 

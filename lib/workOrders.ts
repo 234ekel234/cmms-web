@@ -11,7 +11,7 @@ import type { WorkOrderStatus } from "@/lib/statuses";
  * each call site.
  */
 
-type ApprovalShape = { type?: string | null; isSpecialProject?: boolean | null };
+type ApprovalShape = { type?: string | null; isSpecialProject?: boolean | null; verifiedAt?: string | null };
 
 /**
  * Whether this order ends with the client rather than at COMPLETED.
@@ -29,9 +29,18 @@ export function isDone(status: WorkOrderStatus): boolean {
   return status === "COMPLETED" || status === "APPROVED";
 }
 
-/** Sitting with the client, waiting for a decision. */
+/**
+ * Completed, waiting for a supervisor to check it. Mirrors awaitingReview on
+ * the server. Every job is reviewed; a supervisor completing one verifies it in
+ * the same step, so in practice this is a technician's finished work.
+ */
+export function awaitingReview(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
+  return wo.status === "COMPLETED" && !wo.verifiedAt;
+}
+
+/** Sitting with the client, waiting for a decision — which needs review first. */
 export function awaitingClient(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
-  return wo.status === "COMPLETED" && needsClientApproval(wo);
+  return wo.status === "COMPLETED" && needsClientApproval(wo) && !!wo.verifiedAt;
 }
 
 /**
@@ -52,7 +61,9 @@ export function awaitingClient(wo: ApprovalShape & { status: WorkOrderStatus }):
  */
 export function isSettled(wo: ApprovalShape & { status: WorkOrderStatus }): boolean {
   if (wo.status === "APPROVED") return true;
-  return wo.status === "COMPLETED" && !needsClientApproval(wo);
+  // Internal work is settled once verified, not before: the review is when a
+  // supervisor may still need to correct it.
+  return wo.status === "COMPLETED" && !needsClientApproval(wo) && !!wo.verifiedAt;
 }
 
 /**
@@ -107,6 +118,9 @@ export type StageFacts = {
   /** Null on approved work means the nightly sweep closed it, not the client. */
   approvedById?: string | null;
   approvedByName?: string | null;
+  /** Supervisor review. Null on COMPLETED work means it still awaits review. */
+  verifiedAt?: string | null;
+  verifiedByName?: string | null;
 };
 
 /** What `stageNote` reads. Every field beyond status is optional so any list's row will do. */
@@ -156,6 +170,11 @@ export function stageNote(wo: StageShape, isClient: boolean, now = Date.now()): 
       if (wo.openPause) return note(`On hold — ${wo.openPause.reason}`, true);
       return note("On hold — resume it to continue", true);
     case "COMPLETED": {
+      if (!wo.verifiedAt) {
+        return isClient
+          ? note("Finished — the team is checking it")
+          : note("Done — waiting for supervisor review", true);
+      }
       if (!needsClientApproval(wo)) return note("Done");
       const who = isClient ? "Waiting for your sign-off" : "Waiting for client sign-off";
       if (!wo.autoApproveAt) return note(who, true);
@@ -192,13 +211,15 @@ export function isOverdue(wo: { dueDate: string | null; status: WorkOrderStatus 
  * in the same mutually-exclusive control as the statuses made the two
  * unaskable together.
  */
-export type WorkOrderFlag = "OVERDUE" | "AWAITING";
+export type WorkOrderFlag = "OVERDUE" | "AWAITING" | "REVIEW";
 
 export function matchesFlag(
   wo: ApprovalShape & { status: WorkOrderStatus; dueDate: string | null },
   flag: WorkOrderFlag,
 ): boolean {
-  return flag === "OVERDUE" ? isOverdue(wo) : awaitingClient(wo);
+  if (flag === "OVERDUE") return isOverdue(wo);
+  if (flag === "REVIEW") return awaitingReview(wo);
+  return awaitingClient(wo);
 }
 
 /**
@@ -254,6 +275,11 @@ export const STAFF_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
 export function canSendBack(role: string | undefined, wo: { status: WorkOrderStatus; type?: string; isSpecialProject?: boolean }): boolean {
   if (wo.status !== "COMPLETED") return false;
   if (role === "CLIENT") return needsClientApproval(wo);
+  return role === "SUPERVISOR" || role === "MANAGER" || role === "GENERAL_MANAGER";
+}
+
+/** Supervisors and up review completed work; mirrors STAFF on the server. */
+export function isReviewer(role: string | undefined): boolean {
   return role === "SUPERVISOR" || role === "MANAGER" || role === "GENERAL_MANAGER";
 }
 

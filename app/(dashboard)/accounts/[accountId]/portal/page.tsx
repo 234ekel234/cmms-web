@@ -27,6 +27,8 @@ type Asset = { id: string; name: string };
 type WorkOrder = {
   id: string;
   number: number;
+  /** Null on COMPLETED work the team has not checked yet. */
+  verifiedAt?: string | null;
   title: string;
   description: string | null;
   status: Status;
@@ -203,6 +205,7 @@ function RequestCard({
         <StatusPipeline
           status={order.status}
           steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
+          verified={!!order.verifiedAt}
           ariaLabel={`Status: ${cfg.label}`}
         />
       )}

@@ -18,9 +18,13 @@ import {
   type StageFacts,
   canSendBack,
   needsReason,
+  awaitingReview,
+  awaitingClient,
+  isReviewer,
 } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
+import WorkOrderHistory from "@/components/WorkOrderHistory";
 
 /**
  * The right half of the split view: one work order, beside the queue.
@@ -256,6 +260,9 @@ export default function WorkOrderDetailPanel({
   // set on, so moving to another job in the queue starts back at public —
   // without an effect resetting it.
   const [internalFor, setInternalFor] = useState<string | null>(null);
+  // Open for one order only, like the internal-note flag above.
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const historyOpen = historyFor === order.id;
   const internalNote = internalFor === order.id;
 
   async function postComment() {
@@ -299,9 +306,29 @@ export default function WorkOrderDetailPanel({
   // The client's two moves out of COMPLETED. Offered here rather than through
   // STAFF_TRANSITIONS, which deliberately omits them so staff are never shown
   // an Approve button the API refuses.
-  const clientDecision = isClient && order.status === "COMPLETED" && needsClientApproval(order);
+  // Only once a supervisor has verified it (awaitingClient checks that) — the
+  // API refuses a client's decision on unreviewed work.
+  const clientDecision = isClient && awaitingClient(order);
   // Quality control: a supervisor or above may send any completed job back.
   const staffSendBack = !isClient && canSendBack(user?.role, order);
+  // Supervisor review of a technician's completed work.
+  const canVerify = !isClient && isReviewer(user?.role) && awaitingReview(order);
+  // A supervisor completing work verifies it in the same step — say so.
+  const completingVerifies = isReviewer(user?.role);
+
+  async function verify() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await api.post(`/work-orders/${order.id}/verify`);
+      onChanged(res.data);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setError(e?.response?.data?.error ?? "Couldn't verify this work.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <div className="tu-detail">
@@ -338,17 +365,21 @@ export default function WorkOrderDetailPanel({
           {/* Where it stands and whose move it is. This replaced a sign-off
               badge, which said the same thing for one stage out of seven. */}
           <p className={`tu-stage-note${note.attention ? " tu-attention" : ""}`}>{note.text}</p>
+          {order.verifiedAt && order.verifiedByName && !isClient && (
+            <p className="tu-detail-hint">Verified by {order.verifiedByName} · {new Date(order.verifiedAt).toLocaleString(undefined, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</p>
+          )}
           {order.status !== "REJECTED" && (
             <StatusPipeline
               status={order.status}
               steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
+              verified={!!order.verifiedAt}
               ariaLabel={`Progress: ${WORK_ORDER_STATUS[order.status].label}`}
             />
           )}
         </div>
 
         {/* ── Transitions ── */}
-        {(nexts.length > 0 || clientDecision || staffSendBack) && (
+        {(nexts.length > 0 || clientDecision || staffSendBack || canVerify) && (
           <div className="tu-detail-section">
             <span className="tu-detail-label">Change status</span>
 
@@ -362,12 +393,15 @@ export default function WorkOrderDetailPanel({
                   placeholder="Add closing remarks (optional)"
                   aria-label="Closing remarks"
                 />
+                {completingVerifies && (
+                  <p className="tu-detail-hint">You&apos;re completing this as a supervisor, so it&apos;s verified too — no separate review.</p>
+                )}
                 <div className="tu-detail-actions">
                   <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setConfirmComplete(false)} disabled={busy}>
                     Cancel
                   </button>
                   <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={() => move("COMPLETED")} disabled={busy}>
-                    {busy ? "Saving…" : "Confirm complete"}
+                    {busy ? "Saving…" : completingVerifies ? "Complete & verify" : "Confirm complete"}
                   </button>
                 </div>
               </div>
@@ -406,6 +440,11 @@ export default function WorkOrderDetailPanel({
               </div>
             ) : (
               <div className="tu-detail-actions">
+                {canVerify && (
+                  <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={verify} disabled={busy}>
+                    {busy ? "Saving…" : "Verify work"}
+                  </button>
+                )}
                 {staffSendBack && (
                   <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => { setReasonFor("SEND_BACK"); setReasonText(""); }} disabled={busy}>
                     Send back for rework
@@ -572,6 +611,21 @@ export default function WorkOrderDetailPanel({
             {...(isClient ? {} : { internal: internalNote, onInternalChange: (v: boolean) => setInternalFor(v ? order.id : null) })}
           />
         </div>
+
+        {/* ── History ── loaded only when opened: walking the queue with the
+            arrow keys should not fetch every job's whole history. Keyed to the
+            order so moving to another job starts it closed. */}
+        <details key={order.id} className="tu-detail-section tu-detail-history" onToggle={(e) => setHistoryFor((e.target as HTMLDetailsElement).open ? order.id : null)}>
+          <summary className="tu-detail-label" style={{ cursor: "pointer" }}>History</summary>
+          {historyOpen && (
+            <div style={{ marginTop: 10 }}>
+              <WorkOrderHistory
+                workOrderId={order.id}
+                refreshKey={[order.status, order.priority, order.dueDate, order.verifiedAt, comments.length, order.assignments.length, order.timerStartedAt].join("|")}
+              />
+            </div>
+          )}
+        </details>
       </div>
 
       <div className="tu-detail-footer">

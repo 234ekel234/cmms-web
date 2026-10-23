@@ -33,6 +33,7 @@ const STATUS_ORDER: WorkOrderStatus[] = [
 const FLAG_LABEL: Record<WorkOrderFlag, string> = {
   OVERDUE: "Overdue",
   AWAITING: "Awaiting sign-off",
+  REVIEW: "Awaiting review",
 };
 
 function toggle<T>(set: ReadonlySet<T>, value: T): Set<T> {
@@ -51,7 +52,7 @@ export default function WorkOrderFilters({
   flagCounts,
   /** Flags with nothing behind them are hidden rather than shown at zero —
    *  an account with no external work has no sign-off queue to offer. */
-  availableFlags = ["OVERDUE", "AWAITING"],
+  availableFlags = ["OVERDUE", "REVIEW", "AWAITING"],
 }: {
   statuses: ReadonlySet<WorkOrderStatus>;
   onStatusesChange: (next: Set<WorkOrderStatus>) => void;

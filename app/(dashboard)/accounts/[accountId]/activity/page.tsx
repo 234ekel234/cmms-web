@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 
@@ -11,6 +12,8 @@ type AuditLog = {
   description: string;
   performedByName: string | null;
   createdAt: string;
+  entityType?: string | null;
+  entityId?: string | null;
 };
 
 const ACTION_DOT: Record<string, string> = {
@@ -42,7 +45,9 @@ type FilterKey = "all" | "work_orders" | "checklists" | "attendance" | "assets" 
 
 const FILTERS: { key: FilterKey; label: string; actions: string[] }[] = [
   { key: "all",         label: "All",         actions: [] },
-  { key: "work_orders", label: "Work Orders",  actions: ["WORK_ORDER_REQUESTED","WORK_ORDER_CREATED","WORK_ORDER_ACCEPTED","WORK_ORDER_REJECTED","WORK_ORDER_STARTED","WORK_ORDER_COMPLETED","WORK_ORDER_UPDATED"] },
+  // Every work-order action, by prefix. A fixed list here had already missed
+  // holds, sign-offs, send-backs, the clock, steps and parts.
+  { key: "work_orders", label: "Work Orders",  actions: ["WORK_ORDER_*"] },
   { key: "checklists",  label: "Checklists",   actions: ["CHECKLIST_COMPLETED","CHECKLIST_ASSIGNED","CHECKLIST_REMOVED","CHECKLIST_INCOMPLETE","CHECKLIST_EDITED"] },
   { key: "attendance",  label: "Attendance",   actions: ["ATTENDANCE_MARKED"] },
   { key: "assets",      label: "Assets",       actions: ["ASSET_CREATED","ASSET_STATUS_CHANGED","ASSET_ARCHIVED","ASSET_UNARCHIVED","ASSET_LOCATION_CREATED","ASSET_LOCATION_UPDATED","ASSET_LOCATION_DELETED"] },
@@ -134,7 +139,9 @@ export default function ActivityPage() {
   }
 
   const filterDef = FILTERS.find((f) => f.key === activeFilter)!;
-  const filteredLogs = activeFilter === "all" ? logs : logs.filter((l) => filterDef.actions.includes(l.action));
+  const matches = (action: string) =>
+    filterDef.actions.some((a) => (a.endsWith("*") ? action.startsWith(a.slice(0, -1)) : a === action));
+  const filteredLogs = activeFilter === "all" ? logs : logs.filter((l) => matches(l.action));
   const groups = groupByDate(filteredLogs);
 
   return (
@@ -189,7 +196,17 @@ export default function ActivityPage() {
                       {!isLast && <div className="w-0.5 bg-[var(--tu-bg-tertiary)] flex-1 mt-1" style={{ minHeight: "20px" }} />}
                     </div>
                     <div className={`flex-1 pb-3 ml-2 ${!isLast ? "border-b border-[var(--tu-border)]" : ""}`}>
-                      <p className="text-sm text-[var(--tu-text-heading)] font-medium">{log.description}</p>
+                      {/* A work-order line opens the job, where its full history is. */}
+                      {log.entityType === "WorkOrder" && log.entityId ? (
+                        <Link
+                          href={`/accounts/${accountId}/work-orders/${log.entityId}#history`}
+                          className="text-sm text-[var(--tu-text-heading)] font-medium hover:text-[var(--tu-text-brand)] hover:underline"
+                        >
+                          {log.description}
+                        </Link>
+                      ) : (
+                        <p className="text-sm text-[var(--tu-text-heading)] font-medium">{log.description}</p>
+                      )}
                       <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">
                         {log.performedByName ?? "System"} · {formatTimestamp(log.createdAt)}
                       </p>

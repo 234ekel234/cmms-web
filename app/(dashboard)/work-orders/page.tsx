@@ -67,7 +67,7 @@ type View = "split" | "table" | "calendar";
 const ALL_STATUSES: WorkOrderStatus[] = [
   "REQUESTED", "PENDING", "IN_PROGRESS", "ON_HOLD", "COMPLETED", "APPROVED", "REJECTED",
 ];
-const ALL_FLAGS: WorkOrderFlag[] = ["OVERDUE", "AWAITING"];
+const ALL_FLAGS: WorkOrderFlag[] = ["OVERDUE", "REVIEW", "AWAITING"];
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "SMART",    label: "Smart (urgency)"   },
@@ -422,6 +422,8 @@ export default function WorkOrdersPage() {
             onFlagsChange={setFlags}
             statusCounts={statusCounts}
             flagCounts={flagCounts}
+            // Review is staff business; a client sees unreviewed work as "being checked".
+            availableFlags={isClient ? ["OVERDUE", "AWAITING"] : undefined}
           />
         </div>
 

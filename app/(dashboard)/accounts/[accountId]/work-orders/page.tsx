@@ -15,7 +15,7 @@ import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDet
 import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
 import ReasonDialog from "@/components/ReasonDialog";
-import { STAFF_TRANSITIONS, awaitingClient, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -81,7 +81,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 // overdue check beside it was not, and having two of them is how that happened.
 const isTerminal = (o: WorkOrder) => isClosed(o);
 
-const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed"];
+const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed", "Verified"];
 
 const EMPTY_FORM = {
   title: "",
@@ -139,7 +139,7 @@ export default function WorkOrdersPage() {
       ...(searchParams.get("flag")?.toUpperCase().split(",") ?? []),
       ...(searchParams.get("status")?.toUpperCase().split(",") ?? []),
     ].map((x) => x.trim());
-    return new Set((["OVERDUE", "AWAITING"] as WorkOrderFlag[]).filter((f) => raw.includes(f)));
+    return new Set((["OVERDUE", "AWAITING", "REVIEW"] as WorkOrderFlag[]).filter((f) => raw.includes(f)));
   });
   // The card that just changed. Nothing moves any more — the tabs that used to
   // make it vanish are gone — but a status change still has to *read* as having
@@ -403,6 +403,7 @@ export default function WorkOrdersPage() {
   const flagCounts = {
     OVERDUE: inView.filter((o) => isOverdue(o) && (statuses.size === 0 || statuses.has(o.status))).length,
     AWAITING: inView.filter((o) => awaitingClient(o) && (statuses.size === 0 || statuses.has(o.status))).length,
+    REVIEW: inView.filter((o) => awaitingReview(o) && (statuses.size === 0 || statuses.has(o.status))).length,
   } as Record<WorkOrderFlag, number>;
 
   const filtered = inView.filter((o) => passesFilters(o, statuses, flags));
@@ -514,6 +515,8 @@ export default function WorkOrdersPage() {
             onFlagsChange={setFlags}
             statusCounts={statusCounts}
             flagCounts={flagCounts}
+            // Review is staff business; a client sees unreviewed work as "being checked".
+            availableFlags={isClient ? ["OVERDUE", "AWAITING"] : undefined}
           />
           <label className="tu-toolbar-spacer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 500, color: "var(--tu-text-subtle)" }}>
             Sort
@@ -866,7 +869,7 @@ export default function WorkOrdersPage() {
                     This work order was rejected.
                   </div>
                 ) : (
-                  <StatusPipeline status={order.status} steps={PIPELINE_STEPS} ariaLabel={`Status: ${statusCfg.label}`} />
+                  <StatusPipeline status={order.status} steps={PIPELINE_STEPS} verified={!!order.verifiedAt} ariaLabel={`Status: ${statusCfg.label}`} />
                 )}
 
                 {/* Footer: assignment + created */}

@@ -8,12 +8,13 @@ const PROGRESS: Record<PipelineStatus, number> = {
   PENDING: 2,
   IN_PROGRESS: 3,
   ON_HOLD: 3, // paused at the in-progress stage; the badge conveys "On Hold"
-  COMPLETED: 4,
-  APPROVED: 5,
+  COMPLETED: 4, // 5 once a supervisor has verified it — see `verified`
+  APPROVED: 6,
   REJECTED: -1,
 };
 
-const DEFAULT_STEPS = ["Submitted", "Accepted", "In Progress", "Completed"];
+// Verified is a step, not a status: a supervisor's review of COMPLETED work.
+const DEFAULT_STEPS = ["Submitted", "Accepted", "In Progress", "Completed", "Verified"];
 
 /**
  * The lifecycle for work that ends with the client, rather than at COMPLETED.
@@ -24,7 +25,7 @@ const DEFAULT_STEPS = ["Submitted", "Accepted", "In Progress", "Completed"];
  * fifth step to work that will never reach it would leave every internal job
  * looking permanently unfinished.
  */
-export const APPROVAL_STEPS = ["Submitted", "Accepted", "In Progress", "Completed", "Approved"];
+export const APPROVAL_STEPS = ["Submitted", "Accepted", "In Progress", "Completed", "Verified", "Approved"];
 
 /**
  * Horizontal progress stepper for a work order's lifecycle. Render the
@@ -33,13 +34,16 @@ export const APPROVAL_STEPS = ["Submitted", "Accepted", "In Progress", "Complete
 export default function StatusPipeline({
   status,
   steps = DEFAULT_STEPS,
+  verified = false,
   ariaLabel,
 }: {
   status: PipelineStatus;
   steps?: string[];
+  /** COMPLETED work a supervisor has checked — lights the Verified step. */
+  verified?: boolean;
   ariaLabel?: string;
 }) {
-  const progress = PROGRESS[status];
+  const progress = status === "COMPLETED" && verified ? 5 : PROGRESS[status];
   const onHold = status === "ON_HOLD";
   return (
     <div className="tu-pipeline" role="img" aria-label={ariaLabel ?? `Progress: step ${progress} of ${steps.length}`}>
