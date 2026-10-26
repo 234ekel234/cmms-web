@@ -14,8 +14,9 @@ type Member = {
   id: string;
   name: string;
   email: string;
+  // A person's role on a site is their role. The API still sends
+  // `accountRole`, an always-equal copy, for older clients.
   role: Role;
-  accountRole: Role;
   userAccountId: string;
 };
 
@@ -35,7 +36,6 @@ export default function MembersPage() {
   const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [assigningRole, setAssigningRole] = useState<Role>("SUPERVISOR");
   const [savingId, setSavingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
 
@@ -70,7 +70,7 @@ export default function MembersPage() {
   async function assign(userId: string) {
     setSavingId(userId);
     try {
-      const res = await api.post(`/accounts/${accountId}/members`, { userId, role: assigningRole });
+      const res = await api.post(`/accounts/${accountId}/members`, { userId });
       setMembers((prev) => [...prev, res.data]);
       setSearch("");
     } catch {
@@ -119,8 +119,8 @@ export default function MembersPage() {
                   <p className="text-xs text-[var(--tu-text-subtle)]">{m.email}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleCls(m.accountRole)}`}>
-                    {roleLabel(m.accountRole)}
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleCls(m.role)}`}>
+                    {roleLabel(m.role)}
                   </span>
                   {isManager && (
                     <button
@@ -143,22 +143,9 @@ export default function MembersPage() {
         <div>
           <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Add Member</p>
           <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-5">
-            <div className="mb-4">
-              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-2">Assign as</label>
-              <div className="flex gap-2 flex-wrap">
-                {(["SUPERVISOR", "TECHNICIAN", "CLIENT", "MANAGER"] as Role[]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setAssigningRole(r)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                      assigningRole === r ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
-                    }`}
-                  >
-                    {roleLabel(r)}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <p className="text-xs text-[var(--tu-text-subtle)] mb-4">
+              People join with the role they already have. To change someone&apos;s role, edit them on the Users page.
+            </p>
             <div>
               <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Search Users</label>
               <input
@@ -176,7 +163,7 @@ export default function MembersPage() {
                       <div key={u.id} className="flex items-center justify-between border border-[var(--tu-border)] rounded-xl px-4 py-2.5">
                         <div>
                           <p className="text-sm font-semibold text-[var(--tu-text-heading)]">{u.name}</p>
-                          <p className="text-xs text-[var(--tu-text-subtle)]">{u.email}</p>
+                          <p className="text-xs text-[var(--tu-text-subtle)]">{u.email} · {roleLabel(u.role)}</p>
                         </div>
                         <button
                           onClick={() => assign(u.id)}
