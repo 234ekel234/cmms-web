@@ -19,7 +19,7 @@ npm run lint      # ESLint check
 Create `.env.local`:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3000/api   # dev
-# NEXT_PUBLIC_API_URL=http://cmms-demo.duckdns.org/api  # production
+# NEXT_PUBLIC_API_URL=https://cmms-api.servicemasterph.com/api  # production (set in Vercel)
 ```
 
 ## Architecture

@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      NEXT_PUBLIC_API_URL: https://cmms-demo.duckdns.org/api
+      NEXT_PUBLIC_API_URL: https://cmms-api.servicemasterph.com/api
       NEXT_TELEMETRY_DISABLED: 1
 
     steps:
