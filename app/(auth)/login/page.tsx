@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { isAxiosError } from "axios";
 import api from "@/lib/api";
 import { saveSession } from "@/lib/auth";
@@ -123,6 +124,11 @@ export default function LoginPage() {
                 >
                   {showPassword ? "Hide" : "Show"}
                 </button>
+              </div>
+              <div className="flex justify-end mt-2">
+                <Link href="/forgot-password" className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline">
+                  Forgot password?
+                </Link>
               </div>
             </div>
 
