@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
+import EmployeeImportModal from "@/components/EmployeeImportModal";
 
 type Employee = {
   id: string;
@@ -46,6 +47,9 @@ export default function EmployeesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  // Bumped after an import, to fetch the roster again.
+  const [reloadKey, setReloadKey] = useState(0);
   const [registry, setRegistry] = useState<GlobalEmployee[]>([]);
   const [registryLoading, setRegistryLoading] = useState(false);
   const [search, setSearch] = useState("");
@@ -77,7 +81,7 @@ export default function EmployeesPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, reloadKey]);
 
   async function openAssignModal() {
     setShowAssign(true);
@@ -167,12 +171,20 @@ export default function EmployeesPage() {
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Employees</h2>
         {writable && (
-          <button
-            onClick={openAssignModal}
-            className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
-          >
-            + Assign
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowImport(true)}
+              className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
+            >
+              Import CSV
+            </button>
+            <button
+              onClick={openAssignModal}
+              className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+            >
+              + Assign
+            </button>
+          </div>
         )}
       </div>
 
@@ -300,6 +312,14 @@ export default function EmployeesPage() {
             </Link>
           ))}
         </div>
+      )}
+
+      {showImport && (
+        <EmployeeImportModal
+          accountId={accountId}
+          onClose={() => setShowImport(false)}
+          onImported={() => setReloadKey((k) => k + 1)}
+        />
       )}
 
       {/* Assign modal */}

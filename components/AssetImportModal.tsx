@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import api from "@/lib/api";
-import { downloadCsv } from "@/lib/csv";
+import { downloadCsv, parseCsv } from "@/lib/csv";
 
 type Health = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -37,39 +37,8 @@ const COLUMNS = [
 // says is what the asset is.
 const HEALTH_VALUES: Health[] = ["FUNCTIONAL", "FUNCTIONAL_WITH_FINDINGS", "BREAKDOWN"];
 
-// Minimal RFC4180-ish parser: handles quoted fields, embedded commas, "" escapes,
-// and both \n and \r\n line endings. Good enough for spreadsheet-exported CSVs.
-function parseCSV(text: string): string[][] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let field = "";
-  let inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
-    if (inQuotes) {
-      if (c === '"') {
-        if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
-      } else {
-        field += c;
-      }
-    } else if (c === '"') {
-      inQuotes = true;
-    } else if (c === ",") {
-      row.push(field); field = "";
-    } else if (c === "\n" || c === "\r") {
-      if (c === "\r" && text[i + 1] === "\n") i++;
-      row.push(field); field = "";
-      rows.push(row); row = [];
-    } else {
-      field += c;
-    }
-  }
-  if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
-  return rows.filter((r) => r.some((f) => f.trim() !== ""));
-}
-
 function toRows(text: string): Row[] {
-  const table = parseCSV(text);
+  const table = parseCsv(text);
   if (table.length === 0) return [];
   const header = table[0].map((h) => h.trim().toLowerCase());
   const idx = (key: string) => header.indexOf(key.toLowerCase());
