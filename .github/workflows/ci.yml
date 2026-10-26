@@ -1,0 +1,44 @@
+# Every push and pull request: typecheck, then a production build — the same
+# `next build` Vercel runs, so a commit that would fail to deploy fails here
+# first, with the error in front of whoever pushed it.
+#
+# Lint runs but does not fail the job yet: ~31 react-hooks errors predate CI
+# (ROADMAP.md, Phase 6c). Make it blocking — delete `continue-on-error` — once
+# that backlog is cleared, so new ones cannot join it.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEXT_PUBLIC_API_URL: https://cmms-demo.duckdns.org/api
+      NEXT_TELEMETRY_DISABLED: 1
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint (not yet blocking)
+        run: npm run lint
+        continue-on-error: true
+
+      - name: Build
+        run: npm run build
