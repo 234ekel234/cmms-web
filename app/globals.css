@@ -2949,6 +2949,14 @@ figure:hover .tu-attachment-remove,
 
 /* A one-line explanation under a form control in the work-order pane. */
 .tu-detail-hint { margin: 0; font-size: 12px; color: var(--tu-text-subtle); }
+/* A hint that needs reading — unticked steps at completion or review. */
+.tu-detail-hint.tu-detail-warn {
+  color: var(--tu-on-warning);
+  background: var(--tu-soft-warning);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-weight: 600;
+}
 
 /* "Show archived" under a list (components/ArchivedList.tsx). */
 .tu-archived { margin-top: 20px; }

@@ -15,10 +15,10 @@ import WorkOrderDetailPanel, { type PanelPatch } from "@/components/WorkOrderDet
 import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
 import ReasonDialog from "@/components/ReasonDialog";
-import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
+import { defaultDueHint } from "@/lib/dueDates";
+import { STAFF_TRANSITIONS, awaitingClient, rejectionHint, awaitingReview, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
 import { WORK_ORDER_STATUS } from "@/lib/statuses";
-import { useConfirm } from "@/components/ConfirmDialog";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -120,7 +120,6 @@ function formatTimer(totalSeconds: number) {
 }
 
 export default function WorkOrdersPage() {
-  const confirm = useConfirm();
   const params = useParams();
   const accountId = params.accountId as string;
   const searchParams = useSearchParams();
@@ -210,6 +209,7 @@ export default function WorkOrdersPage() {
   const [pauseTarget, setPauseTarget] = useState<WorkOrder | null>(null);
   // The order being put on hold, while the reason dialog is open.
   const [holdTarget, setHoldTarget] = useState<WorkOrder | null>(null);
+  const [rejectTarget, setRejectTarget] = useState<WorkOrder | null>(null);
   const [timerError, setTimerError] = useState<string | null>(null);
 
   // Ticks once a second so running work-order timers stay live — but only while
@@ -340,11 +340,7 @@ export default function WorkOrdersPage() {
   // the dialog below, which calls back in with the reason.
   async function updateStatus(id: string, status: WorkOrderStatus, reason?: string): Promise<string | null> {
     if (status === "ON_HOLD" && !reason) { setHoldTarget(orders.find((o) => o.id === id) ?? null); return null; }
-    if (status === "REJECTED" && !(await confirm({
-      title: "Reject this work order?",
-      message: "It will be closed without any work done. A rejected order can't be reopened.",
-      confirmLabel: "Reject",
-    }))) return null;
+    if (status === "REJECTED" && !reason) { setRejectTarget(orders.find((o) => o.id === id) ?? null); return null; }
     try {
       const res = await api.patch(`/work-orders/${id}`, reason ? { status, reason } : { status });
       // Merged, not replaced. PATCH returns the row with `asset` and
@@ -593,6 +589,9 @@ export default function WorkOrdersPage() {
                 value={form.dueDate}
                 onChange={(e) => setForm((f) => ({ ...f, dueDate: e.target.value }))}
               />
+              {!form.dueDate && (
+                <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">{defaultDueHint(form.priority)}</p>
+              )}
             </div>
             <div>
               <label className="tu-label">Asset</label>
@@ -692,6 +691,18 @@ export default function WorkOrdersPage() {
           confirmLabel="Put on hold"
           onSubmit={(reason) => updateStatus(holdTarget.id, "ON_HOLD", reason)}
           onClose={() => setHoldTarget(null)}
+        />
+      )}
+      {rejectTarget && (
+        <ReasonDialog
+          title="Reject this work order"
+          subtitle={`${workOrderRef(rejectTarget.number)} · ${rejectTarget.title}`}
+          label="Why is it being rejected?"
+          placeholder="Outside the maintenance contract — please raise it with the landlord."
+          hint={`${rejectionHint(rejectTarget)} A rejected order can't be reopened.`}
+          confirmLabel="Reject"
+          onSubmit={(reason) => updateStatus(rejectTarget.id, "REJECTED", reason)}
+          onClose={() => setRejectTarget(null)}
         />
       )}
       {pauseTarget && (

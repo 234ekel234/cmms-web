@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
-import { isClosed, workOrderRef } from "@/lib/workOrders";
+import { isClosed, isDone, workOrderRef } from "@/lib/workOrders";
 import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, type WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -422,11 +422,13 @@ export default function AssetDetailPage() {
   }
 
   const hCfg = { label: ASSET_HEALTH[asset.health].label, cls: ASSET_HEALTH_CLS[asset.health] };
-  const openWOs = workOrders.filter((w) => !["COMPLETED", "REJECTED"].includes(w.status));
-  const closedWOs = workOrders.filter((w) => ["COMPLETED", "REJECTED"].includes(w.status));
+  // isClosed, not a list of its own: a client-approved job is finished too,
+  // and leaving APPROVED out showed signed-off work as still open here.
+  const openWOs = workOrders.filter((w) => !isClosed(w));
+  const closedWOs = workOrders.filter((w) => isClosed(w));
   const warranty = warrantyStatus(asset.warrantyExpiry, now);
   const lastServiced = workOrders
-    .filter((w) => w.status === "COMPLETED" && w.completedAt)
+    .filter((w) => isDone(w.status) && w.completedAt)
     .map((w) => w.completedAt as string)
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
 

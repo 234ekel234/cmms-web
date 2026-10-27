@@ -311,7 +311,35 @@ export function isReviewer(role: string | undefined): boolean {
 
 /** Moves that must say why — the same rule as pausing the clock. */
 export function needsReason(to: WorkOrderStatus): boolean {
-  return to === "ON_HOLD";
+  return to === "ON_HOLD" || to === "REJECTED";
+}
+
+/**
+ * The steps still unticked on a job, said where it is completed or reviewed —
+ * or null when there are none. Not a block: steps get skipped for good reasons
+ * (not applicable on the day, done another way), so completing stays allowed;
+ * it just stops happening without anyone noticing. The reviewer sees the same
+ * line, which is where a skipped step actually gets questioned.
+ */
+export function openStepsNote(steps: { isDone: boolean }[] | undefined, who: "complete" | "review"): string | null {
+  const all = steps ?? [];
+  const open = all.filter((s) => !s.isDone).length;
+  if (open === 0) return null;
+  const counted = `${open} of ${all.length} step${all.length === 1 ? "" : "s"} ${open === 1 ? "isn't" : "aren't"} ticked`;
+  return who === "complete"
+    ? `${counted}. You can still complete it — say what was skipped and why in the remarks.`
+    : `${counted} on this job. Check the remarks before verifying.`;
+}
+
+/**
+ * Who will read a rejection's reason. The API posts it to the thread publicly
+ * on a client's own request — the reason is what they need — and as a
+ * staff-only note on internal work (backend workOrderRoutes, `rejectionPublic`).
+ */
+export function rejectionHint(wo: { type?: string }): string {
+  return wo.type === "EXTERNAL"
+    ? "Posted to the job's updates — the client who asked will read it."
+    : "Posted as a staff-only note. Whoever raised the job is told why.";
 }
 
 /**

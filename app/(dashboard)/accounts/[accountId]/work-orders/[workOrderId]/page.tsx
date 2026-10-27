@@ -7,7 +7,7 @@ import ActionError from "@/components/ActionError";
 import api, { errorMessage, getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, openStepsNote, rejectionHint, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
 import ReasonDialog from "@/components/ReasonDialog";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
 import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
@@ -169,7 +169,7 @@ export default function WorkOrderDetailPage() {
   const [sendingBack, setSendingBack] = useState(false);
   const [sendBackReason, setSendBackReason] = useState("");
   // Putting a job on hold, or a supervisor sending finished work back: both ask why.
-  const [reasonDialog, setReasonDialog] = useState<null | "HOLD" | "SEND_BACK">(null);
+  const [reasonDialog, setReasonDialog] = useState<null | "HOLD" | "SEND_BACK" | "REJECT">(null);
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -458,16 +458,11 @@ export default function WorkOrderDetailPage() {
   // Returns the API's refusal, or null — the reason dialog shows the refusal.
   async function updateStatus(status: WorkOrderStatus, opts: { reason?: string } = {}): Promise<string | null> {
     if (!order) return null;
-    if (status === "REJECTED" && !(await confirm({
-      title: "Reject this work order?",
-      message: "It will be closed without any work done. A rejected order can't be reopened.",
-      confirmLabel: "Reject",
-    }))) return null;
     setUpdatingStatus(true);
     try {
       const body: { status: WorkOrderStatus; remarks?: string; reason?: string } = { status };
       if (status === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
-      // Required by the API to go on hold, and to send completed work back.
+      // Required by the API to go on hold, to send completed work back, and to reject.
       if (opts.reason) body.reason = opts.reason;
       const res = await api.patch(`/work-orders/${order.id}`, body);
       // PATCH responses omit comments (and other relations); merge so we don't
@@ -1419,6 +1414,11 @@ export default function WorkOrderDetailPage() {
                   onChange={(e) => setRemarks(e.target.value)}
                   placeholder="Add closing remarks (optional)"
                 />
+                {openStepsNote(order.checklistItems, "complete") && (
+                  <p role="status" className="text-xs font-semibold text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-lg px-3 py-2 -mt-1 mb-3">
+                    {openStepsNote(order.checklistItems, "complete")}
+                  </p>
+                )}
                 {isReviewer(user?.role) && (
                   <p className="text-xs text-[var(--tu-text-subtle)] -mt-2 mb-3">
                     You&apos;re completing this as a supervisor, so it&apos;s verified too — no separate review.
@@ -1448,6 +1448,7 @@ export default function WorkOrderDetailPage() {
                     onClick={() => {
                       if (ns === "COMPLETED") { setShowCompleteForm(true); return; }
                       if (ns === "ON_HOLD") { setReasonDialog("HOLD"); return; }
+                      if (ns === "REJECTED") { setReasonDialog("REJECT"); return; }
                       updateStatus(ns);
                     }}
                     disabled={updatingStatus}
@@ -1480,6 +1481,11 @@ export default function WorkOrderDetailPage() {
             the client sees it. A send-back lands On Hold, with why. */}
         {!isClient && canSendBack(user?.role, order) && (
           <div className="mt-4 pt-4 border-t border-[var(--tu-border)] flex gap-2 flex-wrap">
+            {isReviewer(user?.role) && awaitingReview(order) && openStepsNote(order.checklistItems, "review") && (
+              <p role="status" className="basis-full text-xs font-semibold text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-lg px-3 py-2">
+                {openStepsNote(order.checklistItems, "review")}
+              </p>
+            )}
             {isReviewer(user?.role) && awaitingReview(order) && (
               <button
                 type="button"
@@ -1502,6 +1508,18 @@ export default function WorkOrderDetailPage() {
         )}
 
         {reasonDialog && (
+          reasonDialog === "REJECT" ? (
+            <ReasonDialog
+              title="Reject this work order"
+              subtitle={`${workOrderRef(order.number)} · ${order.title}`}
+              label="Why is it being rejected?"
+              placeholder="Outside the maintenance contract — please raise it with the landlord."
+              hint={`${rejectionHint(order)} A rejected order can't be reopened.`}
+              confirmLabel="Reject"
+              onSubmit={(reason) => updateStatus("REJECTED", { reason })}
+              onClose={() => setReasonDialog(null)}
+            />
+          ) : (
           <ReasonDialog
             title={reasonDialog === "SEND_BACK" ? "Send back for rework" : "Put on hold"}
             subtitle={`${workOrderRef(order.number)} · ${order.title}`}
@@ -1514,6 +1532,7 @@ export default function WorkOrderDetailPage() {
             onSubmit={(reason) => updateStatus("ON_HOLD", { reason })}
             onClose={() => setReasonDialog(null)}
           />
+          )
         )}
 
         {order.isSpecialProject && order.status === "REQUESTED" && !isManager && !isClient && (

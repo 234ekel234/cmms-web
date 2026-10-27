@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
+import { isClosed } from "@/lib/workOrders";
+import type { WorkOrderStatus } from "@/lib/statuses";
 
 type WorkOrder = {
-  id: string; status: string; priority: string;
+  id: string; status: WorkOrderStatus; priority: string;
   dueDate: string | null; completedAt: string | null; isSpecialProject: boolean;
 };
 type Asset = { id: string; health: string; status: string; archivedAt: string | null };
@@ -145,7 +147,9 @@ export default function AccountOverviewPage() {
   }
 
   // Work orders
-  const isOpen = (w: WorkOrder) => !["COMPLETED", "REJECTED"].includes(w.status);
+  // isClosed, not a list of its own: leaving APPROVED out counted signed-off
+  // work as open — and, once past its due date, as overdue.
+  const isOpen = (w: WorkOrder) => !isClosed(w);
   const openWO = workOrders.filter(isOpen);
   const overdue = openWO.filter((w) => w.dueDate && new Date(w.dueDate).getTime() < now);
   const specialProjects = workOrders.filter((w) => w.isSpecialProject).length;

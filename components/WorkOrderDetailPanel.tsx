@@ -18,6 +18,8 @@ import {
   type StageFacts,
   canSendBack,
   needsReason,
+  openStepsNote,
+  rejectionHint,
   awaitingReview,
   awaitingClient,
   isReviewer,
@@ -129,7 +131,7 @@ export default function WorkOrderDetailPanel({
   const [remarks, setRemarks] = useState("");
   const [confirmComplete, setConfirmComplete] = useState(false);
   // Holding a job and sending one back both ask why, in the same box.
-  const [reasonFor, setReasonFor] = useState<null | "HOLD" | "SEND_BACK">(null);
+  const [reasonFor, setReasonFor] = useState<null | "HOLD" | "SEND_BACK" | "REJECT">(null);
   const [reasonText, setReasonText] = useState("");
   const { user } = useAuth();
 
@@ -194,27 +196,23 @@ export default function WorkOrderDetailPanel({
 
   async function move(to: WorkOrderStatus) {
     if (to === "COMPLETED" && !confirmComplete) { setConfirmComplete(true); return; }
-    if (needsReason(to)) { setReasonFor("HOLD"); setReasonText(""); return; }
-    if (to === "REJECTED" && !(await confirm({
-      title: "Reject this work order?",
-      message: "It will be closed without any work done. A rejected order can't be reopened.",
-      confirmLabel: "Reject",
-    }))) return;
+    if (needsReason(to)) { setReasonFor(to === "REJECTED" ? "REJECT" : "HOLD"); setReasonText(""); return; }
     const body: Record<string, unknown> = { status: to };
     if (to === "COMPLETED" && remarks.trim()) body.remarks = remarks.trim();
     if (await patch(body)) { setConfirmComplete(false); setRemarks(""); }
   }
 
-  // Both land the job On Hold with the reason; a send-back also posts the
-  // reason to the thread, so that is pulled back in.
+  // Hold and send-back land the job On Hold with the reason; reject closes it.
+  // A send-back and a rejection also post the reason to the thread, so that is
+  // pulled back in.
   async function submitReason() {
     const reason = reasonText.trim();
     if (!reason || !reasonFor) return;
-    const sendingBack = reasonFor === "SEND_BACK";
-    if (await patch({ status: "ON_HOLD", reason })) {
+    const postsToThread = reasonFor === "SEND_BACK" || reasonFor === "REJECT";
+    if (await patch({ status: reasonFor === "REJECT" ? "REJECTED" : "ON_HOLD", reason })) {
       setReasonFor(null);
       setReasonText("");
-      if (sendingBack) {
+      if (postsToThread) {
         try {
           const res = await api.get(`/work-orders/${order.id}`);
           setComments(res.data.comments ?? []);
@@ -419,6 +417,9 @@ export default function WorkOrderDetailPanel({
                   placeholder="Add closing remarks (optional)"
                   aria-label="Closing remarks"
                 />
+                {openStepsNote(steps, "complete") && (
+                  <p className="tu-detail-hint tu-detail-warn" role="status">{openStepsNote(steps, "complete")}</p>
+                )}
                 {completingVerifies && (
                   <p className="tu-detail-hint">You&apos;re completing this as a supervisor, so it&apos;s verified too — no separate review.</p>
                 )}
@@ -439,19 +440,22 @@ export default function WorkOrderDetailPanel({
                   maxLength={500}
                   value={reasonText}
                   onChange={(e) => setReasonText(e.target.value)}
-                  placeholder={reasonFor === "SEND_BACK" ? "What still needs doing? (required)" : "Why is it going on hold? (required)"}
-                  aria-label={reasonFor === "SEND_BACK" ? "Reason for sending back" : "Reason for putting on hold"}
+                  placeholder={reasonFor === "SEND_BACK" ? "What still needs doing? (required)" : reasonFor === "REJECT" ? "Why is it being rejected? (required)" : "Why is it going on hold? (required)"}
+                  aria-label={reasonFor === "SEND_BACK" ? "Reason for sending back" : reasonFor === "REJECT" ? "Reason for rejecting" : "Reason for putting on hold"}
                   autoFocus
                 />
                 {reasonFor === "SEND_BACK" && (
                   <p className="tu-detail-hint">It goes back On Hold, and the reason is posted to the job&apos;s updates for the technician.</p>
+                )}
+                {reasonFor === "REJECT" && (
+                  <p className="tu-detail-hint">{rejectionHint(order)} A rejected order can&apos;t be reopened.</p>
                 )}
                 <div className="tu-detail-actions">
                   <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setReasonFor(null)} disabled={busy}>
                     Cancel
                   </button>
                   <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={submitReason} disabled={busy || !reasonText.trim()}>
-                    {busy ? "Saving…" : reasonFor === "SEND_BACK" ? "Send back" : "Put on hold"}
+                    {busy ? "Saving…" : reasonFor === "SEND_BACK" ? "Send back" : reasonFor === "REJECT" ? "Reject" : "Put on hold"}
                   </button>
                 </div>
               </div>
@@ -466,6 +470,9 @@ export default function WorkOrderDetailPanel({
               </div>
             ) : (
               <div className="tu-detail-actions">
+                {canVerify && openStepsNote(steps, "review") && (
+                  <p className="tu-detail-hint tu-detail-warn" role="status" style={{ flexBasis: "100%" }}>{openStepsNote(steps, "review")}</p>
+                )}
                 {canVerify && (
                   <button type="button" className="tu-sheet-action tu-sheet-action-success" onClick={verify} disabled={busy}>
                     {busy ? "Saving…" : "Verify work"}
