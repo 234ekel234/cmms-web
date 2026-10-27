@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -10,6 +10,7 @@ import EmptyState from "@/components/EmptyState";
 import type { WorkOrderStatus } from "@/lib/statuses";
 import { awaitingClient, isDone, needsClientApproval, signOffCue, surveyable, workOrderRef } from "@/lib/workOrders";
 import { SurveyForm } from "@/components/ClientSurvey";
+import { ACCEPT, MAX_MB, contentUrl, formatSize, thumbUrl, type BaseAttachment } from "@/lib/attachments";
 
 // ── Types ────────────────────────────────────────────────
 // Imported, not re-declared. A local copy of this union is what crashed this
@@ -22,7 +23,13 @@ import { SurveyForm } from "@/components/ClientSurvey";
 type Status = WorkOrderStatus;
 type Priority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
-type Comment = { id: string; body: string; authorName: string; createdAt: string };
+type Comment = {
+  id: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+  attachments?: BaseAttachment[];
+};
 type Asset = { id: string; name: string };
 
 type WorkOrder = {
@@ -106,6 +113,94 @@ function timeAgo(iso: string) {
   return formatDate(iso) ?? "";
 }
 
+// ── Files ────────────────────────────────────────────────
+// Mirrors progressUpload's maxFiles in backend/routes/workOrderRoutes.js.
+const MAX_FILES = 8;
+
+/**
+ * Adds picked files to those already staged, refusing what the API would.
+ * Checked here only so the client hears at once rather than after the upload;
+ * the API enforces both limits regardless.
+ */
+function stageFiles(staged: File[], picked: FileList | null): { files: File[]; error: string } {
+  const incoming = Array.from(picked ?? []);
+  const tooBig = incoming.find((f) => f.size > MAX_MB * 1024 * 1024);
+  if (tooBig) return { files: staged, error: `"${tooBig.name}" is ${formatSize(tooBig.size)}. The limit is ${MAX_MB} MB.` };
+  if (staged.length + incoming.length > MAX_FILES) return { files: staged, error: `Up to ${MAX_FILES} files at a time.` };
+  return { files: [...staged, ...incoming], error: "" };
+}
+
+/** Comments with files go multipart; text-only stays a plain JSON request. */
+function commentPayload(body: string, files: File[]) {
+  if (files.length === 0) return { body };
+  const form = new FormData();
+  if (body) form.append("body", body);
+  for (const f of files) form.append("files", f);
+  return form;
+}
+
+function StagedFiles({ files, onRemove }: { files: File[]; onRemove: (index: number) => void }) {
+  if (files.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 mb-2">
+      {files.map((f, i) => (
+        <span key={`${f.name}-${i}`} className="tu-chip" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          {f.name} · {formatSize(f.size)}
+          <button
+            type="button"
+            onClick={() => onRemove(i)}
+            aria-label={`Remove ${f.name}`}
+            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: 14, lineHeight: 1, padding: 0 }}
+          >
+            ×
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Photos as thumbnails, anything else as a download link — as on the job page. */
+function CommentFiles({ attachments }: { attachments?: BaseAttachment[] }) {
+  const photos = (attachments ?? []).filter((a) => a.isImage);
+  const files = (attachments ?? []).filter((a) => !a.isImage);
+  if (photos.length === 0 && files.length === 0) return null;
+  return (
+    <>
+      {photos.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {photos.map((a) => (
+            <a key={a.id} href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={thumbUrl(a)}
+                alt={a.caption || a.filename}
+                loading="lazy"
+                style={{
+                  width: 72, height: 72, objectFit: "cover", borderRadius: 6,
+                  border: "1px solid var(--tu-border)", display: "block", background: "var(--tu-bg-surface)",
+                }}
+              />
+            </a>
+          ))}
+        </div>
+      )}
+      {files.length > 0 && (
+        <ul role="list" className="mt-2 flex flex-col gap-1">
+          {files.map((a) => (
+            <li key={a.id}>
+              <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" className="tu-link" style={{ fontSize: 12.5 }}>
+                {a.filename}
+              </a>
+              <span className="text-[11px] text-[var(--tu-text-subtle)]"> · {formatSize(a.sizeBytes)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
 // ── Request card ─────────────────────────────────────────
 function RequestCard({
   order,
@@ -116,14 +211,16 @@ function RequestCard({
 }: {
   order: WorkOrder;
   isClient: boolean;
-  onAddComment: (body: string) => Promise<void>;
+  onAddComment: (body: string, files: File[]) => Promise<void>;
   onSignOff: (status: "APPROVED" | "ON_HOLD", reason?: string) => Promise<void>;
   onSurveyed: () => void;
 }) {
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [commentError, setCommentError] = useState(false);
+  const [commentError, setCommentError] = useState("");
+  const [commentFiles, setCommentFiles] = useState<File[]>([]);
+  const commentFileRef = useRef<HTMLInputElement>(null);
   const [sendingBack, setSendingBack] = useState(false);
   const [sendBackReason, setSendBackReason] = useState("");
   const [signingOff, setSigningOff] = useState(false);
@@ -155,18 +252,29 @@ function RequestCard({
     }
   }
 
+  const canComment = (commentText.trim().length > 0 || commentFiles.length > 0) && !submitting;
+
   async function handleComment() {
-    if (!commentText.trim() || submitting) return;
+    if (!canComment) return;
     setSubmitting(true);
-    setCommentError(false);
+    setCommentError("");
     try {
-      await onAddComment(commentText.trim());
+      await onAddComment(commentText.trim(), commentFiles);
       setCommentText("");
-    } catch {
-      setCommentError(true);
+      setCommentFiles([]);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setCommentError(e?.response?.data?.error ?? "Couldn\u2019t send that. Try again.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function onPickCommentFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const { files, error } = stageFiles(commentFiles, e.target.files);
+    setCommentFiles(files);
+    setCommentError(error);
+    if (commentFileRef.current) commentFileRef.current.value = "";
   }
 
   return (
@@ -339,28 +447,47 @@ function RequestCard({
                   <span className="text-xs font-bold text-[var(--tu-text-body)]">{c.authorName}</span>
                   <span className="text-[11px] text-[var(--tu-text-subtle)]">{timeAgo(c.createdAt)}</span>
                 </div>
-                <p className="text-[13px] text-[var(--tu-text-body)] leading-snug">{c.body}</p>
+                {c.body && <p className="text-[13px] text-[var(--tu-text-body)] leading-snug" style={{ whiteSpace: "pre-wrap" }}>{c.body}</p>}
+                <CommentFiles attachments={c.attachments} />
               </div>
             ))
           )}
+          <StagedFiles files={commentFiles} onRemove={(i) => setCommentFiles((prev) => prev.filter((_, j) => j !== i))} />
           <div className="flex gap-2 items-end mt-1">
             <textarea
               value={commentText}
               onChange={(e) => setCommentText(e.target.value)}
               placeholder="Add a comment…"
+              aria-label="Comment"
               rows={1}
               className="flex-1 border border-[var(--tu-border)] rounded-lg px-3 py-2 text-[13px] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] max-h-20"
             />
+            <input
+              ref={commentFileRef}
+              type="file"
+              accept={ACCEPT}
+              multiple
+              onChange={onPickCommentFiles}
+              className="tu-sr-only"
+              id={`comment-files-${order.id}`}
+            />
+            <label
+              htmlFor={`comment-files-${order.id}`}
+              className="tu-btn-secondary tu-btn-sm"
+              style={{ cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              + Photo
+            </label>
             <button
               type="button"
               onClick={handleComment}
-              disabled={!commentText.trim() || submitting}
+              disabled={!canComment}
               className="bg-[var(--tu-text-brand)] text-white rounded-lg px-3.5 py-2 text-[13px] font-bold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {submitting ? "…" : "Send"}
             </button>
           </div>
-          {commentError && <p className="text-[var(--tu-on-danger)] text-[11px] mt-1.5">Couldn&apos;t send comment. Try again.</p>}
+          {commentError && <p className="text-[var(--tu-on-danger)] text-[11px] mt-1.5">{commentError}</p>}
         </div>
       )}
     </div>
@@ -385,6 +512,10 @@ export default function ClientPortalPage() {
   const [form, setForm] = useState({ title: "", description: "", priority: "MEDIUM" as Priority, category: "", assetId: "" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  const [formFiles, setFormFiles] = useState<File[]>([]);
+  const formFileRef = useRef<HTMLInputElement>(null);
+  // Shown above the list when a request went in but its photos did not.
+  const [notice, setNotice] = useState("");
 
   useEffect(() => {
     fetchOrders();
@@ -420,9 +551,29 @@ export default function ClientPortalPage() {
         category: form.category.trim() || null,
         assetId: form.assetId || null,
       });
-      setOrders((prev) => [{ ...res.data, comments: res.data.comments ?? [] }, ...prev]);
+      let created: WorkOrder = { ...res.data, comments: res.data.comments ?? [] };
+      // Photos ride on a first comment rather than the request itself, so the
+      // team sees them in the job's thread — where every other photo lives —
+      // with the client's name and the time beside them. A failure here must
+      // not lose the request, which already exists: it is kept, and the client
+      // is told to add the photos from its comments.
+      setNotice("");
+      if (formFiles.length > 0) {
+        try {
+          const up = await api.post(`/work-orders/${created.id}/comments`, commentPayload("", formFiles));
+          created = { ...created, comments: [...created.comments, up.data] };
+        } catch (err: unknown) {
+          const e = err as { response?: { data?: { error?: string } } };
+          setNotice(
+            `${workOrderRef(created.number)} was submitted, but the photos didn\u2019t upload` +
+            `${e?.response?.data?.error ? ` (${e.response.data.error})` : ""}. Add them from its comments.`
+          );
+        }
+      }
+      setOrders((prev) => [created, ...prev]);
       setShowForm(false);
       setForm({ title: "", description: "", priority: "MEDIUM", category: "", assetId: "" });
+      setFormFiles([]);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to submit request.");
@@ -443,8 +594,8 @@ export default function ClientPortalPage() {
     );
   }
 
-  async function addComment(workOrderId: string, body: string) {
-    const res = await api.post(`/work-orders/${workOrderId}/comments`, { body });
+  async function addComment(workOrderId: string, body: string, files: File[]) {
+    const res = await api.post(`/work-orders/${workOrderId}/comments`, commentPayload(body, files));
     setOrders((prev) =>
       prev.map((o) => (o.id === workOrderId ? { ...o, comments: [...o.comments, res.data] } : o))
     );
@@ -564,10 +715,34 @@ export default function ClientPortalPage() {
               </div>
             )}
           </div>
+          <div className="mt-4">
+            <span className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Photos</span>
+            <StagedFiles files={formFiles} onRemove={(i) => setFormFiles((prev) => prev.filter((_, j) => j !== i))} />
+            <input
+              ref={formFileRef}
+              type="file"
+              accept={ACCEPT}
+              multiple
+              onChange={(e) => {
+                const { files, error } = stageFiles(formFiles, e.target.files);
+                setFormFiles(files);
+                setFormError(error);
+                if (formFileRef.current) formFileRef.current.value = "";
+              }}
+              className="tu-sr-only"
+              id="req-files"
+            />
+            <label htmlFor="req-files" className="tu-btn-secondary tu-btn-sm" style={{ cursor: "pointer" }}>
+              + Add photos
+            </label>
+            <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">
+              A photo of the problem helps the team bring the right tools. Up to {MAX_FILES} files, {MAX_MB} MB each.
+            </p>
+          </div>
           {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button
-              onClick={() => { setShowForm(false); setFormError(""); }}
+              onClick={() => { setShowForm(false); setFormError(""); setFormFiles([]); }}
               className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
             >
               Cancel
@@ -577,7 +752,7 @@ export default function ClientPortalPage() {
               disabled={saving}
               className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
-              {saving ? "Submitting…" : "Submit Request"}
+              {saving ? (formFiles.length > 0 ? "Uploading…" : "Submitting…") : "Submit Request"}
             </button>
           </div>
         </div>
@@ -606,6 +781,13 @@ export default function ClientPortalPage() {
           </button>
         ))}
       </div>
+
+      {notice && (
+        <div className="bg-[var(--tu-soft-warning)] border border-[var(--tu-bd-warning)] text-[var(--tu-on-warning)] text-sm rounded-lg px-4 py-3 mb-6 flex justify-between gap-3">
+          <span>{notice}</span>
+          <button type="button" onClick={() => setNotice("")} aria-label="Dismiss" className="cursor-pointer">×</button>
+        </div>
+      )}
 
       {error && (
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3 mb-6">
@@ -637,7 +819,7 @@ export default function ClientPortalPage() {
               key={order.id}
               order={order}
               isClient={isClient}
-              onAddComment={(body) => addComment(order.id, body)}
+              onAddComment={(body, files) => addComment(order.id, body, files)}
               onSignOff={(status, reason) => signOff(order.id, status, reason)}
               onSurveyed={() => setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, surveyDone: true } : o)))}
             />
