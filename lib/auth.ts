@@ -25,11 +25,29 @@ export function getToken(): string | null {
 export function saveSession(token: string, user: User) {
   localStorage.setItem("token", token);
   localStorage.setItem("user", JSON.stringify(user));
+  try { sessionStorage.removeItem(SIGNED_OUT_KEY); } catch { /* nothing to clear */ }
 }
 
 export function clearSession() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+}
+
+/**
+ * Why this browser was just signed out, carried across the redirect to /login
+ * so the page can say so — "signed out after a long time away" rather than an
+ * unexplained login form. Cleared by the next sign-in rather than on reading,
+ * because React runs a development effect twice and the second read would
+ * find nothing.
+ */
+const SIGNED_OUT_KEY = "signedOutReason";
+
+export function noteSignedOut(reason: string) {
+  try { sessionStorage.setItem(SIGNED_OUT_KEY, reason); } catch { /* private mode: no note, still signed out */ }
+}
+
+export function signedOutReason(): string | null {
+  try { return sessionStorage.getItem(SIGNED_OUT_KEY); } catch { return null; }
 }
 
 export function isLoggedIn(): boolean {

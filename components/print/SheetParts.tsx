@@ -10,7 +10,7 @@ export function SheetHeader({ kicker, title, titleSize }: { kicker: string; titl
       <div className="ps-logos">
         {/* eslint-disable @next/next/no-img-element */}
         <img src="/fmi_logo_dark.png" alt="FMI" />
-        <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="ps-logo-label" />
+        <img src="/servicemaster_logo_hq.png" alt="ServiceMaster" className="ps-logo-label" />
         {/* eslint-enable @next/next/no-img-element */}
       </div>
       <div className="ps-doc-title">

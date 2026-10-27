@@ -3,7 +3,8 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -94,6 +95,8 @@ export default function AttendancePage() {
   // actually want and is read-only throughout.
   const writable = canManage(user?.role);
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
 
   const [view, setView] = useState<"daily" | "summary">("daily");
@@ -186,8 +189,8 @@ export default function AttendancePage() {
       } else {
         setAttendance((prev) => prev.map((r) => r.employee.id === employeeId ? { ...r, isPresent } : r));
       }
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not save that attendance mark."));
     } finally {
       setSaving(null);
     }
@@ -199,8 +202,8 @@ export default function AttendancePage() {
     try {
       await api.post(`/shift-logs/${shiftLogId}/attendance`, { employeeId, isReliever });
       setAttendance((prev) => prev.map((r) => r.employee.id === employeeId ? { ...r, isReliever } : r));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not change the reliever flag."));
     }
   }
 
@@ -247,6 +250,7 @@ export default function AttendancePage() {
 
   return (
     <div className="p-8">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* View toggle */}
       <div className="flex rounded-xl overflow-hidden border border-[var(--tu-border)] w-fit mb-6">
         {(["daily", "summary"] as const).map((v) => (

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useConfirm } from "@/components/ConfirmDialog";
 
@@ -35,6 +36,8 @@ export default function TrainingDetailPage() {
   const trainingId = params.id as string;
 
   const [training, setTraining] = useState<Training | null>(null);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -74,8 +77,8 @@ export default function TrainingDetailPage() {
     try {
       const res = await api.patch(`/trainings/${trainingId}/employees/${employeeId}/complete`, {});
       setAssignments((prev) => prev.map((a) => a.employeeId === employeeId ? { ...a, ...res.data } : a));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not mark that training complete."));
     } finally {
       setCompletingId(null);
     }
@@ -92,8 +95,8 @@ export default function TrainingDetailPage() {
     try {
       await api.delete(`/employees/${employeeId}/trainings/${trainingId}`);
       setAssignments((prev) => prev.filter((a) => a.employeeId !== employeeId));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not remove that training."));
     } finally {
       setRemovingId(null);
     }
@@ -137,6 +140,7 @@ export default function TrainingDetailPage() {
 
   return (
     <div className="tu-page">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* Breadcrumb */}
       <div style={{ marginBottom: 4 }}>
         <Link href="/trainings" style={{ fontSize: 13, color: "var(--tu-text-subtle)", textDecoration: "none", fontWeight: 500 }}>

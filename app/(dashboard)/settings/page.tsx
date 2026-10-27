@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import PasswordChangeForm from "@/components/PasswordChangeForm";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import ThemeToggle, { ThemeHint } from "@/components/ThemeToggle";
 import { roleLabel, roleCls } from "@/lib/statuses";
 import Switch from "@/components/Switch";
 import EmailRulesCard from "@/components/EmailRulesCard";
+import SignedInDevices from "@/components/SignedInDevices";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -34,6 +36,8 @@ type Channel = "IN_APP" | "EMAIL";
 export default function SettingsPage() {
   const { user } = useAuth();
   const [prefs, setPrefs] = useState<Pref[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [loadingPrefs, setLoadingPrefs] = useState(true);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedPrefs, setSavedPrefs] = useState(false);
@@ -84,8 +88,8 @@ export default function SettingsPage() {
       await api.put("/me/notification-preferences", payload);
       setSavedPrefs(true);
       setTimeout(() => setSavedPrefs(false), 2500);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not save your notification preferences."));
     } finally {
       setSavingPrefs(false);
     }
@@ -96,6 +100,7 @@ export default function SettingsPage() {
 
   return (
     <div className="tu-page" style={{ maxWidth: 720 }}>
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div style={{ marginBottom: 32 }}>
         <h1 className="tu-page-title">Settings</h1>
         <p className="tu-page-sub">Manage your account preferences</p>
@@ -165,6 +170,14 @@ export default function SettingsPage() {
           )}
           <PasswordChangeForm onDone={() => setPwChanged(true)} />
         </div>
+      </div>
+
+      {/* Signed-in devices */}
+      <div className="tu-card" style={{ marginBottom: 24 }}>
+        <div className="tu-card-header">
+          <h2 className="tu-card-title">Signed-in devices</h2>
+        </div>
+        <SignedInDevices refreshKey={pwChanged} />
       </div>
 
       {/* Appearance */}

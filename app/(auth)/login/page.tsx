@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import api from "@/lib/api";
-import { saveSession } from "@/lib/auth";
+import { saveSession, signedOutReason } from "@/lib/auth";
 import { pendingConfirm } from "@/lib/emailConfirm";
 
 export default function LoginPage() {
@@ -15,6 +15,14 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Why the last session ended, when the API said — shown once.
+  const [notice, setNotice] = useState<string | null>(null);
+  // Read after mount (sessionStorage does not exist on the server), and set
+  // from a microtask so the effect body itself never sets state.
+  useEffect(() => {
+    const reason = signedOutReason();
+    if (reason) queueMicrotask(() => setNotice(reason));
+  }, []);
 
   const canSubmit = email.trim() !== "" && password !== "" && !loading;
 
@@ -49,7 +57,7 @@ export default function LoginPage() {
           {/* eslint-disable @next/next/no-img-element */}
           <img src="/fmi_logo_dark.png" alt="FMI" className="h-14 w-auto object-contain" />
           <div className="tu-login-logo-rule" />
-          <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="h-8 w-auto object-contain" />
+          <img src="/servicemaster_logo_hq.png" alt="ServiceMaster" className="h-8 w-auto object-contain" />
           {/* eslint-enable @next/next/no-img-element */}
         </div>
         <div className="text-center">
@@ -78,12 +86,18 @@ export default function LoginPage() {
           <div className="tu-login-mobile-logos lg:hidden flex flex-col items-center mb-8 gap-3">
             {/* eslint-disable @next/next/no-img-element */}
             <img src="/fmi_logo_dark.png" alt="FMI" className="tu-mark-fmi h-10 w-auto object-contain" />
-            <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="tu-mark-sm h-7 w-auto object-contain" />
+            <img src="/servicemaster_logo_hq.png" alt="ServiceMaster" className="tu-mark-sm h-7 w-auto object-contain" />
             {/* eslint-enable @next/next/no-img-element */}
           </div>
 
           <h1 className="tu-login-title">Sign in</h1>
           <p className="tu-login-lead">Enter your credentials to continue.</p>
+
+          {notice && !error && (
+            <div className="tu-login-notice" role="status">
+              {notice}
+            </div>
+          )}
 
           {error && (
             <div className="tu-login-error" role="alert">
@@ -147,7 +161,7 @@ export default function LoginPage() {
 
           <div className="tu-login-footer-mark flex justify-center mt-10">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="tu-mark-sm h-6 w-auto object-contain opacity-60" />
+            <img src="/servicemaster_logo_hq.png" alt="ServiceMaster" className="tu-mark-sm h-6 w-auto object-contain opacity-60" />
           </div>
         </div>
       </div>

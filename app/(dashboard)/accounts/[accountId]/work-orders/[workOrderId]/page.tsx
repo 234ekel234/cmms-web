@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api, { getServerClockOffset } from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage, getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
 import { STAFF_TRANSITIONS, awaitingClient, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
@@ -158,6 +159,8 @@ export default function WorkOrderDetailPage() {
   const workOrderId = params.workOrderId as string;
   const { user } = useAuth();
   const [order, setOrder] = useState<WorkOrder | null>(null);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [remarks, setRemarks] = useState("");
@@ -271,8 +274,8 @@ export default function WorkOrderDetailPage() {
       const res = await api.patch(`/work-orders/${order.id}`, { estimatedMinutes: total || null });
       setOrder((prev) => prev ? { ...prev, estimatedMinutes: res.data.estimatedMinutes } : prev);
       setEditingEst(false);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not save the estimate."));
     }
   }
 
@@ -322,8 +325,8 @@ export default function WorkOrderDetailPage() {
     try {
       const res = await api.post(`/work-orders/${order.id}/assignments`, { employeeId: empId });
       setOrder((prev) => prev ? { ...prev, assignments: [...prev.assignments, res.data] } : prev);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not assign that person."));
     } finally {
       setAssigningId(null);
     }
@@ -341,8 +344,8 @@ export default function WorkOrderDetailPage() {
     try {
       await api.delete(`/work-orders/${order.id}/assignments/${empId}`);
       setOrder((prev) => prev ? { ...prev, assignments: prev.assignments.filter((a) => a.employeeId !== empId) } : prev);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not unassign that person."));
     } finally {
       setRemovingId(null);
     }
@@ -428,8 +431,8 @@ export default function WorkOrderDetailPage() {
             checklistItems: res.data.checklistItems ?? prev.checklistItems,
           }
         : res.data);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not change the breakdown flag."));
     } finally {
       setSavingBreakdown(false);
     }
@@ -442,9 +445,10 @@ export default function WorkOrderDetailPage() {
     try {
       const res = await api.post(`/work-orders/${order.id}/verify`);
       setOrder((prev) => (prev ? { ...prev, ...res.data, comments: prev.comments, parts: prev.parts, checklistItems: prev.checklistItems } : prev));
-    } catch {
+    } catch (err) {
       // The button stays; a refusal (already verified, sent back meanwhile) is
-      // resolved by the refetch.
+      // resolved by the refetch — and said, so it is not a click that did nothing.
+      setActionError(errorMessage(err, "Could not verify this job."));
       await fetchOrder();
     } finally {
       setUpdatingStatus(false);
@@ -604,8 +608,8 @@ export default function WorkOrderDetailPage() {
       await api.delete(`/work-orders/${order.id}/parts/${partId}`);
       setOrder((prev) => prev ? { ...prev, parts: (prev.parts ?? []).filter((p) => p.id !== partId) } : prev);
       if (editingPartId === partId) closePartForm();
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not remove that part."));
     } finally {
       setRemovingPartId(null);
     }
@@ -799,6 +803,7 @@ export default function WorkOrderDetailPage() {
 
   return (
     <div className="p-8 max-w-4xl mx-auto">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <Breadcrumbs
         items={[
           { label: "Work Orders", href: `/accounts/${accountId}/work-orders` },

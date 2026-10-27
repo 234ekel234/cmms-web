@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel, roleCls } from "@/lib/statuses";
@@ -33,6 +34,8 @@ export default function MembersPage() {
   const accountId = params.accountId as string;
   const { user } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [allUsers, setAllUsers] = useState<UserRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -73,8 +76,8 @@ export default function MembersPage() {
       const res = await api.post(`/accounts/${accountId}/members`, { userId });
       setMembers((prev) => [...prev, res.data]);
       setSearch("");
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not add that member."));
     } finally {
       setSavingId(null);
     }
@@ -90,8 +93,8 @@ export default function MembersPage() {
     try {
       await api.delete(`/accounts/${accountId}/members/${member.id}`);
       setMembers((prev) => prev.filter((m) => m.id !== member.id));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not remove that member."));
     } finally {
       setRemovingId(null);
     }
@@ -99,6 +102,7 @@ export default function MembersPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-6">Members</h2>
 
       {/* Current members */}

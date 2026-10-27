@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearSession, noteSignedOut } from "@/lib/auth";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
 
@@ -37,10 +38,18 @@ api.interceptors.response.use(
     return res;
   },
   (err) => {
-    if (err.response?.status === 401 && typeof window !== "undefined") {
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.location.href = "/login";
+    // A 401 means the session is over — except from the sign-in calls
+    // themselves, where it means a wrong password. Those used to fall in here
+    // too, and the hard reload threw away the "Incorrect email or password"
+    // the login form had just set, so a typo looked like the page blinking.
+    const url = String(err.config?.url ?? "");
+    const signingIn = url.startsWith("/auth/");
+    if (err.response?.status === 401 && !signingIn && typeof window !== "undefined") {
+      clearSession();
+      // Said on the login page: "you were signed out" beats an unexplained form.
+      const reason = err.response?.data?.error;
+      if (typeof reason === "string" && reason) noteSignedOut(reason);
+      if (window.location.pathname !== "/login") window.location.href = "/login";
     }
     // A password someone else chose must be replaced first; the API refuses
     // everything else until it is (backend withCurrentRole).
@@ -55,5 +64,16 @@ api.interceptors.response.use(
     return Promise.reject(err);
   }
 );
+
+/**
+ * What to tell someone when a request failed: the API's own explanation when
+ * it gave one (a 409 saying *why* an employee cannot be removed is the whole
+ * point of the 409), else `fallback`. For the catch blocks around writes,
+ * which used to swallow the failure and leave the user believing it worked.
+ */
+export function errorMessage(err: unknown, fallback: string): string {
+  const msg = (err as { response?: { data?: { error?: unknown } } })?.response?.data?.error;
+  return typeof msg === "string" && msg ? msg : fallback;
+}
 
 export default api;

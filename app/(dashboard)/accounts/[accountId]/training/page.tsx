@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -30,6 +31,8 @@ export default function TrainingPage() {
   const writable = canManage(user?.role);
 
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [allTrainings, setAllTrainings] = useState<Training[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -85,8 +88,8 @@ export default function TrainingPage() {
       );
       setAssignTarget(null);
       setAssignSearch("");
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not assign that training."));
     } finally {
       setAssigning(false);
     }
@@ -109,8 +112,8 @@ export default function TrainingPage() {
         )
       );
       setCompleteTarget(null);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not mark that training complete."));
     } finally {
       setCompleting(false);
     }
@@ -128,6 +131,7 @@ export default function TrainingPage() {
 
   return (
     <div className="p-8">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

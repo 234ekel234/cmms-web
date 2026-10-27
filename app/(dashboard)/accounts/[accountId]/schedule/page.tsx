@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -97,6 +98,8 @@ export default function SchedulePage() {
   // display: the counts stay, the click does not.
   const writable = canManage(user?.role);
   const [shiftTemplates, setShiftTemplates] = useState<ShiftTemplate[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [weekStart, setWeekStart] = useState<Date>(() => getMonday(new Date()));
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
   const [recurring, setRecurring] = useState<RecurringEntry[]>([]);
@@ -188,8 +191,8 @@ export default function SchedulePage() {
         });
         setSchedules((prev) => [...prev, res.data]);
       }
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not change that day's schedule."));
     } finally {
       setToggling(null);
     }
@@ -209,8 +212,8 @@ export default function SchedulePage() {
         });
         setRecurring((prev) => [...prev, res.data]);
       }
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not change the standing schedule."));
     } finally {
       setTogglingRecurring(null);
     }
@@ -256,8 +259,8 @@ export default function SchedulePage() {
         toDate: toDateString(addDays(weekStart, 7)),
       });
       setWeekStart(addDays(weekStart, 7));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not copy the schedule."));
     } finally {
       setCopying(false);
     }
@@ -269,6 +272,7 @@ export default function SchedulePage() {
 
   return (
     <div className="p-8">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* Today's Availability */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm mb-6">
         <div className="px-6 py-4 border-b border-[var(--tu-border)] flex items-center justify-between">

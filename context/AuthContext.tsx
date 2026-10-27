@@ -3,14 +3,15 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getUser, clearSession, type User } from "@/lib/auth";
+import api from "@/lib/api";
 import { canAccessRoute, ROLE_HOME } from "@/lib/rbac";
 
 type AuthContextType = {
   user: User | null;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
-const AuthContext = createContext<AuthContextType>({ user: null, logout: () => {} });
+const AuthContext = createContext<AuthContextType>({ user: null, logout: async () => {} });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -39,7 +40,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, pathname, router]);
 
-  function logout() {
+  // Ends the session on the server first, so the token stops working rather
+  // than only being forgotten here. Best effort: an unreachable API must not
+  // keep somebody signed in on a shared computer, so the local session goes
+  // regardless.
+  async function logout() {
+    try {
+      await api.post("/me/sign-out");
+    } catch {
+      // already ended, or offline — signed out here either way
+    }
     clearSession();
     router.replace("/login");
   }

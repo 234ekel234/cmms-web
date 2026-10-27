@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, canManage, hasRole } from "@/lib/rbac";
@@ -95,6 +96,8 @@ export default function ChecklistsPage() {
   const canSchedule = canManage(user?.role);
   const canFillIn = hasRole(user?.role, FIELD_STAFF);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState<"ALL" | ChecklistState>("ALL");
 
@@ -133,8 +136,8 @@ export default function ChecklistsPage() {
     try {
       await api.delete(`/accounts/${accountId}/pm-checklists/${assignmentId}`);
       setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not remove that checklist."));
     }
   }
 
@@ -207,6 +210,7 @@ export default function ChecklistsPage() {
 
   return (
     <div className="p-8">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">PM Checklists</h2>

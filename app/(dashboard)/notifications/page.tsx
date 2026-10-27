@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 
 const PAGE_SIZE = 25;
@@ -64,6 +65,8 @@ function timeAgo(iso: string) {
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [cursor, setCursor] = useState<string | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -114,8 +117,8 @@ export default function NotificationsPage() {
       await api.patch(`/notifications/${id}/read`);
       setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
       setUnreadCount((c) => Math.max(0, c - 1));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not mark that notification read."));
     }
   }
 
@@ -125,13 +128,14 @@ export default function NotificationsPage() {
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
       // read-all is server-wide, so it clears the unread beyond this page too.
       setUnreadCount(0);
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not mark your notifications read."));
     }
   }
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-[var(--tu-text-heading)]">Notifications</h1>

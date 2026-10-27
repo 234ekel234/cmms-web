@@ -136,7 +136,10 @@ shown, not swallowed.
 1. User logs in via `POST /api/auth/login`
 2. Token + user info saved to localStorage via `saveSession()`
 3. Axios interceptor attaches token to every request
-4. 401 response → clears session and redirects to `/login`
+4. 401 response → clears session and redirects to `/login`, carrying the API's reason ("signed
+   out after a long time away") for the login page — **except on `/auth/*` calls**, where a 401
+   is a wrong password and must stay on the form. Sign-out calls `POST /me/sign-out` first so
+   the token dies on the server; Settings → Signed-in devices lists and ends sessions.
 5. Protected pages check `isLoggedIn()` on mount and redirect if not authenticated
 
 ## Printing

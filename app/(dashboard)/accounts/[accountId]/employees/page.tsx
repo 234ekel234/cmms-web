@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import ActionError from "@/components/ActionError";
+import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
@@ -44,6 +45,8 @@ export default function EmployeesPage() {
   // unassigning is ours. See lib/rbac.ts.
   const writable = canManage(user?.role);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  // A refused write, said rather than swallowed — see ActionError.
+  const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showAssign, setShowAssign] = useState(false);
@@ -159,8 +162,8 @@ export default function EmployeesPage() {
     try {
       await api.delete(`/accounts/${accountId}/employees/${emp.id}`);
       setEmployees((prev) => prev.filter((e) => e.id !== emp.id));
-    } catch {
-      // silent
+    } catch (err) {
+      setActionError(errorMessage(err, "Could not remove that employee."));
     } finally {
       setUnassigning(null);
     }
@@ -168,6 +171,7 @@ export default function EmployeesPage() {
 
   return (
     <div className="p-8">
+      <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Employees</h2>
         {writable && (
