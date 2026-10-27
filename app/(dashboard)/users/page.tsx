@@ -15,7 +15,15 @@ type User = {
   email: string;
   role: Role;
   disabledAt?: string | null;
+  // Confirming an address (backend helpers/emailConfirmation.js): until it is,
+  // emails go out for 14 days from the first link and then pause.
+  emailVerifiedAt?: string | null;
+  emailConfirmRequestedAt?: string | null;
 };
+
+const GRACE_MS = 14 * 86_400_000;
+const emailPaused = (u: User) =>
+  !u.emailVerifiedAt && !!u.emailConfirmRequestedAt && Date.now() - new Date(u.emailConfirmRequestedAt).getTime() >= GRACE_MS;
 
 function SkeletonRows({ count, cols }: { count: number; cols: number }) {
   return (
@@ -45,6 +53,8 @@ export default function UsersPage() {
   const [form, setForm] = useState({ name: "", email: "", password: "", role: "SUPERVISOR" as Role });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  // Per-row result of "Resend link", keyed by user id.
+  const [resent, setResent] = useState<Record<string, string>>({});
 
   const isManager = me?.role === "GENERAL_MANAGER" || me?.role === "MANAGER";
   // Everyone is provisioned through POST /users — there is no public signup.
@@ -104,6 +114,20 @@ export default function UsersPage() {
     setForm({ name: "", email: "", password: "", role: "SUPERVISOR" });
     setFormError("");
     setShowForm(true);
+  }
+
+  async function resendConfirm(u: User) {
+    setResent((r) => ({ ...r, [u.id]: "Sending…" }));
+    try {
+      const res = await api.post<{ sent: boolean }>(`/users/${u.id}/confirm-email/resend`);
+      setResent((r) => ({ ...r, [u.id]: res.data.sent ? "Link sent" : "Couldn't send — try later" }));
+      if (!u.emailConfirmRequestedAt) {
+        setUsers((list) => list.map((x) => (x.id === u.id ? { ...x, emailConfirmRequestedAt: new Date().toISOString() } : x)));
+      }
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setResent((r) => ({ ...r, [u.id]: e?.response?.data?.error ?? "Couldn't send — try later" }));
+    }
   }
 
   function openEdit(u: User) {
@@ -365,7 +389,32 @@ export default function UsersPage() {
                         )}
                         {u.disabledAt && <span className="tu-badge tu-badge-neutral" style={{ marginLeft: 8 }}>Disabled</span>}
                       </td>
-                      <td style={{ color: "var(--tu-text-body)" }}>{u.email}</td>
+                      <td style={{ color: "var(--tu-text-body)" }}>
+                        {u.email}
+                        {!u.emailVerifiedAt && !u.disabledAt && (
+                          <span style={{ display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 8 }}>
+                            <span
+                              className={`tu-badge ${emailPaused(u) ? "tu-badge-danger" : "tu-badge-warning"}`}
+                              title={emailPaused(u)
+                                ? "Never confirmed, so emails to this address are paused. The app's notifications still reach them."
+                                : "Not confirmed yet. Emails keep going for 14 days from the first link, then pause."}
+                            >
+                              {emailPaused(u) ? "Emails paused" : "Unconfirmed"}
+                            </span>
+                            {resent[u.id] ? (
+                              <span style={{ fontSize: 12, color: "var(--tu-text-subtle)" }}>{resent[u.id]}</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => resendConfirm(u)}
+                                className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline cursor-pointer"
+                              >
+                                {u.emailConfirmRequestedAt ? "Resend link" : "Send link"}
+                              </button>
+                            )}
+                          </span>
+                        )}
+                      </td>
                       <td>
                         <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${roleCls(u.role)}`}>
                           {roleLabel(u.role)}

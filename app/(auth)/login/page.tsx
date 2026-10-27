@@ -6,6 +6,7 @@ import Link from "next/link";
 import { isAxiosError } from "axios";
 import api from "@/lib/api";
 import { saveSession } from "@/lib/auth";
+import { pendingConfirm } from "@/lib/emailConfirm";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,7 +30,10 @@ export default function LoginPage() {
       });
       const { token, user } = res.data;
       saveSession(token, user);
-      router.push(user.mustChangePassword ? "/change-password" : "/accounts");
+      // Arrived from a confirm-email link while signed out: finish that first.
+      // It is allowed before a forced password change, and sends on to it.
+      if (pendingConfirm()) router.push("/confirm-email");
+      else router.push(user.mustChangePassword ? "/change-password" : "/accounts");
     } catch (err) {
       setError((isAxiosError(err) && err.response?.data?.error) || "Incorrect email or password.");
     } finally {
