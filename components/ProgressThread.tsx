@@ -125,7 +125,8 @@ export default function ProgressThread({
                   {photos.length > 0 && (
                     <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
                       {photos.map((a) => (
-                        <a key={a.id} href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
+                        <figure key={a.id} style={{ margin: 0, width: 92 }}>
+                        <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={a.hasThumb ? `${contentUrl(a)}&size=thumb` : contentUrl(a)}
@@ -138,6 +139,12 @@ export default function ProgressThread({
                             }}
                           />
                         </a>
+                        {a.caption && (
+                          <figcaption className="text-[11px] text-[var(--tu-text-subtle)]" style={{ marginTop: 3, overflowWrap: "anywhere" }}>
+                            {a.caption}
+                          </figcaption>
+                        )}
+                        </figure>
                       ))}
                     </div>
                   )}
@@ -149,7 +156,7 @@ export default function ProgressThread({
                           <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" className="tu-link" style={{ fontSize: 13 }}>
                             {a.filename}
                           </a>
-                          <span className="text-xs text-[var(--tu-text-subtle)]"> · {formatSize(a.sizeBytes)}</span>
+                          <span className="text-xs text-[var(--tu-text-subtle)]"> · {formatSize(a.sizeBytes)}{a.caption ? ` · ${a.caption}` : ""}</span>
                         </li>
                       ))}
                     </ul>

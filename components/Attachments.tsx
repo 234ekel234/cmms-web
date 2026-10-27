@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
 import {
   ACCEPT,
+  CAPTION_MAX,
   MAX_MB,
   contentUrl,
   formatSize,
@@ -25,6 +27,90 @@ import ArchivedList from "@/components/ArchivedList";
 // component stays the gallery it was. Both draw their limits and their fetch
 // URL from lib/attachments so they cannot drift apart.
 type Attachment = BaseAttachment;
+
+/**
+ * A caption, and — for whoever may change it — the control to. Inline rather
+ * than a dialog: it is one short line, and a modal for it would cost more
+ * attention than the caption is worth.
+ */
+function Caption({
+  a,
+  editable,
+  onSave,
+  compact = false,
+}: {
+  a: Attachment;
+  editable: boolean;
+  onSave: (caption: string) => Promise<void>;
+  compact?: boolean;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function save() {
+    setSaving(true);
+    setError("");
+    try {
+      await onSave(draft);
+      setEditing(false);
+    } catch (err: unknown) {
+      const r = (err as { response?: { data?: { error?: string } } })?.response;
+      setError(r?.data?.error ?? "Could not save the caption.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div style={{ marginTop: 4 }}>
+        <input
+          className="tu-input"
+          style={{ width: "100%", fontSize: 12, padding: "4px 6px" }}
+          value={draft}
+          maxLength={CAPTION_MAX}
+          autoFocus
+          aria-label={`Caption for ${a.filename}`}
+          placeholder="e.g. serial plate"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") { e.preventDefault(); if (!saving) save(); }
+            if (e.key === "Escape") setEditing(false);
+          }}
+        />
+        <div style={{ display: "flex", gap: 8, marginTop: 4, fontSize: 11.5 }}>
+          <button type="button" className="tu-link-button" onClick={save} disabled={saving}>
+            {saving ? "Saving…" : "Save"}
+          </button>
+          <button type="button" className="tu-link-button" onClick={() => setEditing(false)} disabled={saving}>
+            Cancel
+          </button>
+        </div>
+        {error && <p className="tu-danger-text" style={{ fontSize: 11.5, marginTop: 2 }}>{error}</p>}
+      </div>
+    );
+  }
+
+  if (!a.caption && !editable) return null;
+  return (
+    <span style={{ display: compact ? "inline" : "block", fontSize: 11, color: "var(--tu-text-subtle)", marginTop: compact ? 0 : 4 }}>
+      {a.caption}
+      {editable && (
+        <button
+          type="button"
+          className="tu-link-button"
+          style={{ marginLeft: a.caption ? 6 : 0, fontSize: 11 }}
+          onClick={() => { setDraft(a.caption ?? ""); setError(""); setEditing(true); }}
+          aria-label={a.caption ? `Edit caption for ${a.filename}` : `Add a caption to ${a.filename}`}
+        >
+          {a.caption ? "Edit" : "Add caption"}
+        </button>
+      )}
+    </span>
+  );
+}
 
 type Props = {
   /** Which kind of parent this list hangs off. */
@@ -53,6 +139,7 @@ export default function Attachments({
   onRemoved,
 }: Props) {
   const confirm = useConfirm();
+  const { user } = useAuth();
   const [items, setItems] = useState<Attachment[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -142,6 +229,15 @@ export default function Attachments({
     }
   }
 
+  // Staff caption anything; anyone else only what they uploaded — the API's
+  // rule, mirrored so nobody is offered a control it refuses.
+  const canCaption = (a: Attachment) => canDelete || (!!user && a.uploadedById === user.id);
+
+  async function saveCaption(a: Attachment, caption: string) {
+    const res = await api.patch(`/attachments/${a.id}`, { caption });
+    setItems((prev) => prev.map((x) => (x.id === a.id ? res.data : x)));
+  }
+
   const images = items.filter((a) => a.isImage);
   const files = items.filter((a) => !a.isImage);
 
@@ -224,11 +320,9 @@ export default function Attachments({
                       Make cover
                     </button>
                   )}
-                  {a.caption && (
-                    <figcaption style={{ fontSize: 11, color: "var(--tu-text-subtle)", marginTop: 4 }}>
-                      {a.caption}
-                    </figcaption>
-                  )}
+                  <figcaption>
+                    <Caption a={a} editable={canCaption(a)} onSave={(c) => saveCaption(a, c)} />
+                  </figcaption>
                 </figure>
               ))}
             </div>
@@ -252,11 +346,12 @@ export default function Attachments({
                     >
                       {a.filename}
                     </a>
-                    <p style={{ fontSize: 11.5, color: "var(--tu-text-subtle)", marginTop: 1 }}>
+                    <div style={{ fontSize: 11.5, color: "var(--tu-text-subtle)", marginTop: 1 }}>
                       {formatSize(a.sizeBytes)}
                       {a.uploadedByName ? ` · ${a.uploadedByName}` : ""}
-                      {a.caption ? ` · ${a.caption}` : ""}
-                    </p>
+                      {(a.caption || canCaption(a)) && " · "}
+                      <Caption a={a} editable={canCaption(a)} onSave={(c) => saveCaption(a, c)} compact />
+                    </div>
                   </div>
                   {canDelete && (
                     <button

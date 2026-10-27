@@ -34,6 +34,9 @@ export const ACCEPT_SCANS = "image/jpeg,image/png,image/webp,image/heic,applicat
 /** Mirrors MAX_BYTES in backend/helpers/storage.js. */
 export const MAX_MB = 15;
 
+/** Mirrors CAPTION_MAX in backend/routes/attachmentRoutes.js. */
+export const CAPTION_MAX = 200;
+
 export type BaseAttachment = {
   id: string;
   filename: string;
@@ -41,6 +44,7 @@ export type BaseAttachment = {
   sizeBytes: number;
   caption: string | null;
   uploadedByName: string | null;
+  uploadedById?: string | null;
   createdAt: string;
   isImage: boolean;
   /** A small preview exists — see `thumbUrl`. */

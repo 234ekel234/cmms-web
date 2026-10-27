@@ -170,7 +170,8 @@ function CommentFiles({ attachments }: { attachments?: BaseAttachment[] }) {
       {photos.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mt-2">
           {photos.map((a) => (
-            <a key={a.id} href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
+            <figure key={a.id} style={{ margin: 0, width: 72 }}>
+            <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" title={a.filename}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={thumbUrl(a)}
@@ -182,6 +183,12 @@ function CommentFiles({ attachments }: { attachments?: BaseAttachment[] }) {
                 }}
               />
             </a>
+            {a.caption && (
+              <figcaption className="text-[10.5px] text-[var(--tu-text-subtle)]" style={{ marginTop: 2, overflowWrap: "anywhere" }}>
+                {a.caption}
+              </figcaption>
+            )}
+            </figure>
           ))}
         </div>
       )}
@@ -192,7 +199,7 @@ function CommentFiles({ attachments }: { attachments?: BaseAttachment[] }) {
               <a href={contentUrl(a)} target="_blank" rel="noopener noreferrer" className="tu-link" style={{ fontSize: 12.5 }}>
                 {a.filename}
               </a>
-              <span className="text-[11px] text-[var(--tu-text-subtle)]"> · {formatSize(a.sizeBytes)}</span>
+              <span className="text-[11px] text-[var(--tu-text-subtle)]"> · {formatSize(a.sizeBytes)}{a.caption ? ` · ${a.caption}` : ""}</span>
             </li>
           ))}
         </ul>
