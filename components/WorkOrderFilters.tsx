@@ -1,6 +1,6 @@
 "use client";
 
-import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { type WorkOrderStatus, workOrderStatusGroupLabel } from "@/lib/statuses";
 import type { WorkOrderFlag } from "@/lib/workOrders";
 
 /**
@@ -82,7 +82,7 @@ export default function WorkOrderFilters({
             disabled={count === 0 && !on}
             onClick={() => onStatusesChange(toggle(statuses, s))}
           >
-            {WORK_ORDER_STATUS[s].label}
+            {workOrderStatusGroupLabel(s)}
             <span className="tu-chip-count">{count}</span>
           </button>
         );

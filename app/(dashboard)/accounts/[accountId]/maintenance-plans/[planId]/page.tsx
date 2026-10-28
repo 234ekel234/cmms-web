@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { hasRole, MANAGERS } from "@/lib/rbac";
 import EmptyState from "@/components/EmptyState";
-import { workOrderStatusMeta } from "@/lib/statuses";
+import { workOrderStatusMeta, workOrderStatusFor } from "@/lib/statuses";
 import {
   FREQUENCIES,
   FREQUENCY_LABEL,
@@ -24,6 +24,7 @@ import {
 } from "@/lib/maintenancePlans";
 import { workOrderRef } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { startLoad } from "@/lib/startLoad";
 
 type Asset = { id: string; name: string };
 type Employee = { id: string; name: string; position: string | null };
@@ -72,12 +73,13 @@ export default function MaintenancePlanDetailPage() {
     }
   }, [planId]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => startLoad(load), [load]);
 
   // Seed the edit form from the loaded plan whenever editing opens, so cancelling
   // and reopening always starts from what is actually stored.
-  useEffect(() => {
-    if (!editing || !plan) return;
+  function openEditor() {
+    if (!plan) return;
+    setEditing(true);
     setForm({
       title: plan.title,
       description: plan.description ?? "",
@@ -98,7 +100,7 @@ export default function MaintenancePlanDetailPage() {
     setSteps(plan.steps.map((s) => s.description));
     if (!assets.length) api.get(`/accounts/${accountId}/assets`).then((r) => setAssets(r.data)).catch(() => {});
     if (!employees.length) api.get(`/accounts/${accountId}/employees`).then((r) => setEmployees(r.data)).catch(() => {});
-  }, [editing, plan, accountId, assets.length, employees.length]);
+  }
 
   async function save() {
     if (!form.title.trim()) { setFormError("Title is required."); return; }
@@ -157,7 +159,7 @@ export default function MaintenancePlanDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 space-y-3">
+      <div className="px-4 py-5 sm:p-8 space-y-3">
         {[1, 2, 3].map((i) => (
           <div key={i} className="h-24 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
         ))}
@@ -167,7 +169,7 @@ export default function MaintenancePlanDetailPage() {
 
   if (notFound || !plan) {
     return (
-      <div className="p-8">
+      <div className="px-4 py-5 sm:p-8">
         <div className="tu-card">
           <EmptyState icon="search" title="Plan not found" hint="It may have been deleted, or you may not have access to it." />
         </div>
@@ -178,7 +180,7 @@ export default function MaintenancePlanDetailPage() {
   const state = planState(plan);
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <Link href={`/accounts/${accountId}/maintenance-plans`} className="text-xs text-[var(--tu-text-brand)] hover:underline">
         ← Maintenance Plans
       </Link>
@@ -196,7 +198,7 @@ export default function MaintenancePlanDetailPage() {
           <span className={TONE_CLASS[state.tone]}>{state.label}</span>
           {!editing && (
             <button
-              onClick={() => setEditing(true)}
+              onClick={openEditor}
               className="px-3 py-2 rounded-lg text-sm font-semibold border border-[var(--tu-border)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)] cursor-pointer"
             >
               Edit
@@ -447,7 +449,7 @@ export default function MaintenancePlanDetailPage() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={workOrderStatusMeta(o.status).badge}>
-                      {workOrderStatusMeta(o.status).label}
+                      {workOrderStatusFor(o).label}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-[var(--tu-text-subtle)] text-xs">{fmtDate(o.dueDate)}</td>

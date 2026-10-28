@@ -12,7 +12,7 @@
  * and free of React, so it can be reasoned about (and tested) without one.
  */
 
-import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { WORK_ORDER_STATUS, type WorkOrderStatus, workOrderStatusGroupLabel } from "@/lib/statuses";
 
 export type AccountSummary = {
   id: string;
@@ -108,7 +108,7 @@ export const PRIORITY_SERIES = [
 
 export const WO_STATUS = (Object.keys(WORK_ORDER_STATUS) as WorkOrderStatus[]).map((key) => ({
   key,
-  label: WORK_ORDER_STATUS[key].label,
+  label: workOrderStatusGroupLabel(key),
   color: WORK_ORDER_STATUS[key].color,
 }));
 

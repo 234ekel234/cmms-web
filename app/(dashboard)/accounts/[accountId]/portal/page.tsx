@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
@@ -8,9 +8,11 @@ import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
 import { WORK_ORDER_CATEGORIES } from "@/lib/workOrderCategories";
 import EmptyState from "@/components/EmptyState";
 import type { WorkOrderStatus } from "@/lib/statuses";
-import { awaitingClient, isDone, needsClientApproval, signOffCue, surveyable, workOrderRef } from "@/lib/workOrders";
+import { awaitingClient, isCancellation, isClosed, isDone, needsClientApproval, signOffCue, surveyable, workOrderRef } from "@/lib/workOrders";
 import { SurveyForm } from "@/components/ClientSurvey";
+import DuplicateHint from "@/components/DuplicateHint";
 import { ACCEPT, MAX_MB, contentUrl, formatSize, thumbUrl, type BaseAttachment } from "@/lib/attachments";
+import { startLoad } from "@/lib/startLoad";
 
 // ── Types ────────────────────────────────────────────────
 // Imported, not re-declared. A local copy of this union is what crashed this
@@ -42,6 +44,7 @@ type WorkOrder = {
   title: string;
   description: string | null;
   status: Status;
+  acceptedAt?: string | null;
   priority: Priority;
   category: string | null;
   dueDate: string | null;
@@ -233,7 +236,11 @@ function RequestCard({
   const [signingOff, setSigningOff] = useState(false);
   const [signOffError, setSignOffError] = useState("");
 
-  const cfg = CLIENT_STATUS[order.status];
+  // "Declined" is a request turned down; one the team accepted and later
+  // called off was cancelled (isCancellation).
+  const cfg = order.status === "REJECTED" && isCancellation(order)
+    ? { ...CLIENT_STATUS.REJECTED, label: "Cancelled" }
+    : CLIENT_STATUS[order.status];
   const isDeclined = order.status === "REJECTED";
   // Finished, whether or not the client has signed it off yet.
   const isCompleted = isDone(order.status);
@@ -524,13 +531,7 @@ export default function ClientPortalPage() {
   // Shown above the list when a request went in but its photos did not.
   const [notice, setNotice] = useState("");
 
-  useEffect(() => {
-    fetchOrders();
-    api.get(`/accounts/${accountId}/assets`).then((r) => setAssets(r.data)).catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accountId]);
-
-  async function fetchOrders() {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -541,7 +542,12 @@ export default function ClientPortalPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [accountId]);
+
+  useEffect(() => startLoad(fetchOrders), [fetchOrders]);
+  useEffect(() => {
+    api.get(`/accounts/${accountId}/assets`).then((r) => setAssets(r.data)).catch(() => {});
+  }, [accountId]);
 
   async function createRequest() {
     if (!form.title.trim()) {
@@ -609,7 +615,8 @@ export default function ClientPortalPage() {
   }
 
   const visible = filterOrders(orders, filter);
-  const activeCount = orders.filter((o) => ["REQUESTED", "PENDING", "IN_PROGRESS"].includes(o.status)).length;
+  // Everything not finished or declined — on-hold work is still the client's open business.
+  const activeCount = orders.filter((o) => !isClosed(o)).length;
   const inProgressCount = orders.filter((o) => o.status === "IN_PROGRESS").length;
   const completedCount = orders.filter((o) => isDone(o.status)).length;
   const awaitingCount = orders.filter(awaitingClient).length;
@@ -627,7 +634,7 @@ export default function ClientPortalPage() {
   ];
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">My Requests</h2>
@@ -721,6 +728,9 @@ export default function ClientPortalPage() {
                 </select>
               </div>
             )}
+            <div className="col-span-2">
+              <DuplicateHint orders={orders} assetId={form.assetId} title={form.title} accountId={accountId} />
+            </div>
           </div>
           <div className="mt-4">
             <span className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Photos</span>

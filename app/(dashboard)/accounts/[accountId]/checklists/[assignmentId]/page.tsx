@@ -1,13 +1,18 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { frequencyMeta } from "@/lib/maintenancePlans";
 import { pmControlNumber } from "@/lib/pmControlNumber";
 import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { startLoad } from "@/lib/startLoad";
+import { useAuth } from "@/context/AuthContext";
+import { findingDraft, isPmFinding, raiseWorkOrderHref } from "@/lib/linkedWorkOrders";
+import { workOrderRef } from "@/lib/workOrders";
+import { workOrderStatusFor } from "@/lib/statuses";
 
 type PMItem = { id: string; label: string; order: number };
 type PMSection = { id: string; title: string; answerOptions: string[]; order: number; items: PMItem[] };
@@ -24,6 +29,8 @@ type PMLog = {
   // `answeredByName` is per-answer and internal — the API withholds it from
   // clients, so it is optional here rather than assumed present.
   items: { id: string; itemId: string; answer: string; remarks: string | null; answeredAt: string; answeredByName?: string | null }[];
+  /** Work raised from this round's findings. Only the logs read carries it, not a save's reply. */
+  workOrders?: { id: string; number: number; title: string; status: string; acceptedAt?: string | null; sourcePmItemId: string | null }[];
 };
 type Assignment = {
   id: string;
@@ -119,7 +126,14 @@ export default function ChecklistFormPage() {
 
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [allLogs, setAllLogs] = useState<PMLog[]>([]);
+  const searchParams = useSearchParams();
+  const { user } = useAuth();
+  // `?period=YYYY-MM-DD` opens that round — a work order raised from a finding
+  // links back here with it.
   const [selectedDate, setSelectedDate] = useState(() => {
+    const asked = searchParams.get("period");
+    const at = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? new Date(`${asked}T00:00:00Z`) : null;
+    if (at && !Number.isNaN(at.getTime())) return at;
     const now = new Date();
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
   });
@@ -138,10 +152,31 @@ export default function ChecklistFormPage() {
   // Captured once so the history window stays stable across re-renders.
   const [nowMs] = useState(() => Date.now());
 
-  useEffect(() => { fetchData(); }, [assignmentId]);
+  const fetchData = useCallback(async () => {
+    try {
+      const [assignRes, logsRes] = await Promise.all([
+        api.get(`/accounts/${accountId}/pm-checklists`),
+        api.get(`/account-pm-checklists/${assignmentId}/logs`),
+      ]);
+      const found: Assignment = assignRes.data.find((a: Assignment) => a.id === assignmentId);
+      if (!found) { router.push(`/accounts/${accountId}/checklists`); return; }
+      setAssignment(found);
+      setAllLogs(logsRes.data);
+    } catch {
+      setError("Failed to load checklist.");
+    } finally {
+      setLoading(false);
+    }
+  }, [accountId, assignmentId, router]);
 
-  useEffect(() => {
-    if (!assignment) return;
+  useEffect(() => startLoad(fetchData), [fetchData]);
+
+  // Load the chosen period's answers into the form whenever the period, the
+  // filed rounds or the checklist change. Done during render rather than in an
+  // effect, so the form never paints one frame of the previous period.
+  const [shownFor, setShownFor] = useState<{ date: Date; logs: PMLog[]; assignment: Assignment } | null>(null);
+  if (assignment && (shownFor?.date !== selectedDate || shownFor.logs !== allLogs || shownFor.assignment !== assignment)) {
+    setShownFor({ date: selectedDate, logs: allLogs, assignment });
     const periodStart = getPeriodStart(selectedDate, assignment.checklist.frequency);
     const log = allLogs.find((l) => new Date(l.scheduledDate).getTime() === periodStart.getTime()) ?? null;
     setPeriodLog(log);
@@ -157,23 +192,6 @@ export default function ChecklistFormPage() {
       setIsEditing(true);
     }
     setDirty(false);
-  }, [selectedDate, allLogs, assignment]);
-
-  async function fetchData() {
-    try {
-      const [assignRes, logsRes] = await Promise.all([
-        api.get(`/accounts/${accountId}/pm-checklists`),
-        api.get(`/account-pm-checklists/${assignmentId}/logs`),
-      ]);
-      const found: Assignment = assignRes.data.find((a: Assignment) => a.id === assignmentId);
-      if (!found) { router.push(`/accounts/${accountId}/checklists`); return; }
-      setAssignment(found);
-      setAllLogs(logsRes.data);
-    } catch {
-      setError("Failed to load checklist.");
-    } finally {
-      setLoading(false);
-    }
   }
 
   const setAnswer = useCallback((itemId: string, answer: string) => {
@@ -308,7 +326,8 @@ export default function ChecklistFormPage() {
         const res = await api.post(`/account-pm-checklists/${assignmentId}/logs`, { items, isDraft, scheduledDate });
         savedLog = res.data;
       }
-      setAllLogs((prev) => [savedLog, ...prev.filter((l) => l.id !== savedLog.id)]);
+      // The save's reply does not carry the jobs raised from the round; keep them.
+      setAllLogs((prev) => [{ ...savedLog, workOrders: prev.find((l) => l.id === savedLog.id)?.workOrders }, ...prev.filter((l) => l.id !== savedLog.id)]);
       setDirty(false);
       if (isDraft) {
         const msg = incompleteTitles.length > 0
@@ -330,17 +349,20 @@ export default function ChecklistFormPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-64">
+      <div className="px-4 py-5 sm:p-8 flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--tu-text-brand)] border-t-transparent" />
       </div>
     );
   }
 
   if (!assignment) {
-    return <div className="p-8 text-sm text-[var(--tu-on-danger)]">{error ?? "Checklist not found."}</div>;
+    return <div className="px-4 py-5 sm:p-8 text-sm text-[var(--tu-on-danger)]">{error ?? "Checklist not found."}</div>;
   }
 
   const { checklist } = assignment;
+  // Raising work from a finding is the team's call, not the client's — the API
+  // refuses a client, so the button is not drawn for one.
+  const canRaise = !!user && user.role !== "CLIENT";
   const freq = frequencyMeta(checklist.frequency);
   const atCurrent = isAtCurrentPeriod();
   const { total, completeCount, incompleteTitles } = sectionStats();
@@ -548,6 +570,30 @@ export default function ChecklistFormPage() {
                       {!editable && state.answeredAt && (
                         <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Answered {fmtTime(state.answeredAt)}</p>
                       )}
+                      {/* A finding on a submitted round: its job, or a way to
+                          raise one. Nothing is raised automatically. */}
+                      {canRaise && locked && isPmFinding(state.answer, sec.answerOptions) && periodLog && (() => {
+                        const raised = (periodLog.workOrders ?? []).filter((w) => w.sourcePmItemId === item.id);
+                        const live = raised.filter((w) => w.status !== "REJECTED");
+                        return (
+                          <div className="tu-finding-action">
+                            {raised.map((w) => (
+                              <Link key={w.id} href={`/accounts/${accountId}/work-orders/${w.id}`}>
+                                {workOrderRef(w.number)} · {workOrderStatusFor(w).label}
+                              </Link>
+                            ))}
+                            {live.length === 0 && (
+                              <Link href={raiseWorkOrderHref(accountId, findingDraft({
+                                logId: periodLog.id, itemId: item.id, controlNumber: pmControlNumber(periodLog) ?? "this round",
+                                question: item.label, answer: state.answer, remarks: state.remarks,
+                                assetId: assignment.asset?.id ?? null, assetName: assignment.asset?.name ?? null,
+                              }))}>
+                                + Raise work order
+                              </Link>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     {sec.answerOptions.map((opt) => (
                       <div key={opt} className="w-20 flex justify-center">

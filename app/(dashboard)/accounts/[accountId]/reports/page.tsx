@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
+import { workOrderRef } from "@/lib/workOrders";
 import { csvBuilder } from "@/lib/csv";
 import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import PmExportDialog from "@/components/PmExportDialog";
+import { startLoad } from "@/lib/startLoad";
+import { PrintReportButton, PrintReportHeader, dateRangeLabel } from "@/components/ReportPrint";
+import { WORK_ORDER_STATUS, type WorkOrderStatus, workOrderStatusGroupLabel } from "@/lib/statuses";
 
 type Period = "this_week" | "this_month" | "this_quarter" | "this_year" | "custom";
 
@@ -74,18 +79,6 @@ const PERIOD_LABELS: Record<Period, string> = {
   custom:       "Custom",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  COMPLETED: "Completed", IN_PROGRESS: "In Progress", ON_HOLD: "On Hold", PENDING: "Accepted",
-  REQUESTED: "Requested", REJECTED: "Rejected",
-};
-
-// Chart fills resolve to theme tokens so bars stay legible in dark mode.
-const STATUS_COLORS: Record<string, string> = {
-  COMPLETED: "var(--tu-status-completed)", IN_PROGRESS: "var(--tu-status-in-progress)",
-  ON_HOLD: "var(--tu-status-on-hold)", PENDING: "var(--tu-status-pending)",
-  REQUESTED: "var(--tu-status-requested)", REJECTED: "var(--tu-status-rejected)",
-};
-
 const PRIORITY_COLORS: Record<string, string> = {
   LOW: "var(--tu-priority-low)", MEDIUM: "var(--tu-priority-medium)",
   HIGH: "var(--tu-priority-high)", CRITICAL: "var(--tu-priority-critical)",
@@ -115,7 +108,7 @@ function formatPeso(amount: number) {
 
 function StatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
-    <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm px-4 py-4 text-center flex-1 min-w-[80px]">
+    <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm px-4 py-4 text-center flex-1 min-w-[112px]">
       <p className={`text-2xl font-bold ${color ?? "text-[var(--tu-text-heading)]"}`}>{value}</p>
       <p className="text-xs text-[var(--tu-text-subtle)] mt-1 font-medium">{label}</p>
     </div>
@@ -204,6 +197,18 @@ type AssetReliability = {
   mtbfHours: number | null;
   repairsCompleted: number;
   isDownNow: boolean;
+  /** Jobs on this asset finished in the period whose follow-up came within the window. */
+  cameBack?: number;
+};
+
+/** Fixes that did not hold — backend helpers/reliability.js `repeatWork`. */
+type RepeatWork = {
+  days: number;
+  completed: number;
+  cameBack: number;
+  rate: number | null;
+  stillWatching: number;
+  cases: { workOrderId: string; number: number; title: string; followUpId: string; followUpNumber: number; daysLater: number }[];
 };
 
 type ReliabilityData = {
@@ -218,6 +223,7 @@ type ReliabilityData = {
   };
   assets: AssetReliability[];
   coverage: { unclassifiedWorkOrders: number; assetsWithDowntimeData: number };
+  repeatWork?: RepeatWork;
 };
 
 export default function ReportsPage() {
@@ -233,11 +239,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [reliability, setReliability] = useState<ReliabilityData | null>(null);
 
-  useEffect(() => {
-    loadReport(activeRange.from, activeRange.to);
-  }, [activeRange]);
-
-  async function loadReport(from: string, to: string) {
+  const loadReport = useCallback(async (from: string, to: string) => {
     setLoading(true);
     try {
       // Reliability is a separate endpoint so a failure there cannot blank the
@@ -255,7 +257,12 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [accountId]);
+
+  useEffect(
+    () => startLoad(() => loadReport(activeRange.from, activeRange.to)),
+    [activeRange, loadReport],
+  );
 
   function handlePeriodChange(p: Period) {
     setPeriod(p);
@@ -350,11 +357,16 @@ export default function ReportsPage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
+      <PrintReportHeader title="Site report" scope={data?.accountName} period={dateRangeLabel(activeRange.from, activeRange.to)} />
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3 tu-no-print">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Reports</h2>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <span className="text-xs text-[var(--tu-text-subtle)]">{activeRange.from} – {activeRange.to}</span>
+          <PrintReportButton
+            disabled={!data || loading}
+            className="text-xs font-semibold text-[var(--tu-text-brand)] border border-[var(--tu-border)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-bg-secondary)] cursor-pointer disabled:opacity-50"
+          />
           {data && (
             <button
               type="button"
@@ -386,7 +398,7 @@ export default function ReportsPage() {
       )}
 
       {/* Period picker */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4 tu-no-print">
         {(Object.keys(PERIOD_LABELS) as Period[]).map((p) => (
           <button
             key={p}
@@ -401,7 +413,7 @@ export default function ReportsPage() {
       </div>
 
       {period === "custom" && (
-        <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4 mb-6 flex items-end gap-3 flex-wrap">
+        <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4 mb-6 flex items-end gap-3 flex-wrap tu-no-print">
           <div>
             <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">From</label>
             <input type="date" value={customFrom} onChange={(e) => { setCustomFrom(e.target.value); setCustomError(""); }}
@@ -431,7 +443,8 @@ export default function ReportsPage() {
             <h3 className="text-sm font-bold text-[var(--tu-text-body)] mb-3">Work Orders</h3>
             <div className="flex gap-3 mb-4 flex-wrap">
               <StatCard label="Total" value={data.workOrders.total} />
-              <StatCard label="Completed" value={data.workOrders.byStatus.COMPLETED ?? 0} color="text-[var(--tu-on-success)]" />
+              {/* Client-approved work is finished work too — it moved on from COMPLETED. */}
+              <StatCard label="Completed" value={(data.workOrders.byStatus.COMPLETED ?? 0) + (data.workOrders.byStatus.APPROVED ?? 0)} color="text-[var(--tu-on-success)]" />
               <StatCard label="Avg Days" value={data.workOrders.avgCompletionDays != null ? `${data.workOrders.avgCompletionDays}d` : "—"} />
               {data.workOrders.overdue > 0 && <StatCard label="Overdue" value={data.workOrders.overdue} color="text-[var(--tu-on-danger)]" />}
             </div>
@@ -441,7 +454,7 @@ export default function ReportsPage() {
                 <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4">
                   <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">By Status</p>
                   {Object.entries(data.workOrders.byStatus).filter(([, n]) => n > 0).sort(([, a], [, b]) => b - a).map(([s, n]) => (
-                    <BarRow key={s} label={STATUS_LABELS[s] ?? s} count={n} total={data.workOrders.total} color={STATUS_COLORS[s] ?? "var(--tu-text-subtle)"} />
+                    <BarRow key={s} label={workOrderStatusGroupLabel(s)} count={n} total={data.workOrders.total} color={WORK_ORDER_STATUS[s as WorkOrderStatus]?.color ?? "var(--tu-text-subtle)"} />
                   ))}
                 </div>
                 {Object.values(data.workOrders.byPriority).some((v) => v > 0) && (
@@ -690,7 +703,41 @@ export default function ReportsPage() {
                   value={reliability.summary.assetsDownNow}
                   color={reliability.summary.assetsDownNow > 0 ? "text-[var(--tu-on-danger)]" : undefined}
                 />
+                {reliability.repeatWork && (
+                  <StatCard
+                    label={`Came back within ${reliability.repeatWork.days} days`}
+                    value={reliability.repeatWork.rate != null
+                      ? `${reliability.repeatWork.cameBack} of ${reliability.repeatWork.completed}`
+                      : "—"}
+                    color={reliability.repeatWork.cameBack > 0 ? "text-[var(--tu-on-warning)]" : undefined}
+                  />
+                )}
               </div>
+
+              {/* Fixes that did not hold: a follow-up raised soon after the job
+                  was finished. Recent jobs may still come back, so say how many. */}
+              {reliability.repeatWork && reliability.repeatWork.completed > 0 && (
+                <div className="text-xs text-[var(--tu-text-subtle)] mb-3">
+                  <p>
+                    {reliability.repeatWork.cameBack > 0
+                      ? `${Math.round((reliability.repeatWork.rate ?? 0) * 100)}% of jobs finished on these assets needed a follow-up within ${reliability.repeatWork.days} days.`
+                      : `None of the ${reliability.repeatWork.completed} jobs finished on these assets has needed a follow-up.`}
+                    {reliability.repeatWork.stillWatching > 0 &&
+                      ` ${reliability.repeatWork.stillWatching} finished less than ${reliability.repeatWork.days} days ago and could still come back.`}
+                  </p>
+                  {reliability.repeatWork.cases.length > 0 && (
+                    <ul className="mt-1" style={{ listStyle: "disc", paddingLeft: 18 }}>
+                      {reliability.repeatWork.cases.slice(0, 10).map((c) => (
+                        <li key={c.workOrderId}>
+                          <Link href={`/accounts/${accountId}/work-orders/${c.workOrderId}`} className="text-[var(--tu-text-brand)] hover:underline">{workOrderRef(c.number)}</Link>{" "}
+                          {c.title} → <Link href={`/accounts/${accountId}/work-orders/${c.followUpId}`} className="text-[var(--tu-text-brand)] hover:underline">{workOrderRef(c.followUpNumber)}</Link>{" "}
+                          {c.daysLater < 1 ? "the same day" : `${Math.round(c.daysLater)} day${Math.round(c.daysLater) === 1 ? "" : "s"} later`}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
 
               {/* MTBF is only as honest as the breakdown flag. Saying so beats
                   letting an unflagged account read as flawless. */}
@@ -712,7 +759,7 @@ export default function ReportsPage() {
                 />
               ) : (
                 <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden mb-4">
-                  <div style={{ overflowX: "auto" }}>
+                  <div className="tu-scroll-x">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="bg-[var(--tu-bg-secondary)] text-xs text-[var(--tu-text-subtle)] font-semibold uppercase tracking-wide">
@@ -722,6 +769,7 @@ export default function ReportsPage() {
                           <th className="px-4 py-3 text-center">Failures</th>
                           <th className="px-4 py-3 text-center">Mean Time<br />To Repair</th>
                           <th className="px-4 py-3 text-center">Mean Time<br />Between Failures</th>
+                          <th className="px-4 py-3 text-center">Came<br />Back</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-[var(--tu-border)]">
@@ -754,6 +802,9 @@ export default function ReportsPage() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               {a.mtbfHours != null ? <span className="tu-figure">{a.mtbfHours}h</span> : <span className="tu-figure-zero">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {a.cameBack ? <span className="tu-figure text-[var(--tu-on-warning)]">{a.cameBack}</span> : <span className="tu-figure-zero">—</span>}
                             </td>
                           </tr>
                         ))}

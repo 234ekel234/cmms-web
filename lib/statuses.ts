@@ -122,6 +122,20 @@ function metaOf<T extends string>(
 }
 
 export const workOrderStatusMeta = (s: string | null | undefined) => metaOf(WORK_ORDER_STATUS, s);
+
+/**
+ * The pill for one order. REJECTED reads "Cancelled" when the job had been
+ * accepted — staff work starts accepted — and was then called off; "Rejected"
+ * is kept for a request turned down. Same status, same colour; only the word
+ * differs (isCancellation in backend helpers/workOrderApproval.js).
+ */
+export function workOrderStatusFor(wo: { status: string; acceptedAt?: string | null }): StatusMeta {
+  const meta = workOrderStatusMeta(wo.status);
+  return wo.status === "REJECTED" && wo.acceptedAt ? { ...meta, label: "Cancelled" } : meta;
+}
+
+/** A status as a group of orders — filters and breakdowns, where REJECTED holds both. */
+export const workOrderStatusGroupLabel = (s: string) => (s === "REJECTED" ? "Rejected / Cancelled" : workOrderStatusMeta(s).label);
 export const workOrderPriorityMeta = (p: string | null | undefined) => metaOf(WORK_ORDER_PRIORITY, p, "—");
 // assetStatusMeta is defined above with the asset section — it takes free text
 // rather than looking a key up in a map, so it is not a metaOf() wrapper.

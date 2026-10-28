@@ -5,7 +5,7 @@ import Link from "next/link";
 import api from "@/lib/api";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
 import ProgressThread, { type ProgressEntry } from "@/components/ProgressThread";
-import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
+import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import {
   STAFF_TRANSITIONS,
   isOverdue,
@@ -24,10 +24,15 @@ import {
   awaitingClient,
   isReviewer,
   surveyable,
+  isDone,
+  rejectWords,
   type SurveyScores,
 } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useAuth } from "@/context/AuthContext";
+import WorkOrderLinks from "@/components/WorkOrderLinks";
+import AcceptAndAssign from "@/components/AcceptAndAssign";
+import { hasLinks, type WorkOrderLinks as Links } from "@/lib/linkedWorkOrders";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
 import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
 
@@ -50,6 +55,8 @@ import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
  */
 
 export type PanelOrder = StageFacts & {
+  /** Set once accepted — what makes stopping it a cancellation. */
+  acceptedAt?: string | null;
   id: string;
   number: number;
   title: string;
@@ -137,10 +144,14 @@ export default function WorkOrderDetailPanel({
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [showPicker, setShowPicker] = useState(false);
+  // Accept & assign: picking who does a request as it is accepted.
+  const [acceptAssign, setAcceptAssign] = useState(false);
 
   // The client's rating, from the single-order fetch, for this order only.
   const [fetchedSurvey, setFetchedSurvey] = useState<{ id: string; survey?: SurveyScores } | null>(null);
   const survey = fetchedSurvey?.id === order.id ? fetchedSurvey.survey : order.survey;
+  const [fetchedLinks, setFetchedLinks] = useState<{ id: string; links: Links } | null>(null);
+  const links = fetchedLinks?.id === order.id ? fetchedLinks.links : null;
 
   // The thread is not on the list row — it arrives with the fetch below.
   const [comments, setComments] = useState<ProgressEntry[]>(order.comments ?? []);
@@ -167,6 +178,8 @@ export default function WorkOrderDetailPanel({
         // The rating is on the single order only — list rows say whether one
         // exists, not what it was.
         if (!cancelled) setFetchedSurvey({ id: order.id, survey: res.data.survey });
+        // So are the links — list rows do not carry them.
+        if (!cancelled) setFetchedLinks({ id: order.id, links: res.data });
       } catch {
         // The facts above are already on screen from the list row; a failed
         // thread fetch should not blank them.
@@ -366,7 +379,7 @@ export default function WorkOrderDetailPanel({
         <div className="tu-detail-section">
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             <span className={WORK_ORDER_STATUS[order.status].badge}>
-              {WORK_ORDER_STATUS[order.status].label}
+              {workOrderStatusFor(order).label}
             </span>
             {overdue && <span className="tu-badge tu-badge-danger">Overdue</span>}
           </div>
@@ -382,10 +395,19 @@ export default function WorkOrderDetailPanel({
               steps={needsClientApproval(order) ? APPROVAL_STEPS : undefined}
               verified={!!order.verifiedAt}
               times={order}
-              ariaLabel={`Progress: ${WORK_ORDER_STATUS[order.status].label}`}
+              ariaLabel={`Progress: ${workOrderStatusFor(order).label}`}
             />
           )}
         </div>
+
+        {/* ── Linked work ── the checklist finding or job this came from, its
+            follow-ups, and Raise follow-up on finished work. */}
+        {(hasLinks(links) || isDone(order.status)) && (
+          <div className="tu-detail-section">
+            {hasLinks(links) && <span className="tu-detail-label">Linked work</span>}
+            <WorkOrderLinks accountId={order.accountId} order={order} links={links} />
+          </div>
+        )}
 
         {/* ── Client survey ── on signed-off client-facing work. */}
         {surveyable(order) && (isClient || isReviewer(user?.role)) && (
@@ -432,6 +454,12 @@ export default function WorkOrderDetailPanel({
                   </button>
                 </div>
               </div>
+            ) : acceptAssign ? (
+              <AcceptAndAssign
+                order={order}
+                onDone={(p) => { setAcceptAssign(false); onChanged(p as PanelPatch); }}
+                onCancel={() => setAcceptAssign(false)}
+              />
             ) : reasonFor ? (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <textarea
@@ -440,22 +468,22 @@ export default function WorkOrderDetailPanel({
                   maxLength={500}
                   value={reasonText}
                   onChange={(e) => setReasonText(e.target.value)}
-                  placeholder={reasonFor === "SEND_BACK" ? "What still needs doing? (required)" : reasonFor === "REJECT" ? "Why is it being rejected? (required)" : "Why is it going on hold? (required)"}
-                  aria-label={reasonFor === "SEND_BACK" ? "Reason for sending back" : reasonFor === "REJECT" ? "Reason for rejecting" : "Reason for putting on hold"}
+                  placeholder={reasonFor === "SEND_BACK" ? "What still needs doing? (required)" : reasonFor === "REJECT" ? `${rejectWords(order).question} (required)` : "Why is it going on hold? (required)"}
+                  aria-label={reasonFor === "SEND_BACK" ? "Reason for sending back" : reasonFor === "REJECT" ? `Reason: ${rejectWords(order).question}` : "Reason for putting on hold"}
                   autoFocus
                 />
                 {reasonFor === "SEND_BACK" && (
                   <p className="tu-detail-hint">It goes back On Hold, and the reason is posted to the job&apos;s updates for the technician.</p>
                 )}
                 {reasonFor === "REJECT" && (
-                  <p className="tu-detail-hint">{rejectionHint(order)} A rejected order can&apos;t be reopened.</p>
+                  <p className="tu-detail-hint">{rejectionHint(order)} A {rejectWords(order).past} job can&apos;t be reopened.</p>
                 )}
                 <div className="tu-detail-actions">
                   <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => setReasonFor(null)} disabled={busy}>
                     Cancel
                   </button>
                   <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={submitReason} disabled={busy || !reasonText.trim()}>
-                    {busy ? "Saving…" : reasonFor === "SEND_BACK" ? "Send back" : reasonFor === "REJECT" ? "Reject" : "Put on hold"}
+                    {busy ? "Saving…" : reasonFor === "SEND_BACK" ? "Send back" : reasonFor === "REJECT" ? rejectWords(order).action : "Put on hold"}
                   </button>
                 </div>
               </div>
@@ -481,6 +509,13 @@ export default function WorkOrderDetailPanel({
                 {staffSendBack && (
                   <button type="button" className="tu-sheet-action tu-sheet-action-neutral" onClick={() => { setReasonFor("SEND_BACK"); setReasonText(""); }} disabled={busy}>
                     Send back for rework
+                  </button>
+                )}
+                {/* Accepting and staffing a request in one go — the plain
+                    Accept stays for a job nobody can be named for yet. */}
+                {order.status === "REQUESTED" && nexts.includes("PENDING") && canManage && (
+                  <button type="button" className="tu-sheet-action tu-sheet-action-brand" onClick={() => setAcceptAssign(true)} disabled={busy}>
+                    Accept &amp; assign
                   </button>
                 )}
                 {nexts.map((ns) => (

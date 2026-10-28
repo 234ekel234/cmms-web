@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import api, { getServerClockOffset } from "@/lib/api";
@@ -16,9 +16,12 @@ import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
 import ReasonDialog from "@/components/ReasonDialog";
 import { defaultDueHint } from "@/lib/dueDates";
-import { STAFF_TRANSITIONS, awaitingClient, rejectionHint, awaitingReview, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, rejectionHint, rejectWords, awaitingReview, isClosed, isOverdue, matchesFlag, passesFilters, signOffCue, transitionLabel, triageRank, type StageFacts, type WorkOrderFlag, workOrderRef, isCancellation } from "@/lib/workOrders";
 import { canManage, canWorkOnJob } from "@/lib/rbac";
-import { WORK_ORDER_STATUS } from "@/lib/statuses";
+import { workOrderStatusFor } from "@/lib/statuses";
+import { startLoad } from "@/lib/startLoad";
+import { readRaiseDraft, type RaiseLink } from "@/lib/linkedWorkOrders";
+import DuplicateHint from "@/components/DuplicateHint";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -51,6 +54,7 @@ type WorkOrder = StageFacts & {
   assignments: { employeeId?: string; employee: { id: string; name: string; position: string | null } }[];
   accountId: string;
   checklistItems: { id: string; isDone: boolean }[];
+  acceptedAt?: string | null;
 };
 
 type AccountEmployee = { id: string; name: string; position: string | null };
@@ -191,9 +195,24 @@ export default function WorkOrdersPage() {
    */
   const [mode, setMode] = useState<"queue" | "cards" | "calendar">("queue");
   // An `assetId` query param means we arrived from an asset page's "New Work
-  // Order" action, so open the form with that asset already selected.
-  const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId"));
-  const [form, setForm] = useState({ ...EMPTY_FORM, assetId: searchParams.get("assetId") ?? "" });
+  // Order" action, so open the form with that asset already selected. A
+  // `raise=1` draft means "Raise follow-up" on a job or "Raise work order" on a
+  // checklist finding: the form opens filled in and carries the link
+  // (lib/linkedWorkOrders.ts). Read once — the URL is rewritten just below.
+  const [raised] = useState(() => readRaiseDraft(new URLSearchParams(searchParams.toString())));
+  const [link, setLink] = useState<RaiseLink | null>(() => raised?.link ?? null);
+  const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId") || !!raised);
+  const [form, setForm] = useState(() => {
+    const f = raised?.fields ?? {};
+    return {
+      ...EMPTY_FORM,
+      title: f.title ?? "",
+      description: f.description ?? "",
+      priority: (["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(f.priority ?? "") ? f.priority : "MEDIUM") as WorkOrderPriority,
+      category: f.category ?? "",
+      assetId: f.assetId ?? searchParams.get("assetId") ?? "",
+    };
+  });
   const [assets, setAssets] = useState<{ id: string; name: string }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
@@ -226,7 +245,20 @@ export default function WorkOrdersPage() {
   const canAssign = canManage(user?.role);
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  useEffect(() => { fetchOrders(); }, [accountId]);
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await api.get(`/accounts/${accountId}/work-orders`);
+      setOrders(res.data);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [accountId]);
+
+  useEffect(() => startLoad(fetchOrders), [fetchOrders]);
 
   useEffect(() => {
     const anyRunning = orders.some((o) => o.status === "IN_PROGRESS" && o.timerStartedAt);
@@ -241,19 +273,6 @@ export default function WorkOrdersPage() {
       .then((res) => setAssets(res.data))
       .catch(() => setAssets([]));
   }, [accountId]);
-
-  async function fetchOrders() {
-    setLoading(true);
-    setError(false);
-    try {
-      const res = await api.get(`/accounts/${accountId}/work-orders`);
-      setOrders(res.data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function openAssignModal(order: WorkOrder) {
     setAssigningOrder(order);
@@ -321,6 +340,7 @@ export default function WorkOrdersPage() {
         estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : null,
         isSpecialProject: form.isSpecialProject,
         isBreakdown: form.isBreakdown,
+        ...(link ? { ...link, label: undefined } : {}),
       });
       // The create response includes `asset` only, so the relations the card
       // renders have to be defaulted rather than left undefined — a brand new
@@ -328,6 +348,8 @@ export default function WorkOrdersPage() {
       setOrders((prev) => [{ checklistItems: [], assignments: [], ...res.data }, ...prev]);
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
+      // A linked job was raised from somewhere else on purpose; show it.
+      if (link) { setOpenId(res.data.id); setLink(null); }
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to create work order.");
@@ -378,16 +400,11 @@ export default function WorkOrdersPage() {
   }
 
   const inView = orders.filter((o) => view === "special" ? o.isSpecialProject : !o.isSpecialProject);
-  const now = new Date();
   // APPROVED was missing from the hand-written list here, so work a client had
   // signed off still counted as overdue, showed the red badge and appeared under
   // the OVERDUE filter — signed-off work reading as outstanding, which is the
   // thing the approval status exists to prevent.
   const overdueCount = inView.filter(isOverdue).length;
-  // Its own filter rather than a slice of COMPLETED: the whole point is that
-  // this work is *not* the same as the completed work sitting beside it, and a
-  // client scanning "Completed (8)" has no way to tell which one is theirs.
-  const awaitingCount = inView.filter(awaitingClient).length;
   // Each axis counted against the other's selection, so a chip's number says
   // how many rows clicking it would reveal rather than how many exist.
   const statusCounts = Object.fromEntries(
@@ -458,7 +475,7 @@ export default function WorkOrdersPage() {
             <p className="tu-page-sub tu-danger-text">{overdueCount} overdue</p>
           )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="tu-page-actions">
           {/* List / Calendar toggle */}
           <div className="tu-segmented">
             {([
@@ -534,7 +551,13 @@ export default function WorkOrdersPage() {
       {/* Create form */}
       {showForm && (
         <div className="tu-card" style={{ padding: 20, marginBottom: 24 }}>
-          <h3 className="tu-card-title" style={{ marginBottom: 16 }}>New Work Order</h3>
+          <h3 className="tu-card-title" style={{ marginBottom: link ? 8 : 16 }}>New Work Order</h3>
+          {link && (
+            <div className="tu-link-note">
+              <span>🔗 {link.label}</span>
+              <button type="button" className="tu-btn-ghost tu-btn-sm" onClick={() => setLink(null)}>Unlink</button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="tu-label">Title *</label>
@@ -576,6 +599,11 @@ export default function WorkOrdersPage() {
                 onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
               >
                 <option value="">Select category…</option>
+                {/* A follow-up carries the original's category, which may
+                    predate the current list; offer it rather than drop it. */}
+                {form.category && !(WORK_ORDER_CATEGORIES as readonly string[]).includes(form.category) && (
+                  <option value={form.category}>{form.category}</option>
+                )}
                 {WORK_ORDER_CATEGORIES.map((c) => (
                   <option key={c} value={c}>{c}</option>
                 ))}
@@ -606,6 +634,13 @@ export default function WorkOrdersPage() {
                 ))}
               </select>
             </div>
+            {/* Two people reporting the same fault. A follow-up is new work
+                on purpose, so it is not second-guessed. */}
+            {!link && (
+              <div className="col-span-2">
+                <DuplicateHint orders={orders} assetId={form.assetId} title={form.title} accountId={accountId} />
+              </div>
+            )}
             <div>
               <label className="tu-label">Expected Time</label>
               <div className="flex gap-2">
@@ -663,7 +698,7 @@ export default function WorkOrdersPage() {
           {formError && <p className="tu-danger-text" style={{ fontSize: 12.5, marginTop: 12 }}>{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button
-              onClick={() => { setShowForm(false); setFormError(""); setForm({ ...EMPTY_FORM }); }}
+              onClick={() => { setShowForm(false); setFormError(""); setForm({ ...EMPTY_FORM }); setLink(null); }}
               className="tu-btn-secondary"
             >
               Cancel
@@ -695,12 +730,12 @@ export default function WorkOrdersPage() {
       )}
       {rejectTarget && (
         <ReasonDialog
-          title="Reject this work order"
+          title={rejectWords(rejectTarget).title}
           subtitle={`${workOrderRef(rejectTarget.number)} · ${rejectTarget.title}`}
-          label="Why is it being rejected?"
-          placeholder="Outside the maintenance contract — please raise it with the landlord."
-          hint={`${rejectionHint(rejectTarget)} A rejected order can't be reopened.`}
-          confirmLabel="Reject"
+          label={rejectWords(rejectTarget).question}
+          placeholder={rejectWords(rejectTarget).placeholder}
+          hint={`${rejectionHint(rejectTarget)} A ${rejectWords(rejectTarget).past} job can't be reopened.`}
+          confirmLabel={rejectWords(rejectTarget).action}
           onSubmit={(reason) => updateStatus(rejectTarget.id, "REJECTED", reason)}
           onClose={() => setRejectTarget(null)}
         />
@@ -788,7 +823,7 @@ export default function WorkOrdersPage() {
           {sorted.map((order) => {
             const overdue = isOverdue(order);
             const priorityCfg = PRIORITY_CONFIG[order.priority];
-            const statusCfg = WORK_ORDER_STATUS[order.status];
+            const statusCfg = workOrderStatusFor(order);
             const isRejected = order.status === "REJECTED";
             const signOff = signOffCue(order, isClient);
             const nextStatuses = STAFF_TRANSITIONS[order.status];
@@ -877,7 +912,7 @@ export default function WorkOrdersPage() {
                 {/* Pipeline or rejected banner */}
                 {isRejected ? (
                   <div className="tu-inline-notice tu-inline-notice-danger">
-                    This work order was rejected.
+                    {isCancellation(order) ? "This job was cancelled." : "This work order was rejected."}
                   </div>
                 ) : (
                   <StatusPipeline status={order.status} steps={PIPELINE_STEPS} verified={!!order.verifiedAt} ariaLabel={`Status: ${statusCfg.label}`} />

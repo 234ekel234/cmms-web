@@ -11,7 +11,7 @@ import ResetPasswordButton from "@/components/ResetPasswordButton";
 import LoginAccessButton from "@/components/LoginAccessButton";
 import Credentials from "@/components/Credentials";
 import EmptyState from "@/components/EmptyState";
-import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import { isClosed, workOrderRef } from "@/lib/workOrders";
 
 /**
@@ -259,7 +259,7 @@ export default function EmployeePage() {
                   {workOrderRef(w.number)} · {w.title}
                 </Link>
                 <span className="tu-person-muted"> · {w.account.name} · </span>
-                <span className={WORK_ORDER_STATUS[w.status].badge}>{WORK_ORDER_STATUS[w.status].label}</span>
+                <span className={workOrderStatusFor(w).badge}>{workOrderStatusFor(w).label}</span>
               </li>
             ))}
             {summary.workOrders.length > 20 && (

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
+import { type WorkOrderPriority, type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import { isOverdue, stageNote, workOrderRef, type StageShape } from "@/lib/workOrders";
 
 /**
@@ -131,7 +131,7 @@ export default function WorkOrderQueue({
     <ul className="tu-queue-list" ref={listRef} aria-label="Work order queue">
       {orders.map((o) => {
         const late = isOverdue(o);
-        const stage = WORK_ORDER_STATUS[o.status];
+        const stage = workOrderStatusFor(o);
         const note = stageNote(o, isClient);
         const selected = o.id === selectedId;
         return (

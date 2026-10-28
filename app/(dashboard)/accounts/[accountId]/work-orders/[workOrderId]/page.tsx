@@ -1,22 +1,26 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import ActionError from "@/components/ActionError";
 import api, { errorMessage, getServerClockOffset } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
-import { STAFF_TRANSITIONS, awaitingClient, openStepsNote, rejectionHint, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef } from "@/lib/workOrders";
+import { STAFF_TRANSITIONS, awaitingClient, openStepsNote, rejectionHint, rejectWords, transitionLabel, awaitingReview, canSendBack, isReviewer, surveyable, isClosed, isSettled, needsClientApproval, stageNote, type StageFacts, workOrderRef, isCancellation } from "@/lib/workOrders";
 import ReasonDialog from "@/components/ReasonDialog";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
 import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
-import { WORK_ORDER_STATUS } from "@/lib/statuses";
+import { workOrderStatusFor } from "@/lib/statuses";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import ProgressThread, { type ProgressAttachment } from "@/components/ProgressThread";
 import { canManage as canAdministerAccount } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { startLoad } from "@/lib/startLoad";
+import WorkOrderLinks from "@/components/WorkOrderLinks";
+import AcceptAndAssign from "@/components/AcceptAndAssign";
+import type { WorkOrderLinks as Links } from "@/lib/linkedWorkOrders";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed", "Verified"];
 
@@ -24,7 +28,7 @@ type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "CO
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 
 // StageFacts: why the clock stopped and when sign-off closes itself — the stage line.
-type WorkOrder = StageFacts & {
+type WorkOrder = StageFacts & Links & {
   id: string;
   number: number;
   title: string;
@@ -37,6 +41,7 @@ type WorkOrder = StageFacts & {
   remarks: string | null;
   completedAt: string | null;
   approvedAt: string | null;
+  acceptedAt?: string | null;
   /** Null when the daily sweep closed it rather than a person — see the note
       where this is rendered; the two must not read the same. */
   approvedByName: string | null;
@@ -165,6 +170,8 @@ export default function WorkOrderDetailPage() {
   const [error, setError] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [showCompleteForm, setShowCompleteForm] = useState(false);
+  // Accept & assign: picking who does a request as it is accepted.
+  const [acceptAssign, setAcceptAssign] = useState(false);
   // Client review of finished work.
   const [sendingBack, setSendingBack] = useState(false);
   const [sendBackReason, setSendBackReason] = useState("");
@@ -288,9 +295,7 @@ export default function WorkOrderDetailPage() {
   const canAdmin = canAdministerAccount(user?.role);
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  useEffect(() => { fetchOrder(); }, [workOrderId]);
-
-  async function fetchOrder() {
+  const fetchOrder = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
@@ -304,7 +309,9 @@ export default function WorkOrderDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [workOrderId]);
+
+  useEffect(() => startLoad(fetchOrder), [fetchOrder]);
 
   async function openAssignPicker() {
     setShowAssignPicker(true);
@@ -740,7 +747,7 @@ export default function WorkOrderDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-4xl mx-auto">
+      <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
         <div className="h-8 w-48 bg-[var(--tu-bg-secondary-strong)] rounded animate-pulse mb-4" />
         <div className="h-64 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
       </div>
@@ -749,7 +756,7 @@ export default function WorkOrderDetailPage() {
 
   if (error || !order) {
     return (
-      <div className="p-8">
+      <div className="px-4 py-5 sm:p-8">
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load work order.{" "}
           <button onClick={fetchOrder} className="underline cursor-pointer">Try again</button>
@@ -758,7 +765,7 @@ export default function WorkOrderDetailPage() {
     );
   }
 
-  const cfg = WORK_ORDER_STATUS[order.status];
+  const cfg = workOrderStatusFor(order);
   const note = stageNote(order, isClient);
   const priorityCfg = PRIORITY_CONFIG[order.priority];
   const nextStatuses = STAFF_TRANSITIONS[order.status];
@@ -797,7 +804,7 @@ export default function WorkOrderDetailPage() {
     !!selectedCatalogPart && (Number(partForm.quantity) || 0) - alreadyIssued > selectedCatalogPart.quantityOnHand;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <Breadcrumbs
         items={[
@@ -872,7 +879,7 @@ export default function WorkOrderDetailPage() {
         {/* Lifecycle pipeline */}
         {order.status === "REJECTED" ? (
           <div className="bg-[var(--tu-soft-danger)] rounded-lg p-2.5 my-2.5 text-center text-[13px] font-semibold text-[var(--tu-on-danger)]">
-            This work order was rejected.
+            {isCancellation(order) ? "This job was cancelled." : "This work order was rejected."}
           </div>
         ) : (
           <>
@@ -1045,6 +1052,11 @@ export default function WorkOrderDetailPage() {
             </span>
           </p>
         )}
+
+        {/* Raised from a checklist finding, follows or followed by another job. */}
+        <div className="mb-4">
+          <WorkOrderLinks accountId={accountId} order={order} links={order} heading />
+        </div>
 
         {/* Assignees */}
         <div className="mb-4">
@@ -1405,7 +1417,16 @@ export default function WorkOrderDetailPage() {
         {/* Status actions */}
         {canActOnStatus && nextStatuses.length > 0 && (
           <div className="mt-4 pt-4 border-t border-[var(--tu-border)]">
-            {showCompleteForm && order.status === "IN_PROGRESS" ? (
+            {acceptAssign && order.status === "REQUESTED" ? (
+              <AcceptAndAssign
+                order={{ ...order, accountId }}
+                onDone={(p) => {
+                  setAcceptAssign(false);
+                  setOrder((prev) => (prev ? { ...prev, ...p, comments: prev.comments, parts: prev.parts, checklistItems: prev.checklistItems } as WorkOrder : prev));
+                }}
+                onCancel={() => setAcceptAssign(false)}
+              />
+            ) : showCompleteForm && order.status === "IN_PROGRESS" ? (
               <div>
                 <textarea
                   className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)] resize-none mb-3"
@@ -1442,6 +1463,16 @@ export default function WorkOrderDetailPage() {
               </div>
             ) : (
               <div className="flex gap-2 flex-wrap">
+                {/* Accepting and staffing a request in one go. */}
+                {order.status === "REQUESTED" && nextStatuses.includes("PENDING") && canAdmin && (
+                  <button
+                    onClick={() => setAcceptAssign(true)}
+                    disabled={updatingStatus}
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
+                  >
+                    Accept &amp; assign
+                  </button>
+                )}
                 {nextStatuses.map((ns) => (
                   <button
                     key={ns}
@@ -1468,7 +1499,7 @@ export default function WorkOrderDetailPage() {
                      ns === "IN_PROGRESS" ? "Start Work" :
                      ns === "ON_HOLD" ? "Put On Hold" :
                      ns === "COMPLETED" ? "Mark as Complete" :
-                     ns === "REJECTED" ? "Reject" : ns}
+                     ns === "REJECTED" ? transitionLabel(order.status, ns) : ns}
                   </button>
                 ))}
               </div>
@@ -1510,12 +1541,12 @@ export default function WorkOrderDetailPage() {
         {reasonDialog && (
           reasonDialog === "REJECT" ? (
             <ReasonDialog
-              title="Reject this work order"
+              title={rejectWords(order).title}
               subtitle={`${workOrderRef(order.number)} · ${order.title}`}
-              label="Why is it being rejected?"
-              placeholder="Outside the maintenance contract — please raise it with the landlord."
-              hint={`${rejectionHint(order)} A rejected order can't be reopened.`}
-              confirmLabel="Reject"
+              label={rejectWords(order).question}
+              placeholder={rejectWords(order).placeholder}
+              hint={`${rejectionHint(order)} A ${rejectWords(order).past} job can't be reopened.`}
+              confirmLabel={rejectWords(order).action}
               onSubmit={(reason) => updateStatus("REJECTED", { reason })}
               onClose={() => setReasonDialog(null)}
             />

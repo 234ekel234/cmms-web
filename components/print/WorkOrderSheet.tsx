@@ -1,7 +1,7 @@
 "use client";
 
 import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
-import { workOrderPriorityMeta, workOrderStatusMeta, type WorkOrderStatus } from "@/lib/statuses";
+import { workOrderPriorityMeta, type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import { needsClientApproval, workOrderRef } from "@/lib/workOrders";
 import { Cell, SheetHeader, Sign, printedStamp } from "@/components/print/SheetParts";
 import { formatCapacity } from "@/lib/assetCapacity";
@@ -131,7 +131,7 @@ export default function WorkOrderSheet({
 
       <div className="ps-grid">
         <Cell label="Site" value={order.account?.name ?? "—"} wide />
-        <Cell label="Status" value={workOrderStatusMeta(order.status).label} />
+        <Cell label="Status" value={workOrderStatusFor(order).label} />
         <Cell label="Priority" value={workOrderPriorityMeta(order.priority).label} />
         <Cell label="Raised" value={fmtDate(order.createdAt)} />
         <Cell label="Due" value={fmtDate(order.dueDate)} />

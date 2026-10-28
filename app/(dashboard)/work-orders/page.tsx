@@ -14,7 +14,7 @@ import RowMenu from "@/components/RowMenu";
 import PrintListButton from "@/components/print/PrintListButton";
 import PauseTimerDialog, { type TimerResult } from "@/components/PauseTimerDialog";
 import { EmptyRow } from "@/components/EmptyState";
-import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { WORK_ORDER_PRIORITY, type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 // Aliased the way the detail page does: rbac's `canManage` is the account-
 // administration question, and reading it under its own name next to the
 // per-job one is how the two got conflated in the first place.
@@ -25,6 +25,7 @@ type Account = { id: string; name: string };
 
 // StageFacts: why the clock stopped and when sign-off closes itself — the queue's stage line.
 type WorkOrder = StageFacts & {
+  acceptedAt?: string | null;
   id: string;
   number: number;
   title: string;
@@ -376,7 +377,7 @@ export default function WorkOrdersPage() {
           <p className="tu-page-sub">Maintenance tasks across all your accounts</p>
         </div>
 
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-end" }}>
+        <div className="tu-page-actions" style={{ alignItems: "flex-end" }}>
           {!loading && <PrintListButton ids={sorted.map((o) => o.id)} />}
           <div className="tu-segmented" role="tablist" aria-label="View">
             {([
@@ -543,7 +544,7 @@ export default function WorkOrdersPage() {
                   />
                 ) : (
                   sorted.map((wo) => {
-                    const st = WORK_ORDER_STATUS[wo.status];
+                    const st = workOrderStatusFor(wo);
                     const pri = wo.priority ? WORK_ORDER_PRIORITY[wo.priority] : null;
                     const overdue = isOverdue(wo);
                     const rowCls = [

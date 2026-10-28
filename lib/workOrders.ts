@@ -152,6 +152,7 @@ export function surveyable(wo: ApprovalShape & { status: WorkOrderStatus }): boo
 /** What `stageNote` reads. Every field beyond status is optional so any list's row will do. */
 export type StageShape = ApprovalShape & StageFacts & {
   status: WorkOrderStatus;
+  acceptedAt?: string | null;
   assignments?: { employee: { name: string } }[];
   timerStartedAt?: string | null;
 };
@@ -212,7 +213,7 @@ export function stageNote(wo: StageShape, isClient: boolean, now = Date.now()): 
       if (!wo.approvedById) return note("Closed automatically — no client response");
       return note(wo.approvedByName ? `Signed off by ${wo.approvedByName}` : "Signed off by the client");
     case "REJECTED":
-      return note("Rejected — closed without work");
+      return isCancellation(wo) ? note("Cancelled — called off after it was accepted") : note("Rejected — closed without work");
   }
 }
 
@@ -336,6 +337,25 @@ export function openStepsNote(steps: { isDone: boolean }[] | undefined, who: "co
  * on a client's own request — the reason is what they need — and as a
  * staff-only note on internal work (backend workOrderRoutes, `rejectionPublic`).
  */
+/**
+ * Rejected or cancelled — one status, two words. A request turned down before
+ * anyone accepted it was rejected; a job accepted and then called off (all
+ * staff-raised work starts accepted) was cancelled. Mirrors isCancellation in
+ * backend helpers/workOrderApproval.js.
+ */
+export function isCancellation(wo: { acceptedAt?: string | null }): boolean {
+  return !!wo.acceptedAt;
+}
+
+/** The words the reject / cancel controls and dialog use for this order. */
+export function rejectWords(wo: { acceptedAt?: string | null }) {
+  return isCancellation(wo)
+    ? { action: "Cancel job", title: "Cancel this job", question: "Why is it being cancelled?", past: "cancelled",
+        placeholder: "No longer needed — the unit is being replaced under warranty." }
+    : { action: "Reject", title: "Reject this work order", question: "Why is it being rejected?", past: "rejected",
+        placeholder: "Outside the maintenance contract — please raise it with the landlord." };
+}
+
 export function rejectionHint(wo: { type?: string }): string {
   return wo.type === "EXTERNAL"
     ? "Posted to the job's updates — the client who asked will read it."
@@ -356,7 +376,9 @@ export function transitionLabel(from: WorkOrderStatus, to: WorkOrderStatus): str
   if (to === "IN_PROGRESS") return from === "ON_HOLD" ? "Resume work" : "Start work";
   if (to === "ON_HOLD") return "Put on hold";
   if (to === "COMPLETED") return "Mark as complete";
-  if (to === "REJECTED") return "Reject";
+  // Turning a request down rejects it; stopping a job that was accepted
+  // cancels it (isCancellation). Leaving REQUESTED is what sets acceptedAt.
+  if (to === "REJECTED") return from === "REQUESTED" ? "Reject" : "Cancel job";
   if (to === "APPROVED") return "Approve";
   return to;
 }
@@ -419,4 +441,36 @@ export const MAX_BATCH_PRINT = 100;
 /** The batch print page for these orders, in the order given. */
 export function batchPrintHref(ids: string[]): string {
   return `/print/work-orders?ids=${ids.slice(0, MAX_BATCH_PRINT).map(encodeURIComponent).join(",")}`;
+}
+
+/**
+ * Open jobs a new request may be a duplicate of — two people reporting the
+ * same leak. Same asset first, since that is the sure sign; failing that, a
+ * title sharing two significant words, for the request raised without picking
+ * an asset (most of a client's). A hint shown on the form, never a block: the
+ * same machine can have two separate faults.
+ */
+const DUP_STOPWORDS = new Set(["with", "from", "that", "this", "there", "please", "floor", "level", "room", "near", "again", "work", "order", "check"]);
+const titleWords = (t: string) =>
+  new Set(t.toLowerCase().split(/[^a-z0-9]+/).filter((w) => w.length >= 4 && !DUP_STOPWORDS.has(w)));
+
+export function possibleDuplicates<T extends { status: WorkOrderStatus; title: string; asset?: { id: string } | null }>(
+  orders: T[],
+  draft: { assetId?: string | null; title?: string },
+  max = 3,
+): T[] {
+  const open = orders.filter((o) => !isClosed(o));
+  if (draft.assetId) {
+    const same = open.filter((o) => o.asset?.id === draft.assetId);
+    if (same.length) return same.slice(0, max);
+  }
+  const words = titleWords(draft.title ?? "");
+  if (words.size < 2) return [];
+  return open
+    .filter((o) => {
+      let shared = 0;
+      for (const w of titleWords(o.title)) if (words.has(w)) shared++;
+      return shared >= 2;
+    })
+    .slice(0, max);
 }

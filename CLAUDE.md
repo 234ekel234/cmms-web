@@ -126,6 +126,14 @@ Three things the full record and the pane share:
   satisfaction (`reports/client-satisfaction`) lays out `GET /reports/client-satisfaction`
   and computes nothing itself.
 
+**Linked work** (`components/WorkOrderLinks.tsx`, `lib/linkedWorkOrders.ts`): the full page and
+the pane show the checklist finding a job came from, the job it follows and its follow-ups, and
+offer **Raise follow-up** on finished work. A submitted checklist round shows each finding's job, or
+**+ Raise work order**. Both are plain links to the site's work-order page with a `raise=1` draft in
+the URL, which opens the ordinary New Work Order form filled in and linked; the form reads it once.
+`isPmFinding` mirrors the backend's positional rule. The checklist page takes `?period=` to open a
+round.
+
 The full page's **Edit** form (staff, unsettled jobs) covers title, description and asset as
 well as priority, due date, category and estimate. It loads the site's live assets on first
 open and keeps the current asset offered even if it has since been archived; save errors are
@@ -141,6 +149,24 @@ shown, not swallowed.
    is a wrong password and must stay on the form. Sign-out calls `POST /me/sign-out` first so
    the token dies on the server; Settings → Signed-in devices lists and ends sessions.
 5. Protected pages check `isLoggedIn()` on mount and redirect if not authenticated
+
+## Loading data in effects
+
+Lint is blocking in CI, and `react-hooks/set-state-in-effect` flags an effect that calls a
+loader which sets state — even after an `await`. Start loads with
+`useEffect(() => startLoad(fetchData), [fetchData])` (`lib/startLoad.ts`): the loader runs a
+microtask later, and it may take an `isCancelled` argument to drop a slow answer for the
+record just left. Declare the loader with `useCallback` *above* the effect; a plain
+`async function` below it is the "accessed before declared" error the backlog was made of.
+State derived from props or other state is set during render with a "last seen" guard (the
+checklist fill-in page, the account layout's menu), not in an effect.
+
+## Phone widths
+
+Every page was checked at 390px (27 Oct 2026). Rows of controls use `tu-page-actions` (wraps),
+wide tables sit in `tu-scroll-x` (scrolls, and is positioned so an absolutely placed
+`tu-sr-only` header inside cannot widen the page), create forms use `tu-form-grid` /
+`tu-span-2` (one column on a phone), and site pages pad `px-4 py-5 sm:p-8`.
 
 ## Printing
 
@@ -163,6 +189,12 @@ decides who gets it.
   The QR encodes the asset page's URL and is drawn locally by `qrcode`. A filter rather than
   an id list, so a large register is not a URL too long to send. Geometry is Avery L7160
   under `@page labels`.
+
+- **Reports** print in place, not from a print route: **Save as PDF** on the four report
+  pages (`components/ReportPrint.tsx`). `PrintReportHeader` is the paper-only letterhead
+  (scope, dates, who generated it), `tu-no-print` hides controls, and the button lifts dark
+  mode for the print. The rules are "Reports as PDF" in `globals.css`. In place means the PDF
+  is exactly the period and sites on screen.
 
 `components/print/SheetParts.tsx` holds the letterhead, cells and signature blocks the
 sheets share. CSV downloads go through `lib/csv.ts` (byte-order mark for Excel, and a

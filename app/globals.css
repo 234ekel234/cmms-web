@@ -238,6 +238,14 @@
   --tu-chart-overdue: #E66767;
 }
 
+/* A visible keyboard focus ring everywhere, in the theme's ring colour. Wrapped
+   in :where() so it has no specificity: any component that draws its own ring
+   (the tu-* controls, Tailwind focus: utilities) still wins. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--tu-focus-ring);
+  outline-offset: 2px;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
@@ -503,6 +511,9 @@ code, kbd, pre, .tu-mono {
   margin-bottom: 28px;
   flex-wrap: wrap;
 }
+/* The buttons and filters beside a page title. They wrap, because on a phone
+   a row of four controls is wider than the screen and pushed the page sideways. */
+.tu-page-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .tu-page-title {
   font-size: 26px;
@@ -520,6 +531,7 @@ code, kbd, pre, .tu-mono {
 
 .tu-filter-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 4px;
@@ -584,6 +596,13 @@ code, kbd, pre, .tu-mono {
   color: var(--tu-text-heading);
   line-height: 1;
   margin: 0 0 6px;
+}
+/* The figure's placeholder while a tile loads — sized like a short number. */
+.tu-stat-skel { display: inline-block; width: 72px; height: 0.9em; border-radius: 6px; vertical-align: middle; }
+/* Two tiles a row on a phone leaves ~130px for the figure; a peso total such
+   as ₱89,682.50 at 32px is wider than that and was clipped by the card. */
+@media (max-width: 640px) {
+  .tu-stat-value { font-size: 24px; overflow-wrap: anywhere; }
 }
 .tu-stat-sub {
   font-size: 13px;
@@ -1059,6 +1078,18 @@ code, kbd, pre, .tu-mono {
 @media (min-width: 1024px) { .tu-section-grid { grid-template-columns: repeat(3, 1fr); } }
 
 .tu-card-body { padding: 20px 24px; }
+/* Content under a card's header, which already carries the top spacing. */
+.tu-card-pad { padding: 0 24px 24px; }
+.tu-card-intro { font-size: 14px; color: var(--tu-text-body); margin-bottom: 16px; }
+/* Create/edit forms inside a card: two columns, one on a phone, where a pair
+   of 150px inputs was too narrow to type a name into. */
+.tu-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.tu-span-2 { grid-column: 1 / -1; }
+.tu-form-actions { display: flex; gap: 12px; justify-content: flex-end; flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .tu-form-grid { grid-template-columns: 1fr; }
+  .tu-card-pad { padding: 0 16px 16px; }
+}
 
 .tu-chart-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
 .tu-chart-total { font-size: 28px; font-weight: 700; color: var(--tu-text-heading); line-height: 1; }
@@ -1439,6 +1470,16 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
   font-weight: 600;
 }
 .tu-subnav-chevron { transition: transform 200ms ease; }
+/* On a phone the five tabs are wider than the screen, and the bar was pushing
+   every site page into a sideways scroll. The scope chip goes (the account's
+   name is the heading just above), the tabs wrap onto a second row, and the
+   last menu opens leftwards so it stays on screen. */
+@media (max-width: 640px) {
+  .tu-scope-chip, .tu-scope-divider { display: none; }
+  .tu-subnav { flex-wrap: wrap; }
+  .tu-subnav-tab { padding: 9px 10px; }
+  .tu-subnav > div:last-child .tu-menu { left: auto; right: 0; }
+}
 .tu-subnav-tab[aria-expanded="true"] .tu-subnav-chevron { transform: rotate(180deg); }
 
 /* Dropdown menu shared by the grouped tabs. */
@@ -3638,3 +3679,95 @@ figure:hover .tu-attachment-remove,
 .tu-reset-pw-row .tu-input { flex: 1; min-width: 160px; }
 .tu-reset-pw-note { font-size: 12px; color: var(--tu-text-subtle); max-width: 48ch; }
 .tu-text-danger { color: var(--tu-on-danger); }
+
+/* ── Linked work orders (lib/linkedWorkOrders.ts) ──
+   The form's "raised from" note, the job's links block, and the job chip on a
+   checklist finding. */
+.tu-link-note {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+  background: var(--tu-soft-brand); border-radius: 8px; padding: 8px 12px; margin-bottom: 16px;
+  font-size: 13px; color: var(--tu-text-body);
+}
+.tu-links { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--tu-text-body); }
+.tu-links a:not([class]) { color: var(--tu-text-brand); font-weight: 600; }
+.tu-links a:not([class]):hover { text-decoration: underline; }
+.tu-links-sub { color: var(--tu-text-subtle); font-size: 12px; }
+.tu-finding-action { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.tu-finding-action a {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  color: var(--tu-text-brand); border: 1px solid var(--tu-border); border-radius: 999px; padding: 2px 10px;
+}
+.tu-finding-action a:hover { background: var(--tu-bg-secondary); }
+
+/* ── Accept & assign (components/AcceptAndAssign.tsx) ── */
+.tu-accept-assign { display: flex; flex-direction: column; gap: 8px; }
+.tu-accept-assign-q { margin: 0; font-size: 13px; font-weight: 600; color: var(--tu-text-heading); }
+.tu-accept-assign-list {
+  display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto;
+  border: 1px solid var(--tu-border); border-radius: 8px; padding: 4px;
+}
+.tu-accept-assign-list label {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
+  font-size: 13.5px; color: var(--tu-text-body); cursor: pointer;
+}
+.tu-accept-assign-list label:hover { background: var(--tu-bg-secondary); }
+.tu-accept-assign-pos { margin-left: auto; font-size: 12px; color: var(--tu-text-subtle); }
+
+/* ── Possible duplicate (components/DuplicateHint.tsx) ── */
+.tu-dup-hint {
+  background: var(--tu-soft-warning); color: var(--tu-on-warning); border-radius: 8px;
+  padding: 8px 12px; font-size: 12.5px;
+}
+.tu-dup-hint p { margin: 0 0 4px; font-weight: 600; }
+.tu-dup-hint ul { margin: 0; padding-left: 16px; list-style: disc; }
+.tu-dup-hint a { font-weight: 600; text-decoration: underline; }
+.tu-dup-hint .tu-links-sub { color: inherit; opacity: 0.8; }
+
+/* ── Reports as PDF (components/ReportPrint.tsx) ──
+   A report prints from its own page, so what lands on paper is exactly the
+   period and sites on screen. Everything but the content column goes, the
+   controls go (`tu-no-print`), a letterhead appears (`tu-print-only`), and the
+   theme is forced light by the button's beforeprint hook. Chart bars are
+   backgrounds, which browsers drop on paper unless told otherwise. */
+.tu-print-only { display: none; }
+/* A wide table scrolls sideways on screen; on paper it runs full width.
+   Positioned, so absolutely placed children (a screen-reader-only header) are
+   contained by the scroll box instead of widening the whole page. */
+.tu-scroll-x { overflow-x: auto; position: relative; }
+.tu-print-head {
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 12px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #1f2937;
+}
+.tu-print-head img { height: 44px; width: auto; }
+.tu-print-head-title { font-size: 20px; font-weight: 700; color: #111827; }
+.tu-print-head-meta { font-size: 11px; color: #4b5563; text-align: right; line-height: 1.5; }
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+  /* The page tint is painted by several wrappers (body, the shell, the site
+     body); retinting the token reaches every one of them. */
+  :root, :root[data-theme="dark"] { --background: #fff; }
+  html, body { background: #fff !important; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Paper is narrower than the desktop breakpoint, so the phone layout's
+     off-canvas drawer is in play too, and its edge would print. */
+  .tu-sidebar, .tu-drawer, .tu-overlay, .tu-shell-main > :not(main), .tu-acct-header, .tu-subnav-row, .tu-charttable-toggle, .tu-no-print { display: none !important; }
+  /* Shadows are a screen depth cue; on paper they print as grey smudges. Wide
+     tables are clipped by their scroll wrapper, so let them run full width. */
+  * { box-shadow: none !important; }
+  .tu-card, .tu-stat-card { border: 1px solid #d1d5db !important; }
+  .overflow-x-auto, .tu-scroll-x { overflow: visible !important; }
+  /* Screen padding sized for a 1280px window; on A4 a seven-column table needs it back. */
+  .tu-table { font-size: 12px; }
+  .tu-table th, .tu-table td { padding: 7px 8px !important; white-space: normal !important; }
+  table { width: 100% !important; min-width: 0 !important; }
+  .tu-shell, .tu-shell-main { display: block; min-height: 0; }
+  .tu-page, .tu-shell-content > div { padding: 0 !important; max-width: none !important; }
+  .tu-print-only { display: block; }
+  .tu-print-head.tu-print-only { display: flex; }
+  .tu-stat-card, tr { break-inside: avoid; }
+  .tu-card-header, h2, h3 { break-after: avoid; }
+}

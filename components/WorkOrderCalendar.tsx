@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { workOrderStatusFor, workOrderStatusGroupLabel } from "@/lib/statuses";
 
 // Minimal shape the calendar needs; callers may pass richer objects.
 export type CalendarOrder = {
@@ -9,6 +10,8 @@ export type CalendarOrder = {
   title: string;
   status: "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
   dueDate: string | null;
+  /** Tells a cancelled job from a rejected one (`workOrderStatusFor`). */
+  acceptedAt?: string | null;
 };
 
 type Props<T extends CalendarOrder> = {
@@ -21,14 +24,14 @@ type Props<T extends CalendarOrder> = {
 // Tonal tokens rather than fixed hexes, so day chips stay readable in dark mode.
 // Each status gets a distinct tone — Requested/Accepted/In Progress previously
 // all resolved to the same blue, making the chips impossible to tell apart.
-const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string; label: string }> = {
-  REQUESTED:   { bg: "var(--tu-soft-warning)", fg: "var(--tu-on-warning)", label: "Requested"   },
-  PENDING:     { bg: "var(--tu-soft-info)",    fg: "var(--tu-on-info)",    label: "Accepted"    },
-  IN_PROGRESS: { bg: "var(--tu-soft-brand)",   fg: "var(--tu-on-brand)",   label: "In Progress" },
-  ON_HOLD:     { bg: "var(--tu-soft-neutral)", fg: "var(--tu-on-neutral)", label: "On Hold"     },
-  COMPLETED:   { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)", label: "Completed"   },
-  APPROVED:    { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)", label: "Approved"    },
-  REJECTED:    { bg: "var(--tu-soft-danger)",  fg: "var(--tu-on-danger)",  label: "Rejected"    },
+const CALENDAR_STATUS: Record<CalendarOrder["status"], { bg: string; fg: string }> = {
+  REQUESTED:   { bg: "var(--tu-soft-warning)", fg: "var(--tu-on-warning)" },
+  PENDING:     { bg: "var(--tu-soft-info)",    fg: "var(--tu-on-info)" },
+  IN_PROGRESS: { bg: "var(--tu-soft-brand)",   fg: "var(--tu-on-brand)" },
+  ON_HOLD:     { bg: "var(--tu-soft-neutral)", fg: "var(--tu-on-neutral)" },
+  COMPLETED:   { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)" },
+  APPROVED:    { bg: "var(--tu-soft-success)", fg: "var(--tu-on-success)" },
+  REJECTED:    { bg: "var(--tu-soft-danger)",  fg: "var(--tu-on-danger)" },
 };
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -144,7 +147,7 @@ export default function WorkOrderCalendar<T extends CalendarOrder>({ orders, hre
                         <Link
                           key={wo.id}
                           href={hrefFor(wo)}
-                          title={tooltipFor ? tooltipFor(wo) : `${wo.title} (${c.label})`}
+                          title={tooltipFor ? tooltipFor(wo) : `${wo.title} (${workOrderStatusFor(wo).label})`}
                           style={{
                             display: "block",
                             fontSize: 11,
@@ -180,7 +183,7 @@ export default function WorkOrderCalendar<T extends CalendarOrder>({ orders, hre
             {(Object.keys(CALENDAR_STATUS) as CalendarOrder["status"][]).map((s) => (
               <span key={s} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--tu-text-body)" }}>
                 <span style={{ width: 12, height: 12, borderRadius: 3, background: CALENDAR_STATUS[s].bg, border: `1px solid ${CALENDAR_STATUS[s].fg}33` }} />
-                {CALENDAR_STATUS[s].label}
+                {workOrderStatusGroupLabel(s)}
               </span>
             ))}
             {noDueDateCount > 0 && (
