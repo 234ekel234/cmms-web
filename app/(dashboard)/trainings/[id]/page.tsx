@@ -212,7 +212,7 @@ export default function TrainingDetailPage() {
           </div>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table" aria-label="Training roster">
             <thead>
               <tr>

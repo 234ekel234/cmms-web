@@ -68,8 +68,13 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
     }
   }, [accountId]);
 
-  // Close the open menu on navigation, outside click, or Escape.
-  useEffect(() => { setOpenMenu(null); }, [pathname]);
+  // Close the open menu on navigation, outside click, or Escape. Navigation is
+  // noticed during render, so the menu is already shut on the new page's first paint.
+  const [menuPath, setMenuPath] = useState(pathname);
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setOpenMenu(null);
+  }
   useEffect(() => {
     if (!openMenu) return;
     function onDown(e: MouseEvent) {

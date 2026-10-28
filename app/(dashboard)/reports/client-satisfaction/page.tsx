@@ -8,6 +8,7 @@ import AccountFilter, { type FilterAccount } from "@/components/AccountFilter";
 import EmptyState from "@/components/EmptyState";
 import { Stars } from "@/components/ClientSurvey";
 import { workOrderRef } from "@/lib/workOrders";
+import { PrintReportButton, PrintReportHeader, dateRangeLabel, siteScope } from "@/components/ReportPrint";
 
 /**
  * The client satisfaction scorecard: what clients said about finished work,
@@ -102,19 +103,30 @@ export default function ClientSatisfactionPage() {
   }, [query]);
 
   const t = data?.totals;
+  const shown = rangeDates(range);
 
   return (
     <div className="tu-page">
-      <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Client satisfaction" }]} />
+      <PrintReportHeader
+        title="Client satisfaction"
+        scope={siteScope(selected, accounts)}
+        period={dateRangeLabel(shown.from, shown.to)}
+      />
+      <div className="tu-no-print">
+        <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Client satisfaction" }]} />
+      </div>
 
       <div className="tu-page-header">
         <div>
-          <h1 className="tu-page-title">Client satisfaction</h1>
+          <h1 className="tu-page-title tu-no-print">Client satisfaction</h1>
           <p className="tu-page-sub">What clients said about finished work. Seen by supervisors and managers only.</p>
+        </div>
+        <div className="tu-no-print">
+          <PrintReportButton disabled={!data} />
         </div>
       </div>
 
-      <div className="tu-toolbar" style={{ flexWrap: "wrap", gap: 12 }}>
+      <div className="tu-toolbar tu-no-print" style={{ flexWrap: "wrap", gap: 12 }}>
         <div className="tu-chip-row" role="group" aria-label="Period">
           {RANGES.map((r) => (
             <button
@@ -193,7 +205,7 @@ export default function ClientSatisfactionPage() {
 
           <section className="tu-card" style={{ marginBottom: 24 }}>
             <div className="tu-card-header"><h2 className="tu-card-title">By site</h2></div>
-            <div style={{ overflowX: "auto" }}>
+            <div className="tu-scroll-x">
               <table className="tu-table">
                 <thead>
                   <tr>

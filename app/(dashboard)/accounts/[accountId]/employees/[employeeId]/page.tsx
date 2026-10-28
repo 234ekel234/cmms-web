@@ -96,7 +96,7 @@ export default function EmployeeDetailPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [employeeId]);
+  }, [accountId, employeeId, router]);
 
   function toggleCategory(cat: EmployeeCategory) {
     setCategories((prev) =>
@@ -136,20 +136,20 @@ export default function EmployeeDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-64">
+      <div className="px-4 py-5 sm:p-8 flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--tu-text-brand)] border-t-transparent" />
       </div>
     );
   }
 
   if (!employee) {
-    return <div className="p-8 text-sm text-[var(--tu-on-danger)]">{error ?? "Employee not found."}</div>;
+    return <div className="px-4 py-5 sm:p-8 text-sm text-[var(--tu-on-danger)]">{error ?? "Employee not found."}</div>;
   }
 
   const completedTrainings = trainings.filter((t) => t.status === "COMPLETED").length;
 
   return (
-    <div className="p-8 max-w-3xl space-y-5">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl space-y-5">
       <Breadcrumbs
         items={[
           { label: "Employees", href: `/accounts/${accountId}/employees` },

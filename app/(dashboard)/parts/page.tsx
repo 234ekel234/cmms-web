@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { fmtCost, fmtQty, type Part } from "@/lib/parts";
 import { EmptyRow } from "@/components/EmptyState";
+import { startLoad } from "@/lib/startLoad";
 
 type Account = { id: string; name: string };
 
@@ -39,17 +40,15 @@ export default function PartsPage() {
     api.get("/accounts").then((r) => setAccounts(r.data)).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  useEffect(() => startLoad((isCancelled) => {
     setLoading(true);
     setError(null);
     api
       .get("/parts", { params: showArchived ? { includeArchived: "true" } : {} })
-      .then((r) => { if (!cancelled) setParts(r.data); })
-      .catch(() => { if (!cancelled) setError("Failed to load spare parts."); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [showArchived]);
+      .then((r) => { if (!isCancelled()) setParts(r.data); })
+      .catch(() => { if (!isCancelled()) setError("Failed to load spare parts."); })
+      .finally(() => { if (!isCancelled()) setLoading(false); });
+  }), [showArchived]);
 
   const sorted = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -187,7 +186,7 @@ export default function PartsPage() {
           </span>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table" aria-label="Spare parts">
             <thead>
               <tr>

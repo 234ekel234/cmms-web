@@ -273,8 +273,8 @@ export default function EmployeesPage() {
           <div className="tu-card-header">
             <h2 className="tu-card-title">{editId ? "Edit Employee" : "New Employee"}</h2>
           </div>
-          <div style={{ padding: "0 24px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div style={{ gridColumn: "span 2" }}>
+          <div className="tu-card-pad tu-form-grid">
+            <div className="tu-span-2">
               <label className="tu-label">Name *</label>
               <input
                 className="tu-input"
@@ -304,7 +304,7 @@ export default function EmployeesPage() {
                 <option value="RELIEVER">Reliever — multiple accounts</option>
               </select>
             </div>
-            <div style={{ gridColumn: "span 2" }}>
+            <div className="tu-span-2">
               <label className="tu-label">Skills</label>
               <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", margin: "0 0 8px" }}>
                 Tap every trade this person works in.
@@ -337,11 +337,11 @@ export default function EmployeesPage() {
               </div>
             </div>
             {formError && (
-              <div style={{ gridColumn: "span 2" }}>
+              <div className="tu-span-2">
                 <p style={{ color: "#C70036", fontSize: 13 }}>{formError}</p>
               </div>
             )}
-            <div style={{ gridColumn: "span 2", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <div className="tu-span-2 tu-form-actions">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
@@ -467,7 +467,7 @@ export default function EmployeesPage() {
 
       {/* Table */}
       <div className="tu-card">
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table" aria-label="Employee registry">
             <thead>
               <tr>

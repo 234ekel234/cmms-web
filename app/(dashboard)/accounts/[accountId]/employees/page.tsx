@@ -170,7 +170,7 @@ export default function EmployeesPage() {
   }
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Employees</h2>

@@ -41,6 +41,7 @@ import {
   type OpenOrder,
   type Period,
 } from "@/lib/dashboardModel";
+import { startLoad } from "@/lib/startLoad";
 
 /**
  * Always fetch the widest window the API offers, and let each trend card slice
@@ -176,7 +177,7 @@ export default function DashboardPage() {
   useEffect(() => {
     // In custom mode wait until a valid range has been applied.
     if (period === "custom" && !appliedRange) return;
-    fetchDashboard();
+    return startLoad(fetchDashboard);
     // Deliberately not `trendWindow`: the window is now sliced from the fetched
     // series rather than requested, so changing it is a re-render, not a reload.
     // eslint-disable-next-line react-hooks/exhaustive-deps

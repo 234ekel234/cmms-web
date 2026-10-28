@@ -8,6 +8,7 @@ import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
+import { startLoad } from "@/lib/startLoad";
 
 type ShiftTemplate = {
   id: string;
@@ -128,20 +129,21 @@ export default function AttendancePage() {
   // /shift-logs just to display, which created the log, seeded every rostered
   // employee as absent, and fired the daily-checklist notification — so paging
   // back through the calendar invented absences and spammed the team.
-  const loadAttendance = useCallback(async (templateId: string, date: Date) => {
+  const loadAttendance = useCallback(async (templateId: string, date: Date, isCancelled: () => boolean = () => false) => {
     setLoadingAttendance(true);
     setAttendance([]);
     try {
       const res = await api.get(`/shift-templates/${templateId}/attendance`, {
         params: { date: toDateString(date) },
       });
+      if (isCancelled()) return;
       // null until this shift has actually been marked.
       setShiftLogId(res.data.shiftLogId);
       setAttendance(res.data.attendance);
     } catch {
       // silent
     } finally {
-      setLoadingAttendance(false);
+      if (!isCancelled()) setLoadingAttendance(false);
     }
   }, []);
 
@@ -158,21 +160,20 @@ export default function AttendancePage() {
     return res.data.id;
   }
 
+  // The one place the day's roster is read: picking a shift or a day only
+  // changes the selection, and a slow answer for the day just left is dropped.
+  const selectedTemplateId = shiftTemplates[selectedIndex]?.id;
   useEffect(() => {
-    if (templatesLoaded && shiftTemplates.length > 0) {
-      loadAttendance(shiftTemplates[selectedIndex].id, selectedDate);
-    }
-  }, [templatesLoaded]);
+    if (!selectedTemplateId) return;
+    return startLoad((isCancelled) => loadAttendance(selectedTemplateId, selectedDate, isCancelled));
+  }, [selectedTemplateId, selectedDate, loadAttendance]);
 
-  async function selectShift(index: number) {
+  function selectShift(index: number) {
     setSelectedIndex(index);
-    if (shiftTemplates[index]) await loadAttendance(shiftTemplates[index].id, selectedDate);
   }
 
-  async function changeDate(delta: number) {
-    const newDate = addDays(selectedDate, delta);
-    setSelectedDate(newDate);
-    if (shiftTemplates[selectedIndex]) await loadAttendance(shiftTemplates[selectedIndex].id, newDate);
+  function changeDate(delta: number) {
+    setSelectedDate(addDays(selectedDate, delta));
   }
 
   async function mark(employeeId: string, isPresent: boolean) {
@@ -222,16 +223,17 @@ export default function AttendancePage() {
   }, [accountId]);
 
   useEffect(() => {
-    if (view === "summary") loadGrid(summaryMonth, cutoff);
-  }, [view, summaryMonth, cutoff]);
+    if (view !== "summary") return;
+    return startLoad(() => loadGrid(summaryMonth, cutoff));
+  }, [view, summaryMonth, cutoff, loadGrid]);
 
   if (!templatesLoaded) {
-    return <div className="p-8"><div className="h-32 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" /></div>;
+    return <div className="px-4 py-5 sm:p-8"><div className="h-32 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" /></div>;
   }
 
   if (shiftTemplates.length === 0) {
     return (
-      <div className="p-8">
+      <div className="px-4 py-5 sm:p-8">
         <EmptyState
           icon="schedule"
           title="No shifts yet"
@@ -249,7 +251,7 @@ export default function AttendancePage() {
   const activeTemplate = shiftTemplates[selectedIndex];
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* View toggle */}
       <div className="flex rounded-xl overflow-hidden border border-[var(--tu-border)] w-fit mb-6">

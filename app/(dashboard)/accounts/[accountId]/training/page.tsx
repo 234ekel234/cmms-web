@@ -73,7 +73,7 @@ export default function TrainingPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [accountId, writable]);
 
   async function handleAssign(employeeId: string, trainingId: string) {
     setAssigning(true);
@@ -130,7 +130,7 @@ export default function TrainingPage() {
   );
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">

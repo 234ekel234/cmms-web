@@ -20,13 +20,16 @@ const OPTIONS: { value: ThemePreference; label: string; Icon: () => React.ReactE
 export default function ThemeToggle() {
   // The real value lives in localStorage and is applied before hydration, so
   // render "system" on the server and correct it on mount rather than reading
-  // storage during render.
+  // storage during render. Corrected from a microtask so the effect body itself
+  // never sets state.
   const [pref, setPref] = useState<ThemePreference>("system");
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setPref(getThemePreference());
-    setReady(true);
+    queueMicrotask(() => {
+      setPref(getThemePreference());
+      setReady(true);
+    });
   }, []);
 
   // The top bar carries a light/dark button too, and on this page both are on

@@ -301,7 +301,7 @@ export default function AssetsPage() {
           </span>
         </div>
 
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table" aria-label="Assets">
             <thead>
               <tr>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { csvBuilder } from "@/lib/csv";
@@ -8,6 +8,11 @@ import PmExportDialog from "@/components/PmExportDialog";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
+import { startLoad } from "@/lib/startLoad";
+import { PrintReportButton, PrintReportHeader, siteScope } from "@/components/ReportPrint";
+import { WO_STATUS } from "@/lib/dashboardModel";
+import type { WorkOrderStatus } from "@/lib/statuses";
+import { StackedBar } from "@/components/charts";
 
 type Period = "today" | "week" | "month";
 
@@ -25,7 +30,9 @@ type AccountSummary = {
 };
 
 type DashboardData = {
-  workOrders: { REQUESTED: number; PENDING: number; IN_PROGRESS: number; ON_HOLD: number; COMPLETED: number; REJECTED: number };
+  // Every status, from the shared union — a hand-written list here once left
+  // APPROVED out, so the breakdown summed short of its own total.
+  workOrders: Record<WorkOrderStatus, number>;
   assets: { FUNCTIONAL: number; FUNCTIONAL_WITH_FINDINGS: number; BREAKDOWN: number };
   overdueWorkOrders: number;
   poorHealthAssets: number;
@@ -45,22 +52,29 @@ type EmployeeReport = {
   training: { total: number; completed: number; rate: number | null };
 };
 
-// Lifecycle order. This is also the order the colour palette was validated in:
-// the adjacent-pair CVD gate depends on it, so do not reorder casually.
-const STATUS_SERIES = [
-  { label: "Requested",   key: "REQUESTED",   token: "var(--tu-status-requested)"   },
-  { label: "Accepted",    key: "PENDING",     token: "var(--tu-status-pending)"     },
-  { label: "In Progress", key: "IN_PROGRESS", token: "var(--tu-status-in-progress)" },
-  { label: "On Hold",     key: "ON_HOLD",     token: "var(--tu-status-on-hold)"     },
-  { label: "Completed",   key: "COMPLETED",   token: "var(--tu-status-completed)"   },
-  { label: "Rejected",    key: "REJECTED",    token: "var(--tu-status-rejected)"    },
-] as const;
+// The dashboard's series: lifecycle order, built from lib/statuses, which is
+// also the order the colour palette was validated in.
+const STATUS_SERIES = WO_STATUS.map(({ key, label, color }) => ({ key, label, token: color }));
 
 const PERIOD_LABELS: Record<Period, string> = {
   today: "Today",
   week:  "This Week",
   month: "This Month",
 };
+
+/**
+ * The dates a period covers, for the printed letterhead — "This Month" means
+ * nothing on a PDF opened next quarter. Mirrors the API's own windows
+ * (dashboardRoutes.js): the week starts on Monday, the month on the 1st.
+ */
+function periodDates(p: Period): string {
+  const fmt = (d: Date) => d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  const today = new Date();
+  const start = new Date(today);
+  if (p === "week") start.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  if (p === "month") start.setDate(1);
+  return p === "today" ? fmt(today) : `${fmt(start)} – ${fmt(today)}`;
+}
 
 function pct(a: number, b: number) {
   if (!b) return null;
@@ -161,20 +175,18 @@ export default function ReportsPage() {
     [selectedAccounts],
   );
 
-  useEffect(() => { fetchData(); }, [period, accountKey]);
-
   // Option list is fetched once and never narrowed by the filter itself.
   useEffect(() => {
     api.get("/accounts").then((r) => setAllAccounts(r.data)).catch(() => setAllAccounts([]));
   }, []);
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(false);
     try {
       // Employee performance rides alongside the dashboard so the CSV export can
       // include a per-employee section; a failure there shouldn't blank the page.
-      const accountIds = selectedAccounts.size > 0 ? Array.from(selectedAccounts).join(",") : undefined;
+      const accountIds = accountKey || undefined;
       const [dash, emp] = await Promise.all([
         api.get("/dashboard", { params: { period, accountIds } }),
         api.get("/reports/employees", { params: { period } }).catch(() => null),
@@ -186,25 +198,32 @@ export default function ReportsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [period, accountKey]);
+
+  useEffect(() => startLoad(fetchData), [fetchData]);
 
   const wo = data?.workOrders;
   const totalWOs = wo ? Object.values(wo).reduce((a, b) => a + b, 0) : 0;
-  const completedWOs = wo?.COMPLETED ?? 0;
+  // Client-approved work is finished work too — it moved on from COMPLETED.
+  const completedWOs = (wo?.COMPLETED ?? 0) + (wo?.APPROVED ?? 0);
   const totalAssets =
     (data?.assets.FUNCTIONAL ?? 0) +
     (data?.assets.FUNCTIONAL_WITH_FINDINGS ?? 0) +
     (data?.assets.BREAKDOWN ?? 0);
 
+  // Follows the page's account filter: none selected means every site.
+  const scopeLabel = siteScope(selectedAccounts, allAccounts);
+
   return (
     <div className="tu-page">
+      <PrintReportHeader title="Performance report" scope={scopeLabel} period={`${PERIOD_LABELS[period]}: ${periodDates(period)}`} />
       {/* Header */}
-      <div className="tu-page-header">
+      <div className="tu-page-header tu-no-print">
         <div>
           <h1 className="tu-page-title">Reports</h1>
           <p className="tu-page-sub">Cross-account performance overview</p>
         </div>
-        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+        <div className="tu-page-actions">
           {data && (
             <button
               type="button"
@@ -214,6 +233,7 @@ export default function ReportsPage() {
               ↓ Export CSV
             </button>
           )}
+          <PrintReportButton disabled={!data} />
           <Link href="/reports/response-times" className="tu-btn-secondary">
             Response times
           </Link>
@@ -226,14 +246,7 @@ export default function ReportsPage() {
           {showPmExport && (
             <PmExportDialog
               onClose={() => setShowPmExport(false)}
-              // Follows the page's account filter: none selected means every site.
-              scope={
-                selectedAccounts.size === 0
-                  ? "All sites"
-                  : selectedAccounts.size === 1
-                    ? allAccounts.find((a) => selectedAccounts.has(a.id))?.name ?? "1 site"
-                    : `${selectedAccounts.size} sites`
-              }
+              scope={scopeLabel}
               accountIds={Array.from(selectedAccounts)}
             />
           )}
@@ -264,7 +277,7 @@ export default function ReportsPage() {
       <div className="tu-kpi-grid" style={{ marginBottom: 24 }}>
         <div className="tu-stat-card">
           <p className="tu-stat-label">Work Orders Created</p>
-          <p className="tu-stat-value">{loading ? "—" : totalWOs}</p>
+          <p className="tu-stat-value">{loading ? <span className="tu-skeleton tu-stat-skel" aria-label="Loading" /> : totalWOs}</p>
           <p className="tu-stat-sub">
             {loading ? " " : `${completedWOs} completed · ${data?.workOrders.IN_PROGRESS ?? 0} in progress`}
           </p>
@@ -272,13 +285,13 @@ export default function ReportsPage() {
         <div className="tu-stat-card">
           <p className="tu-stat-label">Overdue</p>
           <p className={`tu-stat-value${(data?.overdueWorkOrders ?? 0) > 0 ? " tu-stat-danger" : ""}`}>
-            {loading ? "—" : data?.overdueWorkOrders ?? 0}
+            {loading ? <span className="tu-skeleton tu-stat-skel" aria-label="Loading" /> : data?.overdueWorkOrders ?? 0}
           </p>
           <p className="tu-stat-sub">work orders past due</p>
         </div>
         <div className="tu-stat-card">
           <p className="tu-stat-label">Assets</p>
-          <p className="tu-stat-value">{loading ? "—" : totalAssets}</p>
+          <p className="tu-stat-value">{loading ? <span className="tu-skeleton tu-stat-skel" aria-label="Loading" /> : totalAssets}</p>
           <p className="tu-stat-sub">
             {loading ? " " : `${data?.poorHealthAssets ?? 0} need attention`}
           </p>
@@ -286,7 +299,7 @@ export default function ReportsPage() {
         <div className="tu-stat-card">
           <p className="tu-stat-label">PM Checklists</p>
           <p className={`tu-stat-value${data && data.checklists.completed < data.checklists.total ? " tu-stat-warning" : ""}`}>
-            {loading ? "—" : `${data?.checklists.completed ?? 0}/${data?.checklists.total ?? 0}`}
+            {loading ? <span className="tu-skeleton tu-stat-skel" aria-label="Loading" /> : `${data?.checklists.completed ?? 0}/${data?.checklists.total ?? 0}`}
           </p>
           <p className="tu-stat-sub">completed {PERIOD_LABELS[period].toLowerCase()}</p>
         </div>
@@ -296,9 +309,9 @@ export default function ReportsPage() {
       <div className="tu-card">
         <div className="tu-card-header">
           <h2 className="tu-card-title">Per-Account Breakdown</h2>
-          <span className="tu-result-count">Click a row for the full account report</span>
+          <span className="tu-result-count tu-no-print">Click a row for the full account report</span>
         </div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table tu-table-interactive" aria-label="Per-account report">
             <thead>
               <tr>
@@ -308,7 +321,7 @@ export default function ReportsPage() {
                 <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
                 <th scope="col" style={{ minWidth: 160 }}>Checklists</th>
                 <th scope="col" style={{ minWidth: 160 }}>Attendance</th>
-                <th scope="col" style={{ width: 110 }}></th>
+                <th scope="col" className="tu-no-print" style={{ width: 110 }}></th>
               </tr>
             </thead>
             <tbody>
@@ -372,7 +385,7 @@ export default function ReportsPage() {
                           <span className="tu-figure-zero" style={{ fontSize: 12 }}>No shifts logged</span>
                         )}
                       </td>
-                      <td>
+                      <td className="tu-no-print">
                         <Link
                           href={`/accounts/${acc.id}/reports`}
                           className="tu-row-link tu-row-link-brand"
@@ -404,23 +417,18 @@ export default function ReportsPage() {
             <span className="tu-result-count">{totalWOs} total</span>
           </div>
           <div className="tu-card-body">
-            <div className="tu-segbar tu-segbar-lg" role="img" aria-label={STATUS_SERIES.map(({ label, key }) => `${label}: ${wo?.[key as keyof typeof wo] ?? 0}`).join(", ")}>
-              {STATUS_SERIES.map(({ label, key, token }) => {
-                const count = wo?.[key as keyof typeof wo] ?? 0;
-                if (count === 0) return null;
-                return (
-                  <span
-                    key={key}
-                    style={{ width: `${(count / totalWOs) * 100}%`, background: token }}
-                    title={`${label}: ${count} (${pct(count, totalWOs)}%)`}
-                  />
-                );
-              })}
-            </div>
+            {/* The dashboard's pipeline chart: labelled, keyboard-reachable
+                segments and a table view, rather than a private copy of the bar. */}
+            {totalWOs > 0 && (
+              <StackedBar
+                ariaLabel="Work order status distribution"
+                segments={STATUS_SERIES.map(({ key, label, token }) => ({ key, label, value: wo?.[key] ?? 0, color: token }))}
+              />
+            )}
 
             <ul className="tu-legend tu-legend-grid">
               {STATUS_SERIES.map(({ label, key, token }) => {
-                const count = wo?.[key as keyof typeof wo] ?? 0;
+                const count = wo?.[key] ?? 0;
                 const share = pct(count, totalWOs);
                 return (
                   <li key={key}>

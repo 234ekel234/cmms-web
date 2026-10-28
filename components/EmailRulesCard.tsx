@@ -113,7 +113,7 @@ export default function EmailRulesCard() {
         </div>
       </div>
 
-      <div style={{ padding: "0 24px 24px" }}>
+      <div className="tu-card-pad">
         <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 4 }}>
           Applies to the whole company. Turning an email off here stops it for everybody; each
           person can still turn off their own above. The app notifications are not affected.

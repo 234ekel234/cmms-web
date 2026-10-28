@@ -73,6 +73,8 @@ export default function AssetsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  // Captured once, so "days since service" does not shift between re-renders.
+  const [nowMs] = useState(() => Date.now());
   const [sortKey, setSortKey] = useState<"name" | "condition">("name");
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...BLANK_FORM });
@@ -215,7 +217,7 @@ export default function AssetsPage() {
   });
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assets</h2>
         {writable && (
@@ -533,7 +535,7 @@ export default function AssetsPage() {
                 const hCfg = { label: ASSET_HEALTH[asset.health].label, cls: ASSET_HEALTH_CLS[asset.health] };
                 const isArchived = !!asset.archivedAt;
                 const daysSince = asset.lastCompletedAt
-                  ? Math.floor((Date.now() - new Date(asset.lastCompletedAt).getTime()) / 86_400_000)
+                  ? Math.floor((nowMs - new Date(asset.lastCompletedAt).getTime()) / 86_400_000)
                   : null;
                 return (
                   <tr key={asset.id} className={`hover:bg-[var(--tu-bg-secondary)] transition-colors ${isArchived ? "opacity-60" : ""}`}>

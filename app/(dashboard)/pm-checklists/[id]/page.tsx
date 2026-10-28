@@ -8,6 +8,7 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
+import { startLoad } from "@/lib/startLoad";
 
 type PMItem = { id?: string; label: string };
 type PMSection = { id?: string; title: string; answerOptions: string[]; items: PMItem[] };
@@ -48,9 +49,7 @@ export default function EditChecklistPage() {
   const confirm = useConfirm();
   useUnsavedChanges(dirty, "Your changes to this template since the last save will be lost.");
 
-  useEffect(() => { fetchChecklist(); }, [id]);
-
-  async function fetchChecklist() {
+  const fetchChecklist = useCallback(async () => {
     try {
       const res = await api.get(`/pm-checklists/${id}`);
       const data = res.data;
@@ -70,7 +69,9 @@ export default function EditChecklistPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
+
+  useEffect(() => startLoad(fetchChecklist), [fetchChecklist]);
 
   // --- Section mutations ---
   const addSection = useCallback(() => {
@@ -216,14 +217,14 @@ export default function EditChecklistPage() {
 
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center min-h-64">
+      <div className="px-4 py-5 sm:p-8 flex items-center justify-center min-h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-2 border-[var(--tu-text-brand)] border-t-transparent" />
       </div>
     );
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto pb-32">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto pb-32">
       {/* Header */}
       <Breadcrumbs
         items={[

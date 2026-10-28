@@ -180,8 +180,8 @@ export default function TrainingsPage() {
           <div className="tu-card-header">
             <h2 className="tu-card-title">{editId ? "Edit Training" : "New Training Module"}</h2>
           </div>
-          <div style={{ padding: "0 24px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-            <div style={{ gridColumn: "span 2" }}>
+          <div className="tu-card-pad tu-form-grid">
+            <div className="tu-span-2">
               <label className="tu-label">Title *</label>
               <input
                 className="tu-input"
@@ -212,7 +212,7 @@ export default function TrainingsPage() {
                 placeholder="e.g. 2"
               />
             </div>
-            <div style={{ gridColumn: "span 2" }}>
+            <div className="tu-span-2">
               <label className="tu-label">Description</label>
               <textarea
                 className="tu-input"
@@ -223,11 +223,11 @@ export default function TrainingsPage() {
               />
             </div>
             {formError && (
-              <div style={{ gridColumn: "span 2" }}>
+              <div className="tu-span-2">
                 <p style={{ color: "#C70036", fontSize: 13 }}>{formError}</p>
               </div>
             )}
-            <div style={{ gridColumn: "span 2", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <div className="tu-span-2 tu-form-actions">
               <button type="button" onClick={() => setShowForm(false)} className="tu-btn-secondary">
                 Cancel
               </button>
@@ -318,7 +318,7 @@ export default function TrainingsPage() {
                   {cat}
                 </p>
                 <div className="tu-card">
-                  <div style={{ overflowX: "auto" }}>
+                  <div className="tu-scroll-x">
                     <table className="tu-table" aria-label={`${cat} trainings`}>
                       <thead>
                         <tr>

@@ -84,7 +84,7 @@ export default function AssignChecklistPage() {
     : 0;
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="px-4 py-5 sm:p-8 max-w-4xl">
       {/* Header */}
       <div className="flex items-center gap-3 mb-6">
         <Link

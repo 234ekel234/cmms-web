@@ -87,8 +87,8 @@ export default function SignedInDevices({ refreshKey }: { refreshKey?: unknown }
   const others = sessions?.filter((s) => !s.current).length ?? 0;
 
   return (
-    <div style={{ padding: "0 24px 24px" }}>
-      <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+    <div className="tu-card-pad">
+      <p className="tu-card-intro">
         Signing a device out ends it straight away. Devices unused for 30 days sign out on their own.
       </p>
       {error && <p className="tu-danger-text" role="alert" style={{ fontSize: 13, marginBottom: 12 }}>{error}</p>}

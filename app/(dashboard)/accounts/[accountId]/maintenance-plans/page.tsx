@@ -19,6 +19,7 @@ import {
   type Frequency,
   type MaintenancePlan,
 } from "@/lib/maintenancePlans";
+import { startLoad } from "@/lib/startLoad";
 
 type Asset = { id: string; name: string };
 type Employee = { id: string; name: string; position: string | null };
@@ -72,7 +73,7 @@ export default function MaintenancePlansPage() {
     }
   }, [accountId]);
 
-  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+  useEffect(() => startLoad(fetchPlans), [fetchPlans]);
 
   // Only needed once the form opens, so they are not fetched on page load.
   useEffect(() => {
@@ -157,8 +158,8 @@ export default function MaintenancePlansPage() {
   const labelCls = "block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1";
 
   return (
-    <div className="p-8">
-      <div className="flex items-start justify-between mb-2 gap-4">
+    <div className="px-4 py-5 sm:p-8">
+      <div className="flex items-start justify-between mb-2 gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Maintenance Plans</h2>
           <p className="text-xs text-[var(--tu-text-subtle)] mt-1 max-w-2xl">

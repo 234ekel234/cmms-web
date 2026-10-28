@@ -16,6 +16,7 @@ import {
   type PartTransactionType,
 } from "@/lib/parts";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { startLoad } from "@/lib/startLoad";
 
 type PartDetail = Part & {
   assets: { id: string; asset: { id: string; name: string; category: string } }[];
@@ -74,7 +75,7 @@ export default function PartDetailPage() {
     }
   }, [accountId, partId]);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
+  useEffect(() => startLoad(fetchAll), [fetchAll]);
 
   function openMovement(type: PartTransactionType) {
     setMoveType(type);
@@ -188,7 +189,7 @@ export default function PartDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-3xl mx-auto">
+      <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
         <div className="h-8 w-48 bg-[var(--tu-bg-secondary-strong)] rounded animate-pulse mb-6" />
         <div className="h-64 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
       </div>
@@ -197,7 +198,7 @@ export default function PartDetailPage() {
 
   if (error || !part) {
     return (
-      <div className="p-8">
+      <div className="px-4 py-5 sm:p-8">
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load part.{" "}
           <button onClick={fetchAll} className="underline cursor-pointer">Try again</button>
@@ -210,7 +211,7 @@ export default function PartDetailPage() {
   const negative = part.quantityOnHand < 0;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <Breadcrumbs
         items={[
           { label: "Spare Parts", href: `/accounts/${accountId}/parts` },

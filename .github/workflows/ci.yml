@@ -2,9 +2,8 @@
 # `next build` Vercel runs, so a commit that would fail to deploy fails here
 # first, with the error in front of whoever pushed it.
 #
-# Lint runs but does not fail the job yet: ~31 react-hooks errors predate CI
-# (ROADMAP.md, Phase 6c). Make it blocking — delete `continue-on-error` — once
-# that backlog is cleared, so new ones cannot join it.
+# Lint is blocking: the react-hooks backlog that predated CI was cleared on
+# 27 Oct 2026, so a new error fails the job rather than joining a pile.
 name: CI
 
 on:
@@ -36,9 +35,8 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
-      - name: Lint (not yet blocking)
+      - name: Lint
         run: npm run lint
-        continue-on-error: true
 
       - name: Build
         run: npm run build

@@ -21,5 +21,5 @@ export default function AccountRootPage() {
     router.replace(`/accounts/${accountId}/${dest}`);
   }, [user, accountId, router]);
 
-  return <div className="p-8 text-sm text-[var(--tu-text-subtle)]">Loading…</div>;
+  return <div className="px-4 py-5 sm:p-8 text-sm text-[var(--tu-text-subtle)]">Loading…</div>;
 }

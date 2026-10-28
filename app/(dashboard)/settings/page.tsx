@@ -43,19 +43,16 @@ export default function SettingsPage() {
   const [savedPrefs, setSavedPrefs] = useState(false);
   const [pwChanged, setPwChanged] = useState(false);
 
-  useEffect(() => { fetchPrefs(); }, []);
-
-  async function fetchPrefs() {
-    setLoadingPrefs(true);
-    try {
-      const res = await api.get("/me/notification-preferences");
-      setPrefs(res.data);
-    } catch {
-      // silent
-    } finally {
-      setLoadingPrefs(false);
-    }
-  }
+  // `loadingPrefs` starts true, so the load sets nothing before it has an answer.
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get("/me/notification-preferences")
+      .then((res) => { if (!cancelled) setPrefs(res.data); })
+      .catch(() => { /* the page still works without them */ })
+      .finally(() => { if (!cancelled) setLoadingPrefs(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   function togglePref(action: string, channel: Channel) {
     setPrefs((prev) =>
@@ -111,7 +108,7 @@ export default function SettingsPage() {
         <div className="tu-card-header">
           <h2 className="tu-card-title">Profile</h2>
         </div>
-        <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div className="tu-card-pad" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div
               style={{
@@ -159,8 +156,8 @@ export default function SettingsPage() {
         <div className="tu-card-header">
           <h2 className="tu-card-title">Password</h2>
         </div>
-        <div style={{ padding: "0 24px 24px" }}>
-          <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+        <div className="tu-card-pad">
+          <p className="tu-card-intro">
             Changing it signs you out on every other device.
           </p>
           {pwChanged && (
@@ -185,8 +182,8 @@ export default function SettingsPage() {
         <div className="tu-card-header">
           <h2 className="tu-card-title">Appearance</h2>
         </div>
-        <div style={{ padding: "0 24px 24px" }}>
-          <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+        <div className="tu-card-pad">
+          <p className="tu-card-intro">
             Choose how the interface looks on this browser. The setting is stored locally,
             so each device can differ.
           </p>
@@ -214,8 +211,8 @@ export default function SettingsPage() {
             </button>
           </div>
         </div>
-        <div style={{ padding: "0 24px 24px" }}>
-          <p style={{ fontSize: 14, color: "var(--tu-text-body)", marginBottom: 16 }}>
+        <div className="tu-card-pad">
+          <p className="tu-card-intro">
             Choose which events send you push and in-app notifications.
           </p>
           {loadingPrefs ? (

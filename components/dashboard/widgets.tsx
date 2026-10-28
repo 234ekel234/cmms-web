@@ -153,7 +153,9 @@ function StatCard({ def, loading }: { def: KpiDef; loading: boolean }) {
         <span className="tu-stat-ico">{def.icon}</span>
       </div>
       <p className={`tu-stat-value${def.valueClass ? " " + def.valueClass : ""}`} aria-live="polite">
-        {def.value}
+        {/* A skeleton, not "—": the dash already means "nothing recorded"
+            (no shifts logged, no ratings), and loading must not read as that. */}
+        {loading ? <span className="tu-skeleton tu-stat-skel" aria-label="Loading" /> : def.value}
       </p>
       <p className="tu-stat-sub">{def.sub}</p>
       {def.href && !loading && def.cta && (
@@ -646,7 +648,7 @@ function AccountSummary({ model: m, columns }: { model: DashboardModel; columns:
           <h2 id="accounts-heading" className="tu-card-title">Account Summary</h2>
           <span className="tu-chart-cap">{loading ? "" : `${data?.accounts.length ?? 0} accounts`}</span>
         </div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table tu-table-interactive" aria-label="Account metrics">
             <thead>
               <tr>

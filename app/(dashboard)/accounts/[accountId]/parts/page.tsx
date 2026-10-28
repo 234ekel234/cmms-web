@@ -80,7 +80,7 @@ export default function PartsPage() {
   const labelCls = "block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1";
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Spare Parts</h2>

@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { workOrderRef } from "@/lib/workOrders";
 import { WORK_ORDER_PRIORITY, WORK_ORDER_STATUS, type WorkOrderPriority, type WorkOrderStatus } from "@/lib/statuses";
 import { formatMinutes } from "@/lib/durations";
+import { PrintReportButton, PrintReportHeader, dateRangeLabel, siteScope } from "@/components/ReportPrint";
 
 /**
  * How quickly work is answered: from raised to accepted, started and
@@ -98,22 +99,33 @@ export default function ResponseTimesPage() {
   }, [query]);
 
   const t = data?.totals;
+  const shown = rangeDates(range);
 
   return (
     <div className="tu-page">
-      <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Response times" }]} />
+      <PrintReportHeader
+        title="Response times"
+        scope={siteScope(selected, accounts)}
+        period={dateRangeLabel(shown.from, shown.to)}
+      />
+      <div className="tu-no-print">
+        <Breadcrumbs items={[{ label: "Reports", href: "/reports" }, { label: "Response times" }]} />
+      </div>
 
       <div className="tu-page-header">
         <div>
-          <h1 className="tu-page-title">Response times</h1>
+          <h1 className="tu-page-title tu-no-print">Response times</h1>
           <p className="tu-page-sub">
             How long jobs raised in the period took to be accepted, started and completed. Typical (median) time,
             and the time 90% of jobs were within. Maintenance-plan work is not counted — it runs to its schedule.
           </p>
         </div>
+        <div className="tu-no-print">
+          <PrintReportButton disabled={!data} />
+        </div>
       </div>
 
-      <div className="tu-toolbar" style={{ flexWrap: "wrap", gap: 12 }}>
+      <div className="tu-toolbar tu-no-print" style={{ flexWrap: "wrap", gap: 12 }}>
         <div className="tu-chip-row" role="group" aria-label="Period">
           {RANGES.map((r) => (
             <button key={r.key} type="button" className="tu-chip-toggle" aria-pressed={range === r.key} onClick={() => setRange(r.key)}>
@@ -147,7 +159,7 @@ export default function ResponseTimesPage() {
 
               <section className="tu-card" style={{ marginBottom: 24 }}>
                 <div className="tu-card-header"><h2 className="tu-card-title">By priority</h2></div>
-                <div style={{ overflowX: "auto" }}>
+                <div className="tu-scroll-x">
                   <table className="tu-table">
                     <thead>
                       <tr>
@@ -175,7 +187,7 @@ export default function ResponseTimesPage() {
 
               <section className="tu-card" style={{ marginBottom: 24 }}>
                 <div className="tu-card-header"><h2 className="tu-card-title">By site</h2></div>
-                <div style={{ overflowX: "auto" }}>
+                <div className="tu-scroll-x">
                   <table className="tu-table">
                     <thead>
                       <tr>

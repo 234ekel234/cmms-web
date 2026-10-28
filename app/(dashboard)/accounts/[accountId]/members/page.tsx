@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ActionError from "@/components/ActionError";
 import api, { errorMessage } from "@/lib/api";
@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { roleLabel, roleCls } from "@/lib/statuses";
 import { useConfirm } from "@/components/ConfirmDialog";
+import { startLoad } from "@/lib/startLoad";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -44,9 +45,7 @@ export default function MembersPage() {
 
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  useEffect(() => { fetchData(); }, [accountId]);
-
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     try {
       const [membersRes, usersRes] = await Promise.all([
         api.get(`/accounts/${accountId}/members`),
@@ -59,7 +58,9 @@ export default function MembersPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [accountId]);
+
+  useEffect(() => startLoad(fetchData), [fetchData]);
 
   const memberIds = new Set(members.map((m) => m.id));
   const filteredUsers = allUsers.filter(
@@ -101,7 +102,7 @@ export default function MembersPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-6">Members</h2>
 

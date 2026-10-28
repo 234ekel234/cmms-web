@@ -7,6 +7,7 @@ import api from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { isClosed } from "@/lib/workOrders";
 import type { WorkOrderStatus } from "@/lib/statuses";
+import { WO_STATUS } from "@/lib/dashboardModel";
 
 type WorkOrder = {
   id: string; status: WorkOrderStatus; priority: string;
@@ -20,19 +21,10 @@ type Activity = { id: string; description: string; performedByName: string | nul
 type ShiftTemplate = { id: string; name: string; startTime: string; endTime: string };
 type Account = { id: string; name: string; description: string | null; createdAt: string; shiftTemplates: ShiftTemplate[] };
 
-const WO_STATUS: { key: string; label: string; cls: string }[] = [
-  { key: "REQUESTED",   label: "Requested",   cls: "bg-[var(--tu-status-pending)]" },
-  { key: "PENDING",     label: "Accepted",    cls: "bg-[var(--tu-priority-medium)]" },
-  { key: "IN_PROGRESS", label: "In Progress", cls: "bg-[var(--tu-priority-high)]" },
-  { key: "ON_HOLD",     label: "On Hold",     cls: "bg-[var(--tu-status-on-hold)]" },
-  { key: "COMPLETED",   label: "Completed",   cls: "bg-[var(--tu-status-completed)]" },
-  { key: "REJECTED",    label: "Rejected",    cls: "bg-[var(--tu-priority-critical)]" },
-];
-
-const HEALTH: { key: string; label: string; cls: string }[] = [
-  { key: "FUNCTIONAL",               label: "Functional",     cls: "bg-[var(--tu-status-completed)]" },
-  { key: "FUNCTIONAL_WITH_FINDINGS", label: "With Findings",  cls: "bg-[var(--tu-priority-high)]" },
-  { key: "BREAKDOWN",                label: "Breakdown",      cls: "bg-[var(--tu-priority-critical)]" },
+const HEALTH: { key: string; label: string; color: string }[] = [
+  { key: "FUNCTIONAL",               label: "Functional",     color: "var(--tu-status-completed)" },
+  { key: "FUNCTIONAL_WITH_FINDINGS", label: "With Findings",  color: "var(--tu-priority-high)" },
+  { key: "BREAKDOWN",                label: "Breakdown",      color: "var(--tu-priority-critical)" },
 ];
 
 function getPeriodStart(frequency: string, now: number): number {
@@ -73,19 +65,19 @@ function StatTile({ label, value, sub, href, accent }: { label: string; value: s
 }
 
 // Compact segmented bar with a labelled legend for a categorical breakdown.
-function Breakdown({ segments, total }: { segments: { label: string; count: number; cls: string }[]; total: number }) {
+function Breakdown({ segments, total }: { segments: { label: string; count: number; color: string }[]; total: number }) {
   const present = segments.filter((s) => s.count > 0);
   return (
     <div>
       <div className="flex h-2.5 rounded-full overflow-hidden bg-[var(--tu-bg-secondary-strong)] mb-3">
         {present.map((s) => (
-          <div key={s.label} className={s.cls} style={{ width: `${(s.count / total) * 100}%` }} title={`${s.label}: ${s.count}`} />
+          <div key={s.label} style={{ width: `${(s.count / total) * 100}%`, background: s.color }} title={`${s.label}: ${s.count}`} />
         ))}
       </div>
       <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5">
         {segments.map((s) => (
           <li key={s.label} className="flex items-center gap-2 text-xs">
-            <span className={`w-2.5 h-2.5 rounded-sm ${s.cls}`} aria-hidden="true" />
+            <span className="w-2.5 h-2.5 rounded-sm" style={{ background: s.color }} aria-hidden="true" />
             <span className="text-[var(--tu-text-subtle)] flex-1">{s.label}</span>
             <span className="font-semibold text-[var(--tu-text-heading)] tabular-nums">{s.count}</span>
           </li>
@@ -136,11 +128,11 @@ export default function AccountOverviewPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [accountId]);
+  }, [base]);
 
   if (loading) {
     return (
-      <div className="p-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="px-4 py-5 sm:p-8 grid grid-cols-2 lg:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map((i) => <div key={i} className="h-24 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
       </div>
     );
@@ -153,14 +145,16 @@ export default function AccountOverviewPage() {
   const openWO = workOrders.filter(isOpen);
   const overdue = openWO.filter((w) => w.dueDate && new Date(w.dueDate).getTime() < now);
   const specialProjects = workOrders.filter((w) => w.isSpecialProject).length;
-  const woSegments = WO_STATUS.map((s) => ({ label: s.label, count: workOrders.filter((w) => w.status === s.key).length, cls: s.cls }));
+  // Every status from the shared series, in its colour — this page once kept its
+  // own list, which had no APPROVED, so the legend summed short of the total.
+  const woSegments = WO_STATUS.map((s) => ({ label: s.label, count: workOrders.filter((w) => w.status === s.key).length, color: s.color }));
 
   // Assets
   const activeAssets = assets.filter((a) => !a.archivedAt);
   // Counted from health, not status: status is free text, so "how many are
   // down" can only be answered by the field that still has a fixed meaning.
   const downNow = activeAssets.filter((a) => a.health === "BREAKDOWN").length;
-  const healthSegments = HEALTH.map((h) => ({ label: h.label, count: activeAssets.filter((a) => a.health === h.key).length, cls: h.cls }));
+  const healthSegments = HEALTH.map((h) => ({ label: h.label, count: activeAssets.filter((a) => a.health === h.key).length, color: h.color }));
 
   // Employees
   const occupied = employees.filter((e) => e.occupied).length;
@@ -171,7 +165,7 @@ export default function AccountOverviewPage() {
   const pmPct = pm.length > 0 ? Math.round((pmCounts.done / pm.length) * 100) : 0;
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="px-4 py-5 sm:p-8 space-y-6">
       {/* Stat tiles */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile label="Open Work Orders" value={String(openWO.length)} sub={overdue.length > 0 ? `${overdue.length} overdue` : "none overdue"} href={`${base}/work-orders`} accent={openWO.length > 0 ? "text-[var(--tu-text-brand)]" : undefined} />

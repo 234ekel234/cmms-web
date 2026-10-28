@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { isClosed, isDone, workOrderRef } from "@/lib/workOrders";
-import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, type WorkOrderStatus } from "@/lib/statuses";
+import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
@@ -80,20 +80,6 @@ type PMChecklistAssignment = {
   logs: PMLogLite[];
 };
 
-const WO_STATUS_CLS: Record<string, string> = {
-  REQUESTED:   "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]",
-  PENDING:     "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
-  IN_PROGRESS: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
-  ON_HOLD:     "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]",
-  COMPLETED:   "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
-  REJECTED:    "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]",
-};
-
-const WO_STATUS_LABELS: Record<string, string> = {
-  REQUESTED: "Requested", PENDING: "Accepted", IN_PROGRESS: "In Progress",
-  ON_HOLD: "On Hold", COMPLETED: "Completed", REJECTED: "Rejected",
-};
-
 const PRIORITY_CONFIG: Record<string, { label: string; cls: string }> = {
   LOW:      { label: "Low",      cls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]" },
   MEDIUM:   { label: "Medium",   cls: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]" },
@@ -132,8 +118,10 @@ function WorkOrderRow({ wo }: { wo: WorkOrder }) {
           {dateLabel} · {assignees.length > 0 ? assignees.join(", ") : "Unassigned"}
         </p>
       </div>
-      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${WO_STATUS_CLS[wo.status] ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]"}`}>
-        {WO_STATUS_LABELS[wo.status] ?? wo.status}
+      {/* The shared stage pill — a private copy here had no APPROVED, so a
+          signed-off job showed its raw status name. */}
+      <span className={`shrink-0 ${WORK_ORDER_STATUS[wo.status as WorkOrderStatus]?.badge ?? "tu-badge"}`}>
+        {WORK_ORDER_STATUS[wo.status as WorkOrderStatus]?.label ?? wo.status}
       </span>
     </Link>
   );
@@ -403,7 +391,7 @@ export default function AssetDetailPage() {
 
   if (loading) {
     return (
-      <div className="p-8 max-w-3xl mx-auto">
+      <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
         <div className="h-8 w-48 bg-[var(--tu-bg-secondary-strong)] rounded animate-pulse mb-6" />
         <div className="h-64 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
       </div>
@@ -412,7 +400,7 @@ export default function AssetDetailPage() {
 
   if (error || !asset) {
     return (
-      <div className="p-8">
+      <div className="px-4 py-5 sm:p-8">
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load asset.{" "}
           <button onClick={() => setReloadKey((k) => k + 1)} className="underline cursor-pointer">Try again</button>
@@ -433,7 +421,7 @@ export default function AssetDetailPage() {
     .sort((a, b) => new Date(b).getTime() - new Date(a).getTime())[0] ?? null;
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <Breadcrumbs
         items={[
           { label: "Assets", href: `/accounts/${accountId}/assets` },

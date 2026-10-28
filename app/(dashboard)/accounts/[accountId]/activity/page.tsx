@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
+import { startLoad } from "@/lib/startLoad";
 import EmptyState from "@/components/EmptyState";
 
 type AuditLog = {
@@ -117,11 +118,7 @@ export default function ActivityPage() {
   // Guarded like the other twelve fetches in this change set — this one was
   // missed. Switching accounts re-runs it, and a slow first response landing
   // after the second would overwrite the list with the previous account's trail.
-  useEffect(() => {
-    let cancelled = false;
-    loadInitial(() => cancelled);
-    return () => { cancelled = true; };
-  }, [loadInitial]);
+  useEffect(() => startLoad(loadInitial), [loadInitial]);
 
   async function loadMore() {
     if (!cursor || loadingMore) return;
@@ -145,7 +142,7 @@ export default function ActivityPage() {
   const groups = groupByDate(filteredLogs);
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-4">Activity Log</h2>
 
       {/* Filter chips */}

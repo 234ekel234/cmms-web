@@ -134,7 +134,7 @@ export default function NotificationsPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       <div className="flex items-center justify-between mb-6">
         <div>

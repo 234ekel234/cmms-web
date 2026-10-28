@@ -230,7 +230,7 @@ export default function UsersPage() {
           <div className="tu-card-header">
             <h2 className="tu-card-title">{editingId ? "Edit User" : "New User"}</h2>
           </div>
-          <div style={{ padding: "0 24px 24px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+          <div className="tu-card-pad tu-form-grid">
             <div>
               <label className="tu-label">Name *</label>
               <input
@@ -285,11 +285,11 @@ export default function UsersPage() {
               </p>
             </div>
             {formError && (
-              <div style={{ gridColumn: "span 2" }}>
+              <div className="tu-span-2">
                 <p style={{ color: "#C70036", fontSize: 13 }}>{formError}</p>
               </div>
             )}
-            <div style={{ gridColumn: "span 2", display: "flex", gap: 12, justifyContent: "flex-end" }}>
+            <div className="tu-span-2 tu-form-actions">
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
@@ -345,7 +345,7 @@ export default function UsersPage() {
 
       {/* Table */}
       <div className="tu-card">
-        <div style={{ overflowX: "auto" }}>
+        <div className="tu-scroll-x">
           <table className="tu-table" aria-label="Users">
             <thead>
               <tr>

@@ -18,14 +18,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
 
+  // The session lives in localStorage, which the server render cannot read, so
+  // it is picked up after mount — from a microtask, so the effect body itself
+  // never sets state.
   useEffect(() => {
     const u = getUser();
     if (!u) {
       router.replace("/login");
     } else {
-      setUser(u);
+      queueMicrotask(() => setUser(u));
     }
-  }, []);
+  }, [router]);
 
   // Route-level RBAC: bounce users away from pages their role can't reach,
   // including via direct URL navigation. Re-runs on every path change.

@@ -9,6 +9,7 @@ import RowMenu from "@/components/RowMenu";
 import EmptyState from "@/components/EmptyState";
 import { NEEDS_ATTENTION_LABEL, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { isClosed } from "@/lib/workOrders";
+import { startLoad } from "@/lib/startLoad";
 
 type Account = {
   id: string;
@@ -128,10 +129,10 @@ export default function AccountsPage() {
   }
 
   // Declared after both loaders so neither is referenced before initialisation.
-  useEffect(() => {
+  useEffect(() => startLoad(() => {
     fetchAccounts();
     loadStats();
-  }, []);
+  }), []);
 
   function updateShift(index: number, field: keyof ShiftInput, value: string) {
     setShifts((prev) => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)));
@@ -384,7 +385,7 @@ export default function AccountsPage() {
             hint={`Nothing matches “${query}”. Try a shorter search.`}
           />
         ) : (
-          <div style={{ overflowX: "auto" }}>
+          <div className="tu-scroll-x">
             <table className="tu-table tu-table-interactive">
               <thead>
                 <tr>

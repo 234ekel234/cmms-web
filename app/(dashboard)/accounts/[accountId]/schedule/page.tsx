@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import ActionError from "@/components/ActionError";
 import api, { errorMessage } from "@/lib/api";
 import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { canManage } from "@/lib/rbac";
+import { startLoad } from "@/lib/startLoad";
 
 type ShiftTemplate = {
   id: string;
@@ -122,20 +123,7 @@ export default function SchedulePage() {
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const todayStr = toDateString(new Date());
 
-  useEffect(() => {
-    api.get(`/accounts/${accountId}/shift-templates`).then((r) => {
-      setShiftTemplates(r.data);
-      setTemplatesLoaded(true);
-    }).catch(() => setTemplatesLoaded(true));
-    api.get(`/accounts/${accountId}/employees`).then((r) => setEmployees(r.data)).catch(() => {});
-    fetchAvailability();
-  }, [accountId]);
-
-  useEffect(() => {
-    if (templatesLoaded) fetchData(weekStart);
-  }, [weekStart, templatesLoaded]);
-
-  async function fetchData(start: Date) {
+  const fetchData = useCallback(async (start: Date) => {
     setLoading(true);
     const startDate = toDateString(start);
     const endDate = toDateString(addDays(start, 6));
@@ -151,9 +139,9 @@ export default function SchedulePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [accountId]);
 
-  async function fetchAvailability() {
+  const fetchAvailability = useCallback(async () => {
     setAvailLoading(true);
     try {
       const res = await api.get(`/accounts/${accountId}/availability?date=${todayStr}`);
@@ -163,7 +151,22 @@ export default function SchedulePage() {
     } finally {
       setAvailLoading(false);
     }
-  }
+  }, [accountId, todayStr]);
+
+  useEffect(() => {
+    api.get(`/accounts/${accountId}/shift-templates`).then((r) => {
+      setShiftTemplates(r.data);
+      setTemplatesLoaded(true);
+    }).catch(() => setTemplatesLoaded(true));
+    api.get(`/accounts/${accountId}/employees`).then((r) => setEmployees(r.data)).catch(() => {});
+  }, [accountId]);
+
+  useEffect(() => startLoad(fetchAvailability), [fetchAvailability]);
+
+  useEffect(() => {
+    if (!templatesLoaded) return;
+    return startLoad(() => fetchData(weekStart));
+  }, [weekStart, templatesLoaded, fetchData]);
 
   function getSlotEntries(templateId: string, date: Date): ScheduleEntry[] {
     const ds = toDateString(date);
@@ -271,7 +274,7 @@ export default function SchedulePage() {
   const WEEKDAY_NAMES = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   return (
-    <div className="p-8">
+    <div className="px-4 py-5 sm:p-8">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
       {/* Today's Availability */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm mb-6">
