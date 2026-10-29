@@ -22,6 +22,13 @@ import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
  * The grid is 3 × 7 on A4 at 63.5 × 38.1 mm — Avery L7160 and its many
  * equivalents, the commonest laser label sheet — and prints with faint cut
  * lines for plain paper. The geometry lives in print.css under `@page labels`.
+ *
+ * Each tag reads in the order someone in a plant room needs it: whose tag it
+ * is (the letterhead strip), which machine (the asset code, largest, because
+ * it is what gets quoted over the radio), then the name, kind and where it
+ * sits, and finally what scanning does. The QR keeps a quiet zone of two
+ * modules: a code drawn hard against the label edge or the cut line is the one
+ * a phone camera struggles with.
  */
 
 const LABELS_PER_SHEET = 21;
@@ -76,7 +83,9 @@ function Labels() {
         a.id,
         "data:image/svg+xml;charset=utf-8," +
           encodeURIComponent(
-            await QRCode.toString(`${origin}/accounts/${accountId}/assets/${a.id}`, { type: "svg", margin: 0, errorCorrectionLevel: "M" })
+            await QRCode.toString(`${origin}/accounts/${accountId}/assets/${a.id}`, {
+              type: "svg", margin: 2, errorCorrectionLevel: "M", color: { dark: "#111111", light: "#ffffff" },
+            })
           ),
       ] as const)
     ).then((pairs) => { if (!cancelled) setQr(Object.fromEntries(pairs)); });
@@ -124,13 +133,25 @@ function Labels() {
           const where = locationPath(a.location);
           return (
             <div key={a.id} className="ps-label-card">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {qr[a.id] ? <img className="ps-label-qr" src={qr[a.id]} alt={`QR code for ${a.name}`} /> : <div className="ps-label-qr" />}
-              <div className="ps-label-text">
-                <div className="ps-label-name">{a.name}</div>
-                {a.assetCode && <div className="ps-label-code">{a.assetCode}</div>}
-                {where && <div className="ps-label-meta">{where}</div>}
-                <div className="ps-label-meta">{accountName}</div>
+              <div className="ps-tag">
+                <div className="ps-tag-head">
+                  {/* eslint-disable @next/next/no-img-element */}
+                  <img src="/fmi_logo_dark.png" alt="FMI" className="ps-tag-logo" />
+                  <img src="/logo_with_label_dark.png" alt="ServiceMaster" className="ps-tag-logo-sm" />
+                  {/* eslint-enable @next/next/no-img-element */}
+                  <span className="ps-tag-kicker">Asset tag</span>
+                </div>
+                <div className="ps-tag-body">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  {qr[a.id] ? <img className="ps-label-qr" src={qr[a.id]} alt={`QR code for ${a.name}`} /> : <div className="ps-label-qr" />}
+                  <div className="ps-label-text">
+                    {a.assetCode && <div className="ps-label-code">{a.assetCode}</div>}
+                    <div className={a.assetCode ? "ps-label-name" : "ps-label-name ps-label-name-lead"}>{a.name}</div>
+                    <div className="ps-label-meta">{[a.category, where].filter(Boolean).join(" · ")}</div>
+                    <div className="ps-label-meta ps-label-site">{accountName}</div>
+                  </div>
+                </div>
+                <div className="ps-tag-foot">Scan for history, or to report a fault</div>
               </div>
             </div>
           );

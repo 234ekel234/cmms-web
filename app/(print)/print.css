@@ -187,20 +187,82 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 .ps-label-card {
-  display: flex;
-  align-items: center;
-  gap: 3mm;
-  padding: 3mm;
+  padding: 1.6mm;
   overflow: hidden;
   break-inside: avoid;
   box-sizing: border-box;
 }
 .ps-labels-cut .ps-label-card { outline: 0.2mm dashed #bbb; outline-offset: -0.1mm; }
-.ps-label-qr { width: 28mm; height: 28mm; flex-shrink: 0; display: block; }
-.ps-label-text { min-width: 0; display: flex; flex-direction: column; gap: 0.6mm; }
-.ps-label-name { font-weight: 700; font-size: 9pt; line-height: 1.15; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.ps-label-code { font-size: 10pt; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: 0.02em; }
-.ps-label-meta { font-size: 6.5pt; color: #444; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The tag itself, inset from the label edge so a sheet fed slightly askew
+   still prints the frame whole. Colours are named outright (paper is white
+   whatever the screen theme) and taken from the FMI mark: navy #2C377D. */
+.ps-tag {
+  height: 100%;
+  box-sizing: border-box;
+  border: 0.3mm solid #2c377d;
+  border-radius: 1.6mm;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.ps-tag-head {
+  display: flex;
+  align-items: center;
+  gap: 1.4mm;
+  height: 5mm;
+  padding: 0 1.8mm;
+  border-bottom: 0.3mm solid #2c377d;
+  flex-shrink: 0;
+}
+.ps-tag-logo { height: 2.9mm; width: auto; display: block; }
+.ps-tag-logo-sm { height: 2.1mm; width: auto; display: block; }
+.ps-tag-kicker {
+  margin-left: auto;
+  font-size: 5.5pt;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #2c377d;
+}
+.ps-tag-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  gap: 1.6mm;
+  padding: 0 1.8mm 0 0.6mm;
+}
+.ps-label-qr { width: 22mm; height: 22mm; flex-shrink: 0; display: block; }
+.ps-label-text { min-width: 0; display: flex; flex-direction: column; gap: 0.5mm; }
+.ps-label-code {
+  font-size: 11.5pt;
+  font-weight: 800;
+  line-height: 1.05;
+  color: #2c377d;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ps-label-name { font-weight: 700; font-size: 7.5pt; line-height: 1.15; color: #111; overflow-wrap: anywhere; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* No asset code: the name leads in its place. */
+.ps-label-name-lead { font-size: 9.5pt; color: #2c377d; -webkit-line-clamp: 3; }
+.ps-label-meta { font-size: 6pt; color: #444; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ps-label-site { color: #777; }
+.ps-tag-foot {
+  flex-shrink: 0;
+  background: #2c377d;
+  color: #fff;
+  font-size: 5.5pt;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-align: center;
+  padding: 0.7mm 1mm;
+}
 
 .ps-screen { overflow-x: auto; }
 .ps-state { max-width: 210mm; margin: 64px auto; text-align: center; color: #333; }
