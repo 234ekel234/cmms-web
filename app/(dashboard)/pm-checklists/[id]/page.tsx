@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
 import { startLoad } from "@/lib/startLoad";
+import { CUSTOM_DAYS, MAX_INTERVAL_DAYS, MIN_INTERVAL_DAYS, intervalDaysError } from "@/lib/pmPeriod";
 
 type PMItem = { id?: string; label: string };
 type PMSection = { id?: string; title: string; answerOptions: string[]; items: PMItem[] };
@@ -18,8 +19,9 @@ const FREQUENCIES = [
   { value: "WEEKLY",        label: "Weekly" },
   { value: "MONTHLY",       label: "Monthly" },
   { value: "QUARTERLY",     label: "Quarterly" },
-  { value: "SEMI_ANNUALLY", label: "Semi-Annually" },
+  { value: "SEMI_ANNUALLY", label: "Semi-annually" },
   { value: "ANNUALLY",      label: "Annually" },
+  { value: CUSTOM_DAYS,     label: "Every N days…" },
 ];
 
 const DEFAULT_OPTIONS = ["OK", "NOT OK", "N/A"];
@@ -36,6 +38,7 @@ export default function EditChecklistPage() {
 
   const [name, setName] = useState("");
   const [frequency, setFrequency] = useState("MONTHLY");
+  const [intervalDays, setIntervalDays] = useState("30");
   const [sections, setSections] = useState<(PMSection & { _key: string })[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -56,6 +59,7 @@ export default function EditChecklistPage() {
       setName(data.name);
       setArchivedAt(data.archivedAt ?? null);
       setFrequency(data.frequency);
+      setIntervalDays(data.intervalDays ? String(data.intervalDays) : "30");
       setSections(
         (data.sections ?? []).map((s: PMSection) => ({
           ...s,
@@ -145,6 +149,8 @@ export default function EditChecklistPage() {
 
   async function handleSave() {
     if (!name.trim()) { setError("Name is required."); return; }
+    const intervalError = intervalDaysError(frequency, intervalDays);
+    if (intervalError) { setError(intervalError); return; }
     const emptySection = sections.find((s) => !s.title.trim());
     if (emptySection) { setError("All sections must have a title."); return; }
 
@@ -172,6 +178,7 @@ export default function EditChecklistPage() {
       const res = await api.put(`/pm-checklists/${id}`, {
         name: name.trim(),
         frequency,
+        ...(frequency === CUSTOM_DAYS ? { intervalDays: Number(intervalDays) } : {}),
         sections: sections.map((s) => ({
           id: s.id,
           title: s.title.trim(),
@@ -257,7 +264,7 @@ export default function EditChecklistPage() {
             <label className="block text-xs font-bold text-[var(--tu-text-subtle)] mb-1.5">Frequency</label>
             <select
               value={frequency}
-              onChange={(e) => setFrequency(e.target.value)}
+              onChange={(e) => { setFrequency(e.target.value); setDirty(true); }}
               disabled={!canEdit}
               className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 disabled:bg-[var(--tu-bg-secondary)]"
             >
@@ -265,6 +272,22 @@ export default function EditChecklistPage() {
                 <option key={f.value} value={f.value}>{f.label}</option>
               ))}
             </select>
+            {frequency === CUSTOM_DAYS && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-[var(--tu-text-subtle)]">Every</span>
+                <input
+                  type="number"
+                  min={MIN_INTERVAL_DAYS}
+                  max={MAX_INTERVAL_DAYS}
+                  value={intervalDays}
+                  onChange={(e) => { setIntervalDays(e.target.value); setDirty(true); }}
+                  disabled={!canEdit}
+                  aria-label="Repeat every how many days"
+                  className="w-20 border border-[var(--tu-border)] rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 disabled:bg-[var(--tu-bg-secondary)]"
+                />
+                <span className="text-xs text-[var(--tu-text-subtle)]">days, from each site&apos;s start date</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

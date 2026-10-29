@@ -7,11 +7,13 @@ import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
 import ArchivedList from "@/components/ArchivedList";
 import { FREQUENCIES, frequencyMeta } from "@/lib/maintenancePlans";
+import { CUSTOM_DAYS, MAX_INTERVAL_DAYS, MIN_INTERVAL_DAYS, intervalDaysError } from "@/lib/pmPeriod";
 
 type PMChecklist = {
   id: string;
   name: string;
   frequency: string;
+  intervalDays?: number | null;
   sections: { id: string; items: { id: string }[] }[];
 };
 
@@ -21,7 +23,7 @@ export default function PMChecklistsPage() {
   const [loading, setLoading] = useState(true);
   const [activeFreq, setActiveFreq] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", frequency: "MONTHLY" });
+  const [form, setForm] = useState({ name: "", frequency: "MONTHLY", intervalDays: "30" });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -46,17 +48,20 @@ export default function PMChecklistsPage() {
 
   async function createChecklist() {
     if (!form.name.trim()) { setFormError("Name is required."); return; }
+    const intervalError = intervalDaysError(form.frequency, form.intervalDays);
+    if (intervalError) { setFormError(intervalError); return; }
     setFormError("");
     setSaving(true);
     try {
       const res = await api.post("/pm-checklists", {
         name: form.name.trim(),
         frequency: form.frequency,
+        ...(form.frequency === CUSTOM_DAYS ? { intervalDays: Number(form.intervalDays) } : {}),
         sections: [],
       });
       setChecklists((prev) => [res.data, ...prev]);
       setShowForm(false);
-      setForm({ name: "", frequency: "MONTHLY" });
+      setForm({ name: "", frequency: "MONTHLY", intervalDays: "30" });
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
       setFormError(e?.response?.data?.error ?? "Failed to create checklist.");
@@ -143,8 +148,23 @@ export default function PMChecklistsPage() {
                 {FREQUENCIES.map((k) => (
                   <option key={k} value={k}>{frequencyMeta(k).label}</option>
                 ))}
+                <option value={CUSTOM_DAYS}>Every N days…</option>
               </select>
             </div>
+            {form.frequency === CUSTOM_DAYS && (
+              <div>
+                <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Repeat every (days)</label>
+                <input
+                  type="number"
+                  min={MIN_INTERVAL_DAYS}
+                  max={MAX_INTERVAL_DAYS}
+                  className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
+                  value={form.intervalDays}
+                  onChange={(e) => setForm((f) => ({ ...f, intervalDays: e.target.value }))}
+                />
+                <p className="text-xs text-[var(--tu-text-subtle)] mt-1">Counted from the date each site starts it.</p>
+              </div>
+            )}
           </div>
           {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
@@ -180,13 +200,13 @@ export default function PMChecklistsPage() {
           <EmptyState
             icon="search"
             title="No matching checklists"
-            hint={`No templates run on a ${activeFreq?.toLowerCase()} frequency.`}
+            hint={`No templates run on a ${frequencyMeta(activeFreq ?? "").label.toLowerCase()} frequency.`}
           />
         </div>
       ) : (
         <div className="space-y-3">
           {visible.map((c) => {
-            const freq = frequencyMeta(c.frequency);
+            const freq = frequencyMeta(c.frequency, c.intervalDays);
             const itemCount = c.sections.reduce((sum, s) => sum + s.items.length, 0);
             return (
               <Link
@@ -220,7 +240,7 @@ export default function PMChecklistsPage() {
         noun="archived templates"
         load={async () => (await api.get("/pm-checklists?archived=true")).data}
         title={(c) => c.name}
-        detail={(c) => frequencyMeta(c.frequency).label}
+        detail={(c) => frequencyMeta(c.frequency, c.intervalDays).label}
         restore={async (c) => { await api.post(`/pm-checklists/${c.id}/restore`); }}
         canRestore={canCreate}
         onRestored={() => setReloadKey((k) => k + 1)}

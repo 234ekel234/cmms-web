@@ -76,7 +76,7 @@ type PMLogLite = {
 type PMChecklistAssignment = {
   id: string;
   isActive: boolean;
-  checklist: { id: string; name: string; frequency: string };
+  checklist: { id: string; name: string; frequency: string; intervalDays?: number | null };
   logs: PMLogLite[];
 };
 
@@ -821,7 +821,7 @@ export default function AssetDetailPage() {
         ) : (
           <div className="divide-y divide-[var(--tu-border)]">
             {pmChecklists.map((pm) => {
-              const freq = frequencyMeta(pm.checklist.frequency);
+              const freq = frequencyMeta(pm.checklist.frequency, pm.checklist.intervalDays);
               const last = pm.logs[0];
               return (
                 <Link

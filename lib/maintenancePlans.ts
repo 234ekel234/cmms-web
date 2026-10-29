@@ -260,12 +260,17 @@ export const FREQUENCY_CLS: Record<string, string> = {
   QUARTERLY: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]",
   SEMI_ANNUALLY: "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)]",
   ANNUALLY: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
+  // A PM checklist's "every N days" (lib/pmPeriod.ts). Plans never carry it.
+  CUSTOM_DAYS: "bg-[var(--tu-soft-brand)] text-[var(--tu-on-brand)]",
 };
 
-/** Label + chip class together, tolerating a value the UI does not know. */
-export function frequencyMeta(f: string): { label: string; cls: string } {
+/**
+ * Label + chip class together, tolerating a value the UI does not know. Pass a
+ * PM checklist's `intervalDays` to have a custom interval read "Every 45 days".
+ */
+export function frequencyMeta(f: string, intervalDays?: number | null): { label: string; cls: string } {
   return {
-    label: FREQUENCY_LABEL[f as Frequency] ?? f,
+    label: f === "CUSTOM_DAYS" ? (intervalDays ? `Every ${intervalDays} days` : "Custom interval") : FREQUENCY_LABEL[f as Frequency] ?? f,
     cls: FREQUENCY_CLS[f] ?? "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)]",
   };
 }

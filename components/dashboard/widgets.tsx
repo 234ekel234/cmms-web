@@ -571,7 +571,7 @@ function PmByFrequency({ model: m }: { model: DashboardModel }) {
             const pct = f.total > 0 ? Math.round((f.completed / f.total) * 100) : 0;
             const done = f.completed >= f.total && f.total > 0;
             const color = done ? "var(--tu-status-completed)" : pct >= 50 ? "var(--tu-text-brand)" : "var(--tu-health-fair)";
-            const label = FREQUENCY_LABEL[f.frequency as Frequency] ?? f.frequency;
+            const label = f.frequency === "CUSTOM_DAYS" ? "Every N days" : FREQUENCY_LABEL[f.frequency as Frequency] ?? f.frequency;
             const accounts = f.accounts ?? [];
             const expandable = accounts.length > 1;
             const expanded = expandedFreq === f.frequency;

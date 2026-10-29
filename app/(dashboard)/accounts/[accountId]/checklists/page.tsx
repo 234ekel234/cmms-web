@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, canManage, hasRole } from "@/lib/rbac";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { CUSTOM_DAYS, getPeriodStart, pmSchedule, type PmSchedule } from "@/lib/pmPeriod";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ArchivedList from "@/components/ArchivedList";
 
@@ -21,28 +22,16 @@ type PMLog = {
 
 type Assignment = {
   id: string;
-  checklist: { id: string; name: string; frequency: string; sections: { items: unknown[] }[] };
+  checklist: { id: string; name: string; frequency: string; intervalDays?: number | null; sections: { items: unknown[] }[] };
   asset: { id: string; name: string } | null;
+  /** Where an "every N days" checklist's cycle starts on this site. */
+  startDate?: string;
   logs: PMLog[];
 };
 
-function getPeriodStart(frequency: string): Date {
-  const d = new Date();
-  const y = d.getFullYear(), m = d.getMonth();
-  switch (frequency) {
-    case "DAILY":        return new Date(Date.UTC(y, m, d.getDate()));
-    case "WEEKLY":       return new Date(Date.UTC(y, m, d.getDate() - d.getDay()));
-    case "MONTHLY":      return new Date(Date.UTC(y, m, 1));
-    case "QUARTERLY":    return new Date(Date.UTC(y, Math.floor(m / 3) * 3, 1));
-    case "SEMI_ANNUALLY": return new Date(Date.UTC(y, Math.floor(m / 6) * 6, 1));
-    case "ANNUALLY":     return new Date(Date.UTC(y, 0, 1));
-    default:             return new Date(Date.UTC(y, m, d.getDate()));
-  }
-}
-
-function getThisPeriodLog(logs: PMLog[], frequency: string): PMLog | null {
+function getThisPeriodLog(logs: PMLog[], schedule: PmSchedule): PMLog | null {
   if (!logs.length) return null;
-  const periodStart = getPeriodStart(frequency);
+  const periodStart = getPeriodStart(schedule);
   return logs.find((l) => new Date(l.scheduledDate) >= periodStart) ?? null;
 }
 
@@ -51,7 +40,7 @@ type ChecklistState = "completed" | "draft" | "unanswered";
 // This-period state of an assignment: finalized log = completed, a draft log =
 // draft, no log yet = unanswered.
 function statusOf(a: Assignment): ChecklistState {
-  const log = getThisPeriodLog(a.logs, a.checklist.frequency);
+  const log = getThisPeriodLog(a.logs, pmSchedule(a.checklist, a));
   if (log && !log.isDraft) return "completed";
   if (log) return "draft";
   return "unanswered";
@@ -82,6 +71,8 @@ function fmtDate(iso: string) {
 
 export default function ChecklistsPage() {
   const confirm = useConfirm();
+  // Captured once, for "starts later" — render must not read the clock.
+  const [nowMs] = useState(() => Date.now());
   const params = useParams();
   const accountId = params.accountId as string;
   const { user } = useAuth();
@@ -146,7 +137,9 @@ export default function ChecklistsPage() {
   const totalDone = byStatus.completed.length;
 
   function renderCard(a: Assignment) {
-    const freqCfg = frequencyMeta(a.checklist.frequency);
+    const freqCfg = frequencyMeta(a.checklist.frequency, a.checklist.intervalDays);
+    // An "every N days" checklist whose first round is still ahead.
+    const startsLater = a.checklist.frequency === CUSTOM_DAYS && !!a.startDate && new Date(a.startDate).getTime() > nowMs;
     const state = statusOf(a);
     const done = state === "completed";
     const isDraft = state === "draft";
@@ -178,6 +171,7 @@ export default function ChecklistsPage() {
               </span>
               <span className="text-xs text-[var(--tu-text-subtle)]">{itemCount} items</span>
               {lastLog && <span className="text-xs text-[var(--tu-text-subtle)]">Last: {fmtDate(lastLog.scheduledDate)}</span>}
+              {startsLater && <span className="text-xs text-[var(--tu-text-subtle)]">Starts {fmtDate(a.startDate as string)}</span>}
             </div>
           </div>
           <div className="flex items-start gap-2 shrink-0">

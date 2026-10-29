@@ -3,13 +3,15 @@
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import api from "@/lib/api";
+import api, { errorMessage } from "@/lib/api";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { CUSTOM_DAYS, getPeriodStartUTC, isBeforeStart, lastDayOfPeriod, pmSchedule, stepPeriod, type PmSchedule } from "@/lib/pmPeriod";
 import { pmControlNumber } from "@/lib/pmControlNumber";
 import { useUnsavedChanges } from "@/lib/useUnsavedChanges";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { startLoad } from "@/lib/startLoad";
 import { useAuth } from "@/context/AuthContext";
+import { canManage } from "@/lib/rbac";
 import { findingDraft, isPmFinding, raiseWorkOrderHref } from "@/lib/linkedWorkOrders";
 import { workOrderRef } from "@/lib/workOrders";
 import { workOrderStatusFor } from "@/lib/statuses";
@@ -34,43 +36,26 @@ type PMLog = {
 };
 type Assignment = {
   id: string;
-  checklist: { id: string; name: string; frequency: string; sections: PMSection[] };
+  checklist: { id: string; name: string; frequency: string; intervalDays?: number | null; sections: PMSection[] };
   asset: { id: string; name: string } | null;
+  /** Where an "every N days" checklist's cycle starts on this site. */
+  startDate?: string;
   logs: PMLog[];
 };
 type ItemState = { answer: string; remarks: string; answeredAt?: string; answeredByName?: string | null };
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-function getPeriodStart(date: Date, frequency: string): Date {
-  const y = date.getUTCFullYear(), m = date.getUTCMonth(), d = date.getUTCDate();
-  switch (frequency) {
-    case "DAILY":        return new Date(Date.UTC(y, m, d));
-    case "WEEKLY":       return new Date(Date.UTC(y, m, d - date.getUTCDay()));
-    case "MONTHLY":      return new Date(Date.UTC(y, m, 1));
-    case "QUARTERLY":    return new Date(Date.UTC(y, Math.floor(m / 3) * 3, 1));
-    case "SEMI_ANNUALLY":return new Date(Date.UTC(y, Math.floor(m / 6) * 6, 1));
-    case "ANNUALLY":     return new Date(Date.UTC(y, 0, 1));
-    default:             return new Date(Date.UTC(y, m, d));
-  }
-}
+// Periods come from lib/pmPeriod (the server's rule); `date` is a UTC label.
+const getPeriodStart = (date: Date, schedule: PmSchedule) => getPeriodStartUTC(schedule, date);
 
-function stepPeriod(date: Date, frequency: string, dir: 1 | -1): Date {
+function formatPeriod(date: Date, schedule: PmSchedule): string {
   const y = date.getUTCFullYear(), m = date.getUTCMonth(), d = date.getUTCDate();
-  switch (frequency) {
-    case "DAILY":        return new Date(Date.UTC(y, m, d + dir));
-    case "WEEKLY":       return new Date(Date.UTC(y, m, d + dir * 7));
-    case "MONTHLY":      return new Date(Date.UTC(y, m + dir, 1));
-    case "QUARTERLY":    return new Date(Date.UTC(y, m + dir * 3, 1));
-    case "SEMI_ANNUALLY":return new Date(Date.UTC(y, m + dir * 6, 1));
-    case "ANNUALLY":     return new Date(Date.UTC(y + dir, 0, 1));
-    default:             return new Date(Date.UTC(y, m, d + dir));
+  if (schedule.frequency === CUSTOM_DAYS) {
+    const end = lastDayOfPeriod(schedule, date);
+    return `${MONTHS[m]} ${d} – ${MONTHS[end.getUTCMonth()]} ${end.getUTCDate()}, ${end.getUTCFullYear()}`;
   }
-}
-
-function formatPeriod(date: Date, frequency: string): string {
-  const y = date.getUTCFullYear(), m = date.getUTCMonth(), d = date.getUTCDate();
-  switch (frequency) {
+  switch (schedule.frequency) {
     case "DAILY":   return `${MONTHS[m]} ${d}, ${y}`;
     case "WEEKLY": {
       const end = new Date(Date.UTC(y, m, d + 6));
@@ -93,9 +78,9 @@ function fmtDateTime(iso: string) {
 }
 
 // Compact chip label for the history strip, per frequency.
-function shortPeriodLabel(date: Date, frequency: string): string {
+function shortPeriodLabel(date: Date, schedule: PmSchedule): string {
   const y = date.getUTCFullYear(), m = date.getUTCMonth(), d = date.getUTCDate();
-  switch (frequency) {
+  switch (schedule.frequency) {
     case "WEEKLY":        return `${MONTHS[m]} ${d}`;
     case "MONTHLY":       return `${MONTHS[m]} '${String(y).slice(2)}`;
     case "QUARTERLY":     return `Q${Math.floor(m / 3) + 1} '${String(y).slice(2)}`;
@@ -151,6 +136,29 @@ export default function ChecklistFormPage() {
   useUnsavedChanges(dirty);
   // Captured once so the history window stays stable across re-renders.
   const [nowMs] = useState(() => Date.now());
+  // Moving an "every N days" checklist's start date — staff, and only before
+  // the first round, which is when the API allows it.
+  const [startEdit, setStartEdit] = useState<string | null>(null);
+  const [startSaving, setStartSaving] = useState(false);
+
+  async function saveStartDate() {
+    if (!assignment || !startEdit) return;
+    setStartSaving(true);
+    setError(null);
+    try {
+      const res = await api.patch(`/accounts/${accountId}/pm-checklists/${assignmentId}`, { startDate: startEdit });
+      const next = { ...assignment, startDate: res.data.startDate as string };
+      setAssignment(next);
+      setStartEdit(null);
+      // Land on the first period if the one on screen is now before it.
+      const sched = pmSchedule(next.checklist, next);
+      if (isBeforeStart(sched, getPeriodStartUTC(sched, selectedDate))) setSelectedDate(new Date(next.startDate));
+    } catch (err) {
+      setError(errorMessage(err, "Could not change the start date."));
+    } finally {
+      setStartSaving(false);
+    }
+  }
 
   const fetchData = useCallback(async () => {
     try {
@@ -177,7 +185,7 @@ export default function ChecklistFormPage() {
   const [shownFor, setShownFor] = useState<{ date: Date; logs: PMLog[]; assignment: Assignment } | null>(null);
   if (assignment && (shownFor?.date !== selectedDate || shownFor.logs !== allLogs || shownFor.assignment !== assignment)) {
     setShownFor({ date: selectedDate, logs: allLogs, assignment });
-    const periodStart = getPeriodStart(selectedDate, assignment.checklist.frequency);
+    const periodStart = getPeriodStart(selectedDate, pmSchedule(assignment.checklist, assignment));
     const log = allLogs.find((l) => new Date(l.scheduledDate).getTime() === periodStart.getTime()) ?? null;
     setPeriodLog(log);
     if (log) {
@@ -257,20 +265,22 @@ export default function ChecklistFormPage() {
 
   async function navigate(dir: 1 | -1) {
     if (!assignment || !(await confirmDiscard())) return;
-    setSelectedDate((prev) => stepPeriod(prev, assignment.checklist.frequency, dir));
+    setSelectedDate((prev) => stepPeriod(pmSchedule(assignment.checklist, assignment), prev, dir));
     setError(null); setSaveMsg("");
   }
 
   function isAtCurrentPeriod() {
     if (!assignment) return true;
-    const current = getPeriodStart(new Date(), assignment.checklist.frequency);
-    return getPeriodStart(selectedDate, assignment.checklist.frequency).getTime() >= current.getTime();
+    const schedule = pmSchedule(assignment.checklist, assignment);
+    const current = getPeriodStart(new Date(), schedule);
+    return getPeriodStart(selectedDate, schedule).getTime() >= current.getTime();
   }
 
   function isPastPeriod() {
     if (!assignment) return false;
-    const current = getPeriodStart(new Date(), assignment.checklist.frequency);
-    return getPeriodStart(selectedDate, assignment.checklist.frequency).getTime() < current.getTime();
+    const schedule = pmSchedule(assignment.checklist, assignment);
+    const current = getPeriodStart(new Date(), schedule);
+    return getPeriodStart(selectedDate, schedule).getTime() < current.getTime();
   }
 
   async function handleSubmit() {
@@ -363,27 +373,31 @@ export default function ChecklistFormPage() {
   // Raising work from a finding is the team's call, not the client's — the API
   // refuses a client, so the button is not drawn for one.
   const canRaise = !!user && user.role !== "CLIENT";
-  const freq = frequencyMeta(checklist.frequency);
+  const schedule = pmSchedule(checklist, assignment);
+  const freq = frequencyMeta(checklist.frequency, checklist.intervalDays);
   const atCurrent = isAtCurrentPeriod();
   const { total, completeCount, incompleteTitles } = sectionStats();
   const progressPct = total > 0 ? Math.round((completeCount / total) * 100) : 0;
 
   // Recent occurrences (newest first): match each expected period to its log,
   // marking past periods with no log as "missed" and the current one as "due".
-  const currentStart = getPeriodStart(new Date(nowMs), checklist.frequency).getTime();
-  const selectedStart = getPeriodStart(selectedDate, checklist.frequency).getTime();
+  const currentStart = getPeriodStart(new Date(nowMs), schedule).getTime();
+  const selectedStart = getPeriodStart(selectedDate, schedule).getTime();
+  // The first period of an "every N days" checklist: nothing before it is due,
+  // so the strip and the ‹ button stop there.
+  const atFirstPeriod = isBeforeStart(schedule, stepPeriod(schedule, selectedDate, -1));
   const historyCount = HISTORY_COUNTS[checklist.frequency] ?? 8;
   const history: { time: number; date: Date; status: OccStatus }[] = [];
   {
-    let d = getPeriodStart(new Date(nowMs), checklist.frequency);
-    for (let i = 0; i < historyCount; i++) {
+    let d = getPeriodStart(new Date(nowMs), schedule);
+    for (let i = 0; i < historyCount && !isBeforeStart(schedule, d); i++) {
       const t = d.getTime();
       const log = allLogs.find((l) => new Date(l.scheduledDate).getTime() === t) ?? null;
       const status: OccStatus = log
         ? (log.isDraft ? "partial" : "done")
         : (t >= currentStart ? "due" : "missed");
       history.push({ time: t, date: d, status });
-      d = stepPeriod(d, checklist.frequency, -1);
+      d = stepPeriod(schedule, d, -1);
     }
   }
   const doneCount = history.filter((h) => h.status === "done").length;
@@ -416,7 +430,7 @@ export default function ChecklistFormPage() {
             keyed in afterwards, and the round as filed — answers, remarks and
             its control number — once one exists for this period. */}
         <Link
-          href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, checklist.frequency))}`}
+          href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, schedule))}`}
           target="_blank"
           className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0"
         >
@@ -424,7 +438,7 @@ export default function ChecklistFormPage() {
         </Link>
         {periodLog && (
           <Link
-            href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, checklist.frequency))}&log=${periodLog.id}`}
+            href={`/print/accounts/${accountId}/checklists/${assignmentId}?period=${encodeURIComponent(formatPeriod(selectedDate, schedule))}&log=${periodLog.id}`}
             target="_blank"
             className="text-sm text-[var(--tu-text-brand)] font-semibold hover:underline shrink-0"
             title={dirty ? "Prints what was last saved, not unsaved changes" : undefined}
@@ -442,16 +456,57 @@ export default function ChecklistFormPage() {
         )}
       </div>
 
+      {checklist.frequency === CUSTOM_DAYS && assignment.startDate && (
+        <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-2 flex flex-wrap items-center gap-2 text-xs text-[var(--tu-text-subtle)]">
+          {startEdit === null ? (
+            <>
+              <span>
+                {freq.label}, counted from{" "}
+                <strong className="text-[var(--tu-text-body)]">{formatPeriod(new Date(assignment.startDate), { frequency: "DAILY" })}</strong>
+              </span>
+              {canManage(user?.role) && allLogs.length === 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStartEdit(assignment.startDate!.slice(0, 10))}
+                  className="text-[var(--tu-text-brand)] font-semibold hover:underline cursor-pointer"
+                >
+                  Change
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <label htmlFor="pm-start" className="font-semibold">First round from</label>
+              <input
+                id="pm-start"
+                type="date"
+                value={startEdit}
+                onChange={(e) => setStartEdit(e.target.value)}
+                className="border border-[var(--tu-border)] rounded-lg px-2 py-1 text-xs"
+              />
+              <button type="button" onClick={saveStartDate} disabled={startSaving || !startEdit} className="tu-btn-primary text-xs">
+                {startSaving ? "Saving…" : "Save"}
+              </button>
+              <button type="button" onClick={() => setStartEdit(null)} className="text-[var(--tu-text-subtle)] hover:underline cursor-pointer">
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Period navigation */}
       <div className="bg-[var(--tu-bg-secondary)] border-b border-[var(--tu-border)] px-6 py-3 flex items-center gap-4">
         <button
           onClick={() => navigate(-1)}
-          className="text-2xl text-[var(--tu-text-brand)] hover:text-[var(--tu-on-brand)] font-bold w-8 h-8 flex items-center justify-center cursor-pointer"
+          disabled={atFirstPeriod}
+          aria-label="Previous period"
+          className="text-2xl text-[var(--tu-text-brand)] hover:text-[var(--tu-on-brand)] font-bold w-8 h-8 flex items-center justify-center disabled:text-[var(--tu-text-disabled)] disabled:cursor-not-allowed cursor-pointer"
         >
           ‹
         </button>
         <div className="flex-1 text-center">
-          <p className="text-sm font-bold text-[var(--tu-text-heading)]">{formatPeriod(selectedDate, checklist.frequency)}</p>
+          <p className="text-sm font-bold text-[var(--tu-text-heading)]">{formatPeriod(selectedDate, schedule)}</p>
           <div className="flex items-center justify-center gap-2 mt-1">
             {periodLog ? (
               <>
@@ -481,9 +536,9 @@ export default function ChecklistFormPage() {
       <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-3">
         <div className="flex items-center justify-between mb-2">
           <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide">
-            History · last {historyCount} {freq.label.toLowerCase()}
+            History · last {history.length} {checklist.frequency === CUSTOM_DAYS ? "periods" : freq.label.toLowerCase()}
           </p>
-          <p className="text-xs text-[var(--tu-text-subtle)]">{doneCount}/{historyCount} completed</p>
+          <p className="text-xs text-[var(--tu-text-subtle)]">{doneCount}/{history.length} completed</p>
         </div>
         <div className="flex gap-2 overflow-x-auto pb-1">
           {history.map(({ time, date, status }) => {
@@ -504,7 +559,7 @@ export default function ChecklistFormPage() {
               >
                 <span className={`block w-2 h-2 rounded-full mx-auto mb-1 ${cfg.dot}`} aria-hidden="true" />
                 <span className="block text-[11px] font-semibold text-[var(--tu-text-body)] whitespace-nowrap">
-                  {shortPeriodLabel(date, checklist.frequency)}
+                  {shortPeriodLabel(date, schedule)}
                 </span>
                 <span className={`block text-[10px] font-semibold ${cfg.text}`}>{cfg.label}</span>
               </button>

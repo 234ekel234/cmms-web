@@ -29,7 +29,7 @@ type PMItem = { id: string; label: string; order: number };
 type PMSection = { id: string; title: string; answerOptions: string[]; order: number; items: PMItem[] };
 type Assignment = {
   id: string;
-  checklist: { id: string; name: string; frequency: string; sections: PMSection[] };
+  checklist: { id: string; name: string; frequency: string; intervalDays?: number | null; sections: PMSection[] };
   asset: { id: string; name: string; assetCode: string | null } | null;
 };
 type LogItem = { itemId: string; answer: string; remarks: string | null; answeredAt: string; answeredByName?: string | null };
@@ -142,7 +142,7 @@ function ChecklistForm() {
 
         <div className="ps-grid">
           <Cell label="Site" value={accountName || "—"} wide />
-          <Cell label="Frequency" value={frequencyMeta(checklist.frequency).label} />
+          <Cell label="Frequency" value={frequencyMeta(checklist.frequency, checklist.intervalDays).label} />
           <Cell label="Period" value={period} />
           <Cell label="Asset" value={asset ? asset.name + (asset.assetCode ? ` (${asset.assetCode})` : "") : "—"} wide />
           <Cell label="Control no." value={control ?? ""} mono />

@@ -8,6 +8,7 @@ import EmptyState from "@/components/EmptyState";
 import { isClosed } from "@/lib/workOrders";
 import type { WorkOrderStatus } from "@/lib/statuses";
 import { WO_STATUS } from "@/lib/dashboardModel";
+import { getPeriodStart, pmSchedule } from "@/lib/pmPeriod";
 
 type WorkOrder = {
   id: string; status: WorkOrderStatus; priority: string;
@@ -16,7 +17,7 @@ type WorkOrder = {
 type Asset = { id: string; health: string; status: string; archivedAt: string | null };
 type Employee = { id: string; occupied: boolean };
 type PMLog = { scheduledDate: string; isDraft: boolean };
-type PMAssignment = { id: string; checklist: { frequency: string }; logs: PMLog[] };
+type PMAssignment = { id: string; checklist: { frequency: string; intervalDays?: number | null }; startDate?: string; logs: PMLog[] };
 type Activity = { id: string; description: string; performedByName: string | null; createdAt: string };
 type ShiftTemplate = { id: string; name: string; startTime: string; endTime: string };
 type Account = { id: string; name: string; description: string | null; createdAt: string; shiftTemplates: ShiftTemplate[] };
@@ -27,22 +28,8 @@ const HEALTH: { key: string; label: string; color: string }[] = [
   { key: "BREAKDOWN",                label: "Breakdown",      color: "var(--tu-priority-critical)" },
 ];
 
-function getPeriodStart(frequency: string, now: number): number {
-  const d = new Date(now);
-  const y = d.getFullYear(), m = d.getMonth();
-  switch (frequency) {
-    case "DAILY":         return Date.UTC(y, m, d.getDate());
-    case "WEEKLY":        return Date.UTC(y, m, d.getDate() - d.getDay());
-    case "MONTHLY":       return Date.UTC(y, m, 1);
-    case "QUARTERLY":     return Date.UTC(y, Math.floor(m / 3) * 3, 1);
-    case "SEMI_ANNUALLY": return Date.UTC(y, Math.floor(m / 6) * 6, 1);
-    case "ANNUALLY":      return Date.UTC(y, 0, 1);
-    default:              return Date.UTC(y, m, d.getDate());
-  }
-}
-
 function pmStatus(a: PMAssignment, now: number): "done" | "draft" | "unanswered" {
-  const start = getPeriodStart(a.checklist.frequency, now);
+  const start = getPeriodStart(pmSchedule(a.checklist, a), new Date(now)).getTime();
   const log = a.logs.find((l) => new Date(l.scheduledDate).getTime() >= start);
   if (log && !log.isDraft) return "done";
   if (log) return "draft";

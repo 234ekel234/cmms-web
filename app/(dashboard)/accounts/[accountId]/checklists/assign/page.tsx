@@ -5,11 +5,13 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import api from "@/lib/api";
 import { frequencyMeta } from "@/lib/maintenancePlans";
+import { CUSTOM_DAYS } from "@/lib/pmPeriod";
 
 type PMChecklist = {
   id: string;
   name: string;
   frequency: string;
+  intervalDays?: number | null;
   sections: { id: string; title: string; items: { id: string }[] }[];
 };
 
@@ -36,6 +38,13 @@ export default function AssignChecklistPage() {
   const [selectedChecklist, setSelectedChecklist] = useState<PMChecklist | null>(null);
   const [selectedAssetId, setSelectedAssetId] = useState<string>("");
   const [assetSearch, setAssetSearch] = useState("");
+  // Where an "every N days" checklist's cycle starts on this site. Today by
+  // default; calendar frequencies ignore it.
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  });
+  const isCustom = selectedChecklist?.frequency === CUSTOM_DAYS;
 
   useEffect(() => {
     Promise.all([
@@ -69,6 +78,7 @@ export default function AssignChecklistPage() {
       await api.post(`/accounts/${accountId}/pm-checklists`, {
         checklistId: selectedChecklist.id,
         assetId: selectedAssetId || undefined,
+        ...(isCustom && startDate ? { startDate } : {}),
       });
       router.push(`/accounts/${accountId}/checklists`);
     } catch (err: unknown) {
@@ -150,7 +160,7 @@ export default function AssignChecklistPage() {
                   <p className="text-center text-sm text-[var(--tu-text-subtle)] py-8">No checklists found.</p>
                 ) : (
                   filtered.map((c) => {
-                    const cfg = frequencyMeta(c.frequency);
+                    const cfg = frequencyMeta(c.frequency, c.intervalDays);
                     const items = c.sections.reduce((sum, s) => sum + s.items.length, 0);
                     const isSelected = selectedChecklist?.id === c.id;
                     return (
@@ -250,9 +260,21 @@ export default function AssignChecklistPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--tu-text-subtle)]">Frequency</span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${frequencyMeta(selectedChecklist.frequency).cls}`}>
-                      {frequencyMeta(selectedChecklist.frequency).label}
+                      {frequencyMeta(selectedChecklist.frequency, selectedChecklist.intervalDays).label}
                     </span>
                   </div>
+                  {isCustom && (
+                    <div className="flex justify-between items-center text-sm gap-3">
+                      <label htmlFor="pm-start" className="text-[var(--tu-text-subtle)]">First round from</label>
+                      <input
+                        id="pm-start"
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="border border-[var(--tu-border)] rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30"
+                      />
+                    </div>
+                  )}
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--tu-text-subtle)]">Sections</span>
                     <span className="text-[var(--tu-text-heading)]">{selectedChecklist.sections.length}</span>
