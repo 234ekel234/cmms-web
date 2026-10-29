@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { EmptyRow } from "@/components/EmptyState";
-import { EMPLOYEE_CATEGORIES, orderSkills, skillLabel } from "@/lib/employeeCategories";
+import { orderSkills, skillLabel } from "@/lib/employeeCategories";
+import EmployeeForm from "@/components/EmployeeForm";
 import GiveLoginModal, { type LoginTarget } from "@/components/GiveLoginModal";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ArchivedList from "@/components/ArchivedList";
@@ -15,6 +16,7 @@ type Employee = {
   id: string;
   name: string;
   position: string | null;
+  phone?: string | null;
   categories: string[];
   isReliever: boolean;
   /** Always sent by the API — see the registry shape in employeeRoutes.js.
@@ -67,15 +69,8 @@ export default function EmployeesPage() {
   const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
   const [sortKey, setSortKey] = useState<"name" | "recent" | "type">("name");
   const [showForm, setShowForm] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState({
-    name: "",
-    position: "",
-    categories: [] as string[],
-    isReliever: false,
-  });
-  const [saving, setSaving] = useState(false);
-  const [formError, setFormError] = useState("");
+  // The employee being edited, or null for a new one.
+  const [editing, setEditing] = useState<Employee | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   // A failed removal says why; it used to be swallowed, so the button simply
   // did nothing.
@@ -104,56 +99,22 @@ export default function EmployeesPage() {
   }, [reloadKey]);
 
   function openCreate() {
-    setEditId(null);
-    setForm({ name: "", position: "", categories: [], isReliever: false });
-    setFormError("");
+    setEditing(null);
     setShowForm(true);
   }
 
   function openEdit(emp: Employee) {
-    setEditId(emp.id);
-    setForm({ name: emp.name, position: emp.position ?? "", categories: emp.categories ?? [], isReliever: emp.isReliever });
-    setFormError("");
+    setEditing(emp);
     setShowForm(true);
   }
 
-  // Skills are a fixed vocabulary (see lib/employeeCategories) — picked, never
-  // typed. Free text gave the same trade several spellings and a filter that
-  // offered all of them, and the API rejects anything off the list anyway.
-  function toggleFormCategory(cat: string) {
-    setForm((f) => ({
-      ...f,
-      categories: f.categories.includes(cat)
-        ? f.categories.filter((c) => c !== cat)
-        : orderSkills([...f.categories, cat]),
-    }));
-  }
-
-  async function save() {
-    if (!form.name.trim()) { setFormError("Name is required."); return; }
-    setFormError("");
-    setSaving(true);
-    try {
-      const payload = {
-        name: form.name.trim(),
-        position: form.position.trim() || null,
-        categories: form.categories,
-        isReliever: form.isReliever,
-      };
-      if (editId) {
-        const res = await api.put(`/employees/${editId}`, payload);
-        setEmployees((prev) => prev.map((e) => e.id === editId ? res.data : e));
-      } else {
-        const res = await api.post("/employees", payload);
-        setEmployees((prev) => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
-      }
-      setShowForm(false);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setFormError(e?.response?.data?.error ?? "Failed to save employee.");
-    } finally {
-      setSaving(false);
-    }
+  function onSaved(saved: Employee) {
+    setEmployees((prev) =>
+      editing
+        ? prev.map((e) => (e.id === saved.id ? saved : e))
+        : [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)),
+    );
+    setShowForm(false);
   }
 
   async function deleteEmployee(id: string) {
@@ -271,95 +232,14 @@ export default function EmployeesPage() {
       {showForm && (
         <div className="tu-card" style={{ marginBottom: 24 }}>
           <div className="tu-card-header">
-            <h2 className="tu-card-title">{editId ? "Edit Employee" : "New Employee"}</h2>
+            <h2 className="tu-card-title">{editing ? "Edit Employee" : "New Employee"}</h2>
           </div>
-          <div className="tu-card-pad tu-form-grid">
-            <div className="tu-span-2">
-              <label className="tu-label">Name *</label>
-              <input
-                className="tu-input"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Full name"
-                autoFocus
-              />
-            </div>
-            <div>
-              <label className="tu-label">Position</label>
-              <input
-                className="tu-input"
-                value={form.position}
-                onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
-                placeholder="e.g. Electrician, Supervisor"
-              />
-            </div>
-            <div>
-              <label className="tu-label">Type</label>
-              <select
-                className="tu-select"
-                value={form.isReliever ? "RELIEVER" : "DEDICATED"}
-                onChange={(e) => setForm((f) => ({ ...f, isReliever: e.target.value === "RELIEVER" }))}
-              >
-                <option value="DEDICATED">Regular — one account</option>
-                <option value="RELIEVER">Reliever — multiple accounts</option>
-              </select>
-            </div>
-            <div className="tu-span-2">
-              <label className="tu-label">Skills</label>
-              <p style={{ fontSize: 12, color: "var(--tu-text-subtle)", margin: "0 0 8px" }}>
-                Tap every trade this person works in.
-              </p>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {EMPLOYEE_CATEGORIES.map((cat) => {
-                  const on = form.categories.includes(cat);
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => toggleFormCategory(cat)}
-                      aria-pressed={on}
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        padding: "4px 12px",
-                        borderRadius: 9999,
-                        cursor: "pointer",
-                        border: "1px solid",
-                        borderColor: on ? "var(--tu-text-brand)" : "var(--tu-border)",
-                        background: on ? "var(--tu-bg-brand-soft)" : "var(--tu-bg-surface)",
-                        color: on ? "var(--tu-text-brand)" : "var(--tu-text-body)",
-                      }}
-                    >
-                      {skillLabel(cat)}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {formError && (
-              <div className="tu-span-2">
-                <p style={{ color: "#C70036", fontSize: 13 }}>{formError}</p>
-              </div>
-            )}
-            <div className="tu-span-2 tu-form-actions">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="tu-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={save}
-                disabled={saving}
-                className="tu-btn-primary"
-                style={{ opacity: saving ? 0.5 : 1 }}
-              >
-                {saving ? "Saving…" : (editId ? "Save changes" : "Create")}
-              </button>
-            </div>
-          </div>
+          <EmployeeForm<Employee>
+            key={editing?.id ?? "new"}
+            employee={editing ?? undefined}
+            onSaved={onSaved}
+            onCancel={() => setShowForm(false)}
+          />
         </div>
       )}
 

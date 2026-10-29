@@ -10,6 +10,8 @@ import Breadcrumbs from "@/components/Breadcrumbs";
 import ResetPasswordButton from "@/components/ResetPasswordButton";
 import LoginAccessButton from "@/components/LoginAccessButton";
 import Credentials from "@/components/Credentials";
+import EmployeeForm from "@/components/EmployeeForm";
+import { skillLabel } from "@/lib/employeeCategories";
 import EmptyState from "@/components/EmptyState";
 import { type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import { isClosed, workOrderRef } from "@/lib/workOrders";
@@ -29,6 +31,7 @@ type Employee = {
   id: string;
   name: string;
   position: string | null;
+  phone?: string | null;
   categories: string[];
   isReliever: boolean;
   archivedAt: string | null;
@@ -81,6 +84,7 @@ export default function EmployeePage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [trainings, setTrainings] = useState<TrainingRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -138,7 +142,15 @@ export default function EmployeePage() {
             {[employee.position, employee.isReliever ? "Reliever" : "Regular"].filter(Boolean).join(" · ")}
           </p>
         </div>
-        {employee.archivedAt && <span className="tu-badge tu-badge-neutral">Archived {fmtDate(employee.archivedAt)}</span>}
+        {employee.archivedAt ? (
+          <span className="tu-badge tu-badge-neutral">Archived {fmtDate(employee.archivedAt)}</span>
+        ) : (
+          !editing && (
+            <button type="button" className="tu-btn-secondary" onClick={() => setEditing(true)}>
+              Edit details
+            </button>
+          )
+        )}
       </div>
 
       {employee.archivedAt && (
@@ -169,8 +181,30 @@ export default function EmployeePage() {
 
       <div className="tu-person-grid">
         <section className="tu-card">
-          <div className="tu-card-header"><h2 className="tu-card-title">Details</h2></div>
+          <div className="tu-card-header"><h2 className="tu-card-title">{editing ? "Edit details" : "Details"}</h2></div>
+          {editing ? (
+            <EmployeeForm<Employee>
+              employee={employee}
+              onSaved={(saved) => {
+                // The edit reply carries the registry fields; keep the login,
+                // which only this page's read includes.
+                setEmployee({ ...employee, ...saved, login: employee.login });
+                setEditing(false);
+              }}
+              onCancel={() => setEditing(false)}
+            />
+          ) : (
           <dl className="tu-person-facts">
+            <div>
+              <dt>Phone</dt>
+              <dd>
+                {employee.phone ? (
+                  <a href={`tel:${employee.phone.replace(/[^\d+]/g, "")}`} className="tu-link">{employee.phone}</a>
+                ) : (
+                  <span className="tu-person-muted">Not recorded</span>
+                )}
+              </dd>
+            </div>
             <div>
               <dt>Sites</dt>
               <dd>
@@ -187,8 +221,8 @@ export default function EmployeePage() {
               </dd>
             </div>
             <div>
-              <dt>Categories</dt>
-              <dd>{employee.categories.length ? employee.categories.join(", ") : <span className="tu-person-muted">None</span>}</dd>
+              <dt>Skills</dt>
+              <dd>{employee.categories.length ? employee.categories.map(skillLabel).join(", ") : <span className="tu-person-muted">None</span>}</dd>
             </div>
             <div>
               <dt>Login</dt>
@@ -224,6 +258,7 @@ export default function EmployeePage() {
               <dd>{fmtDate(employee.createdAt)}</dd>
             </div>
           </dl>
+          )}
         </section>
 
         <section className="tu-card">

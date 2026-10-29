@@ -9,15 +9,17 @@ import { canManage } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import Credentials from "@/components/Credentials";
 import EmptyState from "@/components/EmptyState";
-
-type EmployeeCategory = "ELECTRICAL" | "MECHANICAL" | "PLUMBING" | "CIVIL" | "GENERAL";
+import EmployeeForm from "@/components/EmployeeForm";
+import { skillLabel } from "@/lib/employeeCategories";
 
 type Employee = {
   id: string;
   name: string;
   position: string | null;
+  /** Staff only — the API leaves it out for a client. */
+  phone?: string | null;
   isReliever: boolean;
-  categories: EmployeeCategory[];
+  categories: string[];
   openWorkOrders?: number;
   attendance?: { present: number; absent: number; total: number; rate: number | null } | null;
   training?: { total: number; completed: number; rate: number | null } | null;
@@ -31,14 +33,6 @@ type TrainingAssignment = {
   assignedAt: string;
   completedAt: string | null;
 };
-
-const CATEGORIES: { value: EmployeeCategory; label: string }[] = [
-  { value: "ELECTRICAL", label: "Electrical" },
-  { value: "MECHANICAL", label: "Mechanical (Aircon)" },
-  { value: "PLUMBING",   label: "Plumbing" },
-  { value: "CIVIL",      label: "Civil" },
-  { value: "GENERAL",    label: "General / Other" },
-];
 
 function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -59,14 +53,7 @@ export default function EmployeeDetailPage() {
   const [trainings, setTrainings] = useState<TrainingAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  // Edit form state
-  const [name, setName] = useState("");
-  const [position, setPosition] = useState("");
-  const [isReliever, setIsReliever] = useState(false);
-  const [categories, setCategories] = useState<EmployeeCategory[]>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,10 +71,6 @@ export default function EmployeeDetailPage() {
         const found: Employee | undefined = empRes.data.find((e: Employee) => e.id === employeeId);
         if (!found) { router.push(`/accounts/${accountId}/employees`); return; }
         if (!cancelled) setEmployee(found);
-        if (!cancelled) setName(found.name);
-        if (!cancelled) setPosition(found.position ?? "");
-        if (!cancelled) setIsReliever(found.isReliever);
-        if (!cancelled) setCategories(found.categories ?? []);
         if (!cancelled) setTrainings(trainRes.data);
       } catch {
         if (!cancelled) setError("Failed to load employee.");
@@ -97,42 +80,6 @@ export default function EmployeeDetailPage() {
     })();
     return () => { cancelled = true; };
   }, [accountId, employeeId, router]);
-
-  function toggleCategory(cat: EmployeeCategory) {
-    setCategories((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
-  }
-
-  async function handleSave() {
-    if (!name.trim()) { setError("Name is required."); return; }
-    setSaving(true); setError(null);
-    try {
-      const res = await api.put(`/employees/${employeeId}`, {
-        name: name.trim(),
-        position: position.trim() || null,
-        isReliever,
-        categories,
-      });
-      setEmployee((prev) => prev ? { ...prev, ...res.data } : res.data);
-      setEditing(false);
-    } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e?.response?.data?.error ?? "Failed to save.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function cancelEdit() {
-    if (!employee) return;
-    setName(employee.name);
-    setPosition(employee.position ?? "");
-    setIsReliever(employee.isReliever);
-    setCategories(employee.categories ?? []);
-    setEditing(false);
-    setError(null);
-  }
 
   if (loading) {
     return (
@@ -159,112 +106,75 @@ export default function EmployeeDetailPage() {
 
       {/* Profile card */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-6">
+        {editing ? (
+          <>
+            <h2 className="text-sm font-bold text-[var(--tu-text-heading)]">Edit details</h2>
+            <EmployeeForm<Employee>
+              employee={employee}
+              onSaved={(saved) => { setEmployee((prev) => (prev ? { ...prev, ...saved } : saved)); setEditing(false); }}
+              onCancel={() => setEditing(false)}
+            />
+          </>
+        ) : (
+          <>
         <div className="flex items-start justify-between gap-4 mb-5">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[var(--tu-text-brand)]/10 flex items-center justify-center shrink-0">
               <span className="text-[var(--tu-text-brand)] text-lg font-bold">{employee.name[0].toUpperCase()}</span>
             </div>
-            {!editing ? (
-              <div>
-                <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">{employee.name}</h2>
-                {employee.position && <p className="text-sm text-[var(--tu-text-subtle)]">{employee.position}</p>}
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Full name"
-                  className="border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30"
-                />
-                <input
-                  value={position}
-                  onChange={(e) => setPosition(e.target.value)}
-                  placeholder="Position / title"
-                  className="border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30"
-                />
-              </div>
-            )}
+            <div>
+              <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">{employee.name}</h2>
+              {employee.position && <p className="text-sm text-[var(--tu-text-subtle)]">{employee.position}</p>}
+            </div>
           </div>
           {canEdit && (
-            <div>
-              {editing ? (
-                <div className="flex gap-2">
-                  <button onClick={cancelEdit} className="text-sm text-[var(--tu-text-subtle)] border border-[var(--tu-border)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-                  <button onClick={handleSave} disabled={saving} className="text-sm text-white bg-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
-                    {saving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              ) : (
-                <button onClick={() => setEditing(true)} className="text-sm text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-soft-brand)] cursor-pointer">
-                  Edit
-                </button>
-              )}
-            </div>
+            <button onClick={() => setEditing(true)} className="text-sm text-[var(--tu-text-brand)] border border-[var(--tu-text-brand)] px-3 py-1.5 rounded-lg hover:bg-[var(--tu-soft-brand)] cursor-pointer">
+              Edit details
+            </button>
           )}
         </div>
 
         {error && <p className="text-sm text-[var(--tu-on-danger)] bg-[var(--tu-soft-danger)] rounded-lg px-3 py-2 mb-4">{error}</p>}
 
         <div className="grid grid-cols-2 gap-4">
-          {/* Type */}
           <div>
             <p className="text-xs font-bold text-[var(--tu-text-subtle)] mb-1.5">Type</p>
-            {editing ? (
-              <select
-                value={isReliever ? "RELIEVER" : "REGULAR"}
-                onChange={(e) => setIsReliever(e.target.value === "RELIEVER")}
-                className="border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30"
-              >
-                <option value="REGULAR">Regular — one account</option>
-                <option value="RELIEVER">Reliever — multiple accounts</option>
-              </select>
-            ) : (
-              <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                employee.isReliever ? "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" : "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"
-              }`}>
-                {employee.isReliever ? "Reliever" : "Regular"}
-              </span>
-            )}
+            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+              employee.isReliever ? "bg-[var(--tu-soft-info)] text-[var(--tu-on-info)]" : "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]"
+            }`}>
+              {employee.isReliever ? "Reliever" : "Regular"}
+            </span>
           </div>
 
-          {/* Categories */}
-          <div>
-            <p className="text-xs font-bold text-[var(--tu-text-subtle)] mb-1.5">Categories</p>
-            {editing ? (
-              <div className="flex flex-wrap gap-1.5">
-                {CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.value}
-                    onClick={() => toggleCategory(cat.value)}
-                    className={`text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors cursor-pointer ${
-                      categories.includes(cat.value)
-                        ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]"
-                        : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-subtle)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {(employee.categories ?? []).length === 0 ? (
-                  <span className="text-xs text-[var(--tu-text-subtle)]">—</span>
-                ) : (
-                  (employee.categories ?? []).map((cat) => (
-                    <span key={cat} className="text-xs font-semibold bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)] px-2.5 py-1 rounded-full">
-                      {CATEGORIES.find((c) => c.value === cat)?.label ?? cat}
-                    </span>
-                  ))
-                )}
-              </div>
-            )}
+          {/* Phone — staff only; a client's roster read carries none. */}
+          {canEdit && (
+            <div>
+              <p className="text-xs font-bold text-[var(--tu-text-subtle)] mb-1.5">Phone</p>
+              {employee.phone ? (
+                <a href={`tel:${employee.phone.replace(/[^\d+]/g, "")}`} className="text-sm text-[var(--tu-text-brand)] hover:underline">{employee.phone}</a>
+              ) : (
+                <span className="text-xs text-[var(--tu-text-subtle)]">Not recorded</span>
+              )}
+            </div>
+          )}
+
+          <div className="col-span-2">
+            <p className="text-xs font-bold text-[var(--tu-text-subtle)] mb-1.5">Skills</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(employee.categories ?? []).length === 0 ? (
+                <span className="text-xs text-[var(--tu-text-subtle)]">—</span>
+              ) : (
+                (employee.categories ?? []).map((cat) => (
+                  <span key={cat} className="text-xs font-semibold bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-body)] px-2.5 py-1 rounded-full">
+                    {skillLabel(cat)}
+                  </span>
+                ))
+              )}
+            </div>
           </div>
         </div>
 
         {/* Stats row */}
-        {!editing && (
           <div className="grid grid-cols-3 gap-4 mt-5 pt-5 border-t border-[var(--tu-border)]">
             <div className="text-center">
               <p className="text-xl font-bold text-[var(--tu-text-heading)]">{employee.openWorkOrders ?? 0}</p>
@@ -283,6 +193,7 @@ export default function EmployeeDetailPage() {
               <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Training completion</p>
             </div>
           </div>
+          </>
         )}
       </div>
 

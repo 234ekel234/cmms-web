@@ -7,12 +7,13 @@ import { downloadCsv, parseCsv } from "@/lib/csv";
 type Row = {
   name: string;
   position: string;
+  phone: string;
   skills: string;
   reliever: string;
   error?: string;
 };
 
-const COLUMNS = ["name", "position", "skills", "reliever"] as const;
+const COLUMNS = ["name", "position", "phone", "skills", "reliever"] as const;
 
 const RELIEVER_VALUES = ["", "yes", "y", "true", "1", "reliever", "no", "n", "false", "0", "regular"];
 
@@ -25,7 +26,7 @@ function toRows(text: string): Row[] {
   const header = table[0].map((h) => h.trim().toLowerCase());
   return table.slice(1).map((cells) => {
     const get = (key: string) => { const i = header.indexOf(key); return i === -1 ? "" : (cells[i] ?? "").trim(); };
-    const row: Row = { name: get("name"), position: get("position"), skills: get("skills"), reliever: get("reliever") };
+    const row: Row = { name: get("name"), position: get("position"), phone: get("phone"), skills: get("skills"), reliever: get("reliever") };
     if (!row.name) row.error = "Name is required";
     else if (!RELIEVER_VALUES.includes(row.reliever.toLowerCase())) row.error = `Reliever should be yes or no, not "${row.reliever}"`;
     return row;
@@ -37,8 +38,8 @@ function downloadTemplate() {
   // survives the round trip.
   downloadCsv([
     COLUMNS.join(","),
-    ["Maria Santos", "Electrician", "Electrical; HVAC", "no"].join(","),
-    ["Juan dela Cruz", "Reliever technician", "Plumbing", "yes"].join(","),
+    ["Maria Santos", "Electrician", "0917 123 4567", "Electrical; HVAC", "no"].join(","),
+    ["Juan dela Cruz", "Reliever technician", "", "Plumbing", "yes"].join(","),
   ], "cmms-employee-import-template.csv");
 }
 
@@ -83,7 +84,7 @@ export default function EmployeeImportModal({
     setTopError("");
     try {
       const res = await api.post(`/accounts/${accountId}/employees/import`, {
-        employees: validRows.map(({ name, position, skills, reliever }) => ({ name, position, skills, reliever })),
+        employees: validRows.map(({ name, position, phone, skills, reliever }) => ({ name, position, phone, skills, reliever })),
       });
       // The API numbers rows in what it was sent — the valid ones only — so
       // its row numbers are mapped back to the sheet's, which is what a person
@@ -158,6 +159,7 @@ export default function EmployeeImportModal({
                         <tr className="bg-[var(--tu-bg-secondary)] text-[var(--tu-text-subtle)] font-semibold uppercase tracking-wide">
                           <th className="px-3 py-2 text-left">Name</th>
                           <th className="px-3 py-2 text-left">Position</th>
+                          <th className="px-3 py-2 text-left">Phone</th>
                           <th className="px-3 py-2 text-left">Skills</th>
                           <th className="px-3 py-2 text-left">Reliever</th>
                           <th className="px-3 py-2 text-left">Issue</th>
@@ -168,6 +170,7 @@ export default function EmployeeImportModal({
                           <tr key={i} className={r.error ? "bg-[var(--tu-soft-danger)]" : ""}>
                             <td className="px-3 py-2 text-[var(--tu-text-body)]">{r.name || "—"}</td>
                             <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.position || "—"}</td>
+                            <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.phone || "—"}</td>
                             <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.skills || "—"}</td>
                             <td className="px-3 py-2 text-[var(--tu-text-subtle)]">{r.reliever || "no"}</td>
                             <td className="px-3 py-2 text-[var(--tu-on-danger)]">{r.error ?? ""}</td>
