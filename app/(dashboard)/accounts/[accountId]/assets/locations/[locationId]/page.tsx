@@ -7,6 +7,7 @@ import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, MANAGERS, STAFF, hasRole } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
+import Attachments from "@/components/Attachments";
 import { startLoad } from "@/lib/startLoad";
 import type { AssetLocationRef } from "@/lib/assetLocations";
 import { assetHealthMeta, roleLabel, workOrderPriorityMeta, workOrderStatusFor } from "@/lib/statuses";
@@ -274,6 +275,12 @@ export default function LocationPage() {
             </ul>
           </>
         )}
+      </section>
+
+      {/* Photos and documents of the place: how it should look, a floor
+          plan, an access map. Anyone on the site may add; staff archive. */}
+      <section className="tu-card tu-card-pad">
+        <Attachments parent="asset-locations" parentId={location.id} canUpload canDelete={isStaff} />
       </section>
 
       {data.visits && (

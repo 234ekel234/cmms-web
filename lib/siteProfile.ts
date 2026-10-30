@@ -93,6 +93,21 @@ export type SiteProfile = {
   currentContractId: string | null;
   /** Staff only: regular employees on the roster. */
   rosterRegular?: number;
+  operations: SiteOperations;
+};
+
+/** The running side of the site (backend/helpers/siteOverview.js). */
+export type SiteOperations = {
+  shifts: { id: string; name: string; startTime: string; endTime: string; rosteredToday: number }[];
+  /** Our people on the site; staff also see the client's logins. */
+  team: { id: string; name: string; role: string }[];
+  roster: { regular: number; relievers: number };
+  equipment: { total: number; breakdown: number; withFindings: number };
+  work: { open: number; overdue: number; awaitingSignOff: number; completedLast30: number };
+  /** `plans` is staff only. */
+  inspections: { checklists: number; plans?: number };
+  /** Staff only. */
+  satisfaction?: { average: number | null; responses: number; days: number };
 };
 
 /** A `@db.Date` value ("2026-10-30T00:00:00.000Z") as "Oct 30, 2026", read as the calendar day it is. */

@@ -2,16 +2,18 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { MANAGERS, STAFF, hasRole } from "@/lib/rbac";
 import { startLoad } from "@/lib/startLoad";
+import { roleLabel } from "@/lib/statuses";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { contentUrl, formatSize, type BaseAttachment } from "@/lib/attachments";
 import {
   BILLING_LABEL, CONTRACT_STATUS, SERVICE_LABEL, SITE_STATUS, SITE_TYPE_LABEL,
   addressLine, dayInput, endsIn, fmtDay, noticeBy, peso,
-  type Site, type SiteContact, type SiteContract, type SiteProfile,
+  type Site, type SiteContact, type SiteContract, type SiteOperations, type SiteProfile,
 } from "@/lib/siteProfile";
 
 /**
@@ -101,6 +103,10 @@ export default function SiteProfilePage() {
         </div>
       )}
 
+      <SiteOperationsCard accountId={accountId} ops={profile.operations} />
+
+      <SitePlaces accountId={accountId} isStaff={isStaff} />
+
       <Contacts accountId={accountId} contacts={contacts} canEdit={isManager}
         onChange={(next) => setProfile({ ...profile, contacts: next })} />
 
@@ -168,6 +174,181 @@ function SiteLocation({ site }: { site: Site }) {
           ) : null}
         </Fact>
       </dl>
+    </section>
+  );
+}
+
+function OpsBlock({ title, href, children }: { title: string; href?: string; children: React.ReactNode }) {
+  return (
+    <div className="px-5 py-4">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <h3 className="text-xs font-bold uppercase tracking-wide text-[var(--tu-text-subtle)]">{title}</h3>
+        {href && <Link href={href} className="tu-link text-xs">Open →</Link>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function OpsStat({ n, label, tone }: { n: number | string; label: string; tone?: "danger" | "warning" }) {
+  const color = tone === "danger" ? "text-[var(--tu-on-danger)]" : tone === "warning" ? "text-[var(--tu-on-warning)]" : "text-[var(--tu-text-heading)]";
+  return (
+    <div>
+      <div className={`text-lg font-bold tu-figure ${color}`}>{n}</div>
+      <div className="text-xs text-[var(--tu-text-subtle)]">{label}</div>
+    </div>
+  );
+}
+
+const ROLE_ORDER = ["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "TECHNICIAN", "CLIENT"];
+
+/**
+ * How the site runs day to day — its shifts and who is on them today, the
+ * team, the kit, the work and inspections, and (staff) the client's view of
+ * it. Each block summarises a page and links to it; the figures come from the
+ * profile read, which applies each role's usual limits.
+ */
+function SiteOperationsCard({ accountId, ops }: { accountId: string; ops: SiteOperations }) {
+  const base = `/accounts/${accountId}`;
+  const team = [...ops.team].sort((a, b) => ROLE_ORDER.indexOf(a.role) - ROLE_ORDER.indexOf(b.role) || a.name.localeCompare(b.name));
+  return (
+    <section className="tu-card">
+      <div className="tu-card-header"><h2 className="tu-card-title">Running the site</h2></div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 divide-y sm:divide-y-0 divide-[var(--tu-border)]">
+        <OpsBlock title="Shifts" href={`${base}/schedule`}>
+          {ops.shifts.length === 0 ? (
+            <p className="text-sm text-[var(--tu-text-subtle)]">No shifts set up.</p>
+          ) : (
+            <ul className="text-sm space-y-1">
+              {ops.shifts.map((s) => (
+                <li key={s.id} className="flex justify-between gap-2">
+                  <span><span className="font-semibold text-[var(--tu-text-heading)]">{s.name}</span> <span className="text-[var(--tu-text-subtle)]">{s.startTime}–{s.endTime}</span></span>
+                  <span className="text-[var(--tu-text-subtle)]"><span className="tu-figure">{s.rosteredToday}</span> on today</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </OpsBlock>
+        <OpsBlock title="Team" href={`${base}/employees`}>
+          <p className="text-sm text-[var(--tu-text-body)] mb-2">
+            <span className="tu-figure">{ops.roster.regular}</span> regular · <span className="tu-figure">{ops.roster.relievers}</span> reliever{ops.roster.relievers === 1 ? "" : "s"} on the roster
+          </p>
+          <ul className="text-sm space-y-0.5">
+            {team.map((m) => (
+              <li key={m.id}>{m.name} <span className="text-[var(--tu-text-subtle)]">· {roleLabel(m.role)}</span></li>
+            ))}
+          </ul>
+        </OpsBlock>
+        <OpsBlock title="Equipment" href={`${base}/assets`}>
+          <div className="grid grid-cols-3 gap-2">
+            <OpsStat n={ops.equipment.total} label="assets" />
+            <OpsStat n={ops.equipment.breakdown} label="broken down" tone={ops.equipment.breakdown ? "danger" : undefined} />
+            <OpsStat n={ops.equipment.withFindings} label="with findings" tone={ops.equipment.withFindings ? "warning" : undefined} />
+          </div>
+        </OpsBlock>
+        <OpsBlock title="Work" href={`${base}/work-orders`}>
+          <div className="grid grid-cols-2 gap-2">
+            <OpsStat n={ops.work.open} label="open" />
+            <OpsStat n={ops.work.overdue} label="overdue" tone={ops.work.overdue ? "danger" : undefined} />
+            <OpsStat n={ops.work.awaitingSignOff} label="awaiting client sign-off" tone={ops.work.awaitingSignOff ? "warning" : undefined} />
+            <OpsStat n={ops.work.completedLast30} label="finished in 30 days" />
+          </div>
+        </OpsBlock>
+        <OpsBlock title="Inspections" href={`${base}/checklists`}>
+          <div className="grid grid-cols-2 gap-2">
+            <OpsStat n={ops.inspections.checklists} label="PM checklists" />
+            {ops.inspections.plans !== undefined && <OpsStat n={ops.inspections.plans} label="maintenance plans" />}
+          </div>
+        </OpsBlock>
+        {ops.satisfaction && (
+          <OpsBlock title="Client satisfaction" href="/reports/client-satisfaction">
+            {ops.satisfaction.responses === 0 ? (
+              <p className="text-sm text-[var(--tu-text-subtle)]">No ratings in the last {ops.satisfaction.days} days.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <OpsStat n={`${ops.satisfaction.average} / 5`} label={`average, last ${ops.satisfaction.days} days`} tone={ops.satisfaction.average !== null && ops.satisfaction.average <= 2 ? "danger" : undefined} />
+                <OpsStat n={ops.satisfaction.responses} label="ratings" />
+              </div>
+            )}
+          </OpsBlock>
+        )}
+      </div>
+    </section>
+  );
+}
+
+type PlaceRow = {
+  id: string; name: string; parentId: string | null;
+  openJobs: number; recentJobs: number; repeatFlagged: boolean; visitsToday?: number;
+};
+
+/**
+ * The places inside the site — buildings and the floors or rooms in them —
+ * each with its open work and the repeat flag, linking to the place's own page
+ * (the one its QR sticker opens). Read from the same summary as Assets → All
+ * locations, so the two cannot disagree; the places themselves are set up on
+ * the Assets page.
+ */
+function SitePlaces({ accountId, isStaff }: { accountId: string; isStaff: boolean }) {
+  const [rows, setRows] = useState<PlaceRow[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const load = useCallback(async () => {
+    try {
+      const res = await api.get(`/accounts/${accountId}/asset-locations/summary`);
+      setRows(res.data.locations);
+    } catch {
+      setFailed(true);
+    }
+  }, [accountId]);
+  useEffect(() => startLoad(load), [load]);
+
+  if (failed) return null;
+  const buildings = (rows ?? []).filter((r) => !r.parentId);
+  const inside = (id: string) => (rows ?? []).filter((r) => r.parentId === id);
+  const notScanned = isStaff ? (rows ?? []).filter((r) => !r.visitsToday).length : 0;
+  const place = (r: PlaceRow, lead = false) => (
+    <Link
+      key={r.id}
+      href={`/accounts/${accountId}/assets/locations/${r.id}`}
+      className={lead ? "font-semibold text-[var(--tu-text-heading)] hover:underline" : "tu-badge tu-badge-neutral hover:underline"}
+      title={`${r.openJobs} open job${r.openJobs === 1 ? "" : "s"}`}
+    >
+      {r.name}
+      {r.openJobs > 0 && <span className="tu-figure"> · {r.openJobs} open</span>}
+      {r.repeatFlagged && <span className="text-[var(--tu-on-warning)]"> · Repeat</span>}
+    </Link>
+  );
+
+  return (
+    <section className="tu-card">
+      <div className="tu-card-header flex flex-wrap items-center justify-between gap-2">
+        <h2 className="tu-card-title">Places on this site</h2>
+        {rows && rows.length > 0 && (
+          <span className="text-xs text-[var(--tu-text-subtle)]">
+            {buildings.length} building{buildings.length === 1 ? "" : "s"} · {rows.length} place{rows.length === 1 ? "" : "s"}
+            {isStaff && ` · ${notScanned} not scanned today`}
+            {" · "}<Link href={`/accounts/${accountId}/assets/locations`} className="tu-link">All locations →</Link>
+          </span>
+        )}
+      </div>
+      {!rows ? (
+        <div className="tu-card-pad"><div className="tu-skeleton" style={{ height: 60 }} /></div>
+      ) : rows.length === 0 ? (
+        <p className="tu-card-pad text-sm text-[var(--tu-text-subtle)]">
+          No places mapped yet.{isStaff && <> Add buildings and floors with <Link href={`/accounts/${accountId}/assets`} className="tu-link">Manage locations</Link> on the Assets page.</>}
+        </p>
+      ) : (
+        <ul className="divide-y divide-[var(--tu-border)]">
+          {buildings.map((b) => (
+            <li key={b.id} className="px-5 py-3">
+              <div className="text-sm">{place(b, true)}</div>
+              {inside(b.id).length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-2">{inside(b.id).map((r) => place(r))}</div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

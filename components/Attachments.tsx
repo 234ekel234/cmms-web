@@ -114,7 +114,7 @@ function Caption({
 
 type Props = {
   /** Which kind of parent this list hangs off. */
-  parent: "work-orders" | "assets";
+  parent: "work-orders" | "assets" | "asset-locations";
   parentId: string;
   /** Staff may remove; clients may only add and view. */
   canDelete?: boolean;
@@ -282,7 +282,9 @@ export default function Attachments({
           compact
           icon="activity"
           title="No attachments"
-          hint={canUpload ? "Add photos of the work, a nameplate, or a manual." : "Nothing has been attached."}
+          hint={!canUpload ? "Nothing has been attached."
+            : parent === "asset-locations" ? "Add photos of the place, a floor plan, or an access map."
+            : "Add photos of the work, a nameplate, or a manual."}
         />
       ) : (
         <>
