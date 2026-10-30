@@ -59,6 +59,9 @@ export type PmExport = {
     draftsUnfinished: number;
     compliancePct: number | null;
     onTimePct: number | null;
+    /** Team exports only (absent for a client). */
+    scannedOnSite?: number;
+    scannedOnSitePct?: number | null;
     answers: number;
     ok: number;
     findings: number;
@@ -80,6 +83,8 @@ export type PmExport = {
     itemsAnswered: number;
     findings: number;
     findingItems: string | null;
+    /** Team exports only; null with no location on the checklist, or not submitted. */
+    scannedOnSite?: boolean | null;
   })[];
   items: (Base & {
     section: string;
@@ -235,6 +240,7 @@ function summarySheet(wb: Workbook, data: PmExport, scope: string) {
     { header: "Unfinished drafts", width: 11, fmt: FMT.int },
     { header: "Compliance", width: 12, fmt: FMT.pct },
     { header: "On-time rate", width: 12, fmt: FMT.pct },
+    ...(hasScanColumn(data) ? [{ header: "Scanned on site", width: 12, fmt: FMT.pct }] : []),
     { header: "Answers", width: 9, fmt: FMT.int },
     { header: "OK", width: 7, fmt: FMT.int },
     { header: "Findings", width: 9, fmt: FMT.int },
@@ -245,10 +251,19 @@ function summarySheet(wb: Workbook, data: PmExport, scope: string) {
     ...baseCells(r), r.active ? "Yes" : "No",
     r.periodsDue, r.submitted, r.onTime, r.late, r.missed, r.draftsUnfinished,
     frac(r.compliancePct), frac(r.onTimePct),
+    ...(hasScanColumn(data) ? [frac(r.scannedOnSitePct ?? null)] : []),
     r.answers, r.ok, r.findings, r.na, frac(r.findingRatePct),
     r.assignmentId,
   ]));
   ws.getColumn(1).width = Math.max(ws.getColumn(1).width ?? 0, 22);
+}
+
+/**
+ * "Scanned on site" is in the team's export and not the client's (the API
+ * leaves the field out), so the column appears only when the data carries it.
+ */
+function hasScanColumn(data: PmExport): boolean {
+  return data.schedule.some((r) => "scannedOnSite" in r) || data.summary.some((r) => "scannedOnSite" in r);
 }
 
 function scheduleSheet(wb: Workbook, data: PmExport) {
@@ -266,11 +281,13 @@ function scheduleSheet(wb: Workbook, data: PmExport) {
     { header: "Items total", width: 10, fmt: FMT.int },
     { header: "Findings", width: 9, fmt: FMT.int },
     { header: "Finding items", width: 40 },
+    ...(hasScanColumn(data) ? [{ header: "Scanned on site", width: 12 }] : []),
     { header: "Round ID", width: 14 },
     ...ID_COLS,
   ], data.schedule.map((r) => [
     ...baseCells(r), day(r.period), day(r.periodEnd), r.controlNo, PERIOD_STATUS_LABEL[r.status],
     local(r.submittedAt), r.daysLate, r.performedBy, r.itemsAnswered, r.itemsTotal, r.findings, r.findingItems,
+    ...(hasScanColumn(data) ? [r.scannedOnSite == null ? null : r.scannedOnSite ? "Yes" : "No"] : []),
     r.roundId, r.assignmentId,
   ]));
 }

@@ -637,6 +637,97 @@ function PmByFrequency({ model: m }: { model: DashboardModel }) {
   );
 }
 
+/** Signed, with a real minus sign: "−2.5", "+1", "0". */
+function fmtGap(n: number) {
+  if (n === 0) return "0";
+  return n > 0 ? `+${n}` : `\u2212${Math.abs(n)}`;
+}
+
+function Headcount({ model: m }: { model: DashboardModel }) {
+  const { loading, headcount, periodCaption } = m;
+  const rows = headcount?.rows ?? [];
+  const unset = headcount?.unset ?? 0;
+  return (
+    <div className="tu-card">
+      <div className="tu-card-header">
+        <h2 className="tu-card-title">Headcount: Contracted vs Deployed</h2>
+        <span className="tu-chart-cap">{periodCaption}</span>
+      </div>
+      {loading ? (
+        <div className="tu-card-body">
+          <div className="tu-skeleton" style={{ height: 96, borderRadius: 6 }} aria-hidden="true" />
+        </div>
+      ) : rows.length === 0 ? (
+        <div className="tu-card-body">
+          <p className="tu-chart-empty">
+            No site&apos;s current contract names a headcount yet. Add it on the site&apos;s Site Profile → Contracts.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div style={{ overflowX: "auto" }}>
+            <table className="tu-table" aria-label="Contracted headcount against roster and attendance">
+              <thead>
+                <tr>
+                  <th scope="col">Site</th>
+                  <th scope="col" className="tu-center">Contracted</th>
+                  <th scope="col" className="tu-center">On roster</th>
+                  <th scope="col" className="tu-center">Avg present / day</th>
+                  <th scope="col" className="tu-center">vs contract</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((h) => (
+                  <tr key={h.id}>
+                    <td className="tu-strong" scope="row">
+                      <Link href={`/accounts/${h.id}/profile`} className="tu-row-link">{h.name}</Link>
+                    </td>
+                    <td className="tu-center"><span className="tu-figure">{h.contracted}</span></td>
+                    <td className="tu-center">
+                      <span
+                        className={h.rosterGap < 0 ? "tu-figure tu-figure-danger" : "tu-figure"}
+                        title={h.rosterGap < 0 ? `${-h.rosterGap} short of the contract on the roster itself` : undefined}
+                      >
+                        {h.rostered}
+                      </span>
+                    </td>
+                    <td className="tu-center">
+                      {h.averagePresent === null ? (
+                        <span className="tu-figure-zero" title="No attendance recorded in this period">—</span>
+                      ) : (
+                        <span className="tu-figure" title={`Over ${h.daysRecorded} recorded day${h.daysRecorded === 1 ? "" : "s"}`}>
+                          {h.averagePresent}
+                        </span>
+                      )}
+                    </td>
+                    <td className="tu-center">
+                      {h.presentGap === null ? (
+                        <span className="tu-figure-zero">—</span>
+                      ) : (
+                        <span className={h.presentGap < 0 ? "tu-figure tu-figure-danger" : "tu-figure tu-figure-success"}>
+                          {fmtGap(h.presentGap)}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Says what the figures rest on. The roster leaves relievers out
+              because one is linked to every site they might cover; they count
+              on the days they actually turn up. */}
+          <p className="tu-chart-note" style={{ padding: "0 24px 16px" }}>
+            Average present counts distinct people per day with attendance recorded, relievers included;
+            the roster counts regular staff only.
+            {unset > 0 && ` ${unset} site${unset === 1 ? " has" : "s have"} no headcount on its current contract.`}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 function AccountSummary({ model: m, columns }: { model: DashboardModel; columns: string[] }) {
   const { loading, data } = m;
   const shown = ACCOUNT_COLUMNS.filter((c) => columns.includes(c.value));
@@ -988,6 +1079,18 @@ export const CATALOGUE: DashboardWidget[] = [
     spans: [6, 8, 12],
     render: (m) => <PmByFrequency model={m} />,
     isEmpty: (m) => !m.loading && (m.data?.checklistBreakdown.length ?? 0) === 0,
+  },
+
+  {
+    key: "headcount",
+    title: "Headcount: Contracted vs Deployed",
+    group: "Comparisons",
+    defaultSpan: 12,
+    spans: [6, 8, 12],
+    render: (m) => <Headcount model={m} />,
+    // Staff only: the API leaves the block out for a client, and the card
+    // stands down rather than telling them nothing has been entered.
+    isEmpty: (m) => m.headcount === null,
   },
 
   {

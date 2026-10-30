@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { getUser, clearSession, type User } from "@/lib/auth";
+import { getUser, clearSession, loginUrl, type User } from "@/lib/auth";
 import api from "@/lib/api";
 import { canAccessRoute, ROLE_HOME } from "@/lib/rbac";
 
@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const u = getUser();
     if (!u) {
-      router.replace("/login");
+      router.replace(loginUrl());
     } else {
       queueMicrotask(() => setUser(u));
     }

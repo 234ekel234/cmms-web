@@ -21,6 +21,7 @@ type Tab = { label: string; path: string };
 const PINNED: Tab[] = [
   { label: "Members", path: "members" },
   { label: "Overview", path: "overview" },
+  { label: "Site Profile", path: "profile" },
 ];
 
 const GROUPS: { label: string; tabs: Tab[] }[] = [
@@ -32,6 +33,7 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
       { label: "Assets", path: "assets" },
       { label: "Spare Parts", path: "parts" },
       { label: "PM Checklists", path: "checklists" },
+      { label: "Problem Reports", path: "problem-reports" },
     ],
   },
   {

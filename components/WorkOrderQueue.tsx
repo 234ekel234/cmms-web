@@ -1,5 +1,6 @@
 "use client";
 
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 import { useEffect, useRef } from "react";
 import { type WorkOrderPriority, type WorkOrderStatus, workOrderStatusFor } from "@/lib/statuses";
 import { isOverdue, stageNote, workOrderRef, type StageShape } from "@/lib/workOrders";
@@ -30,6 +31,7 @@ export type QueueOrder = StageShape & {
   isSpecialProject?: boolean;
   account?: { name: string } | null;
   asset?: { name: string } | null;
+  location?: AssetLocationRef | null;
   assignments: { employee: { name: string } }[];
 };
 
@@ -157,6 +159,7 @@ export default function WorkOrderQueue({
                 <span className="tu-wo-ref">{workOrderRef(o.number)}</span>
                 {showAccount && o.account?.name && <span className="tu-queue-account">{o.account.name}</span>}
                 {o.asset?.name && <span>{o.asset.name}</span>}
+                {o.location && <span>{locationPath(o.location)}</span>}
                 {o.priority && <span className={`tu-queue-pri tu-queue-pri-${o.priority.toLowerCase()}`}>{o.priority}</span>}
                 {o.dueDate && (
                   <span className={late ? "tu-queue-late" : undefined}>

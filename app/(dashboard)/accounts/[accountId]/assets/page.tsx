@@ -231,6 +231,19 @@ export default function AssetsPage() {
             >
               Print labels
             </Link>
+            {/* One sticker per place, opening that place's page. Follows the
+                filter the same way: a building prints with its floors. */}
+            <Link
+              href={`/print/accounts/${accountId}/locations/labels${
+                !locationFilter ? "" : locations.some((r) => r.id === locationFilter)
+                  ? `?under=${encodeURIComponent(locationFilter)}`
+                  : `?location=${encodeURIComponent(locationFilter)}`
+              }`}
+              target="_blank"
+              className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
+            >
+              Location stickers
+            </Link>
             <button
               onClick={() => setShowImport(true)}
               className="bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border border-[var(--tu-border)] px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-bg-secondary)] transition-colors cursor-pointer"
@@ -286,6 +299,15 @@ export default function AssetsPage() {
             </optgroup>
           ))}
         </select>
+        {locationFilter ? (
+          <Link href={`/accounts/${accountId}/assets/locations/${locationFilter}`} className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline">
+            Open location page →
+          </Link>
+        ) : locations.length > 0 && (
+          <Link href={`/accounts/${accountId}/assets/locations`} className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline">
+            All locations →
+          </Link>
+        )}
         {writable && (
           <button
             onClick={() => setShowLocations(true)}

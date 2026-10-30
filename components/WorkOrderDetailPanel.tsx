@@ -34,6 +34,7 @@ import WorkOrderLinks from "@/components/WorkOrderLinks";
 import AcceptAndAssign from "@/components/AcceptAndAssign";
 import { hasLinks, type WorkOrderLinks as Links } from "@/lib/linkedWorkOrders";
 import WorkOrderHistory from "@/components/WorkOrderHistory";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 import { SurveyForm, SurveyResult } from "@/components/ClientSurvey";
 
 /**
@@ -76,6 +77,7 @@ export type PanelOrder = StageFacts & {
   accountId: string;
   account?: { id: string; name: string } | null;
   asset: { id: string; name: string } | null;
+  location?: AssetLocationRef | null;
   assignments: { employeeId?: string; employee: { id: string; name: string; position: string | null } }[];
   checklistItems?: { id: string; isDone: boolean }[];
   comments?: ProgressEntry[];
@@ -359,7 +361,7 @@ export default function WorkOrderDetailPanel({
           <p className="tu-detail-sub">
             {/* The account name is only worth stating when the queue spans more
                 than one. Inside an account the page header already says which. */}
-            {[workOrderRef(order.number), order.account?.name, order.asset?.name, order.isSpecialProject ? "Special project" : null]
+            {[workOrderRef(order.number), order.account?.name, order.asset?.name, locationPath(order.location) || null, order.isSpecialProject ? "Special project" : null]
               .filter(Boolean)
               .join(" · ")}
           </p>

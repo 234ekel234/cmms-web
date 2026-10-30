@@ -169,7 +169,12 @@ export default function NotificationsPage() {
         <div className="space-y-2">
           {notifications.map((n) => {
             const dotCls = ACTION_DOT[n.action] ?? "bg-[var(--tu-text-disabled)]";
-            const isDeepLinkable = WORK_ORDER_ACTIONS.has(n.action) && n.entityId && n.accountId;
+            // A sticker report opens the site's report inbox rather than a job.
+            const href = !n.accountId ? null
+              : n.action === "PUBLIC_REPORT" ? `/accounts/${n.accountId}/problem-reports`
+              : WORK_ORDER_ACTIONS.has(n.action) && n.entityId ? `/accounts/${n.accountId}/work-orders/${n.entityId}`
+              : null;
+            const isDeepLinkable = !!href;
 
             function handleClick() {
               if (!n.isRead) markRead(n.id);
@@ -201,7 +206,7 @@ export default function NotificationsPage() {
 
             if (isDeepLinkable) {
               return (
-                <Link key={n.id} href={`/accounts/${n.accountId}/work-orders/${n.entityId}`}>
+                <Link key={n.id} href={href!}>
                   {content}
                 </Link>
               );

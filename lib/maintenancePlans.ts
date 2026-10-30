@@ -1,3 +1,4 @@
+import type { AssetLocationRef } from "@/lib/assetLocations";
 // Recurring work orders. A MaintenancePlan is a standing rule; each period it
 // produces one ordinary work order (its "occurrence"). The backend owns the
 // generation — see backend/jobs/recurringWorkOrderJob.js — so nothing here
@@ -101,6 +102,7 @@ export type MaintenancePlan = {
   endDate: string | null;
   accountId: string;
   asset: { id: string; name: string } | null;
+  location?: AssetLocationRef | null;
   account?: { id: string; name: string };
   assignees: { id: string; employeeId: string; employee: { id: string; name: string; position: string | null } }[];
   steps: { id: string; description: string; order: number }[];

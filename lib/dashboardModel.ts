@@ -47,6 +47,21 @@ export type FreqBreakdown = {
   accounts?: FreqAccount[];
 };
 
+/** One site's contracted headcount against who is actually there. Staff only. */
+export type HeadcountEntry = {
+  id: string;
+  name: string;
+  /** Heads the current contract puts on site. */
+  contracted: number;
+  /** Regular employees on the roster — relievers are not counted here. */
+  rostered: number;
+  /** People present per recorded day in the period; null when none was recorded. */
+  averagePresent: number | null;
+  daysRecorded: number;
+  rosterGap: number;
+  presentGap: number | null;
+};
+
 export type DashboardData = {
   // Derived from the status union rather than spelled out, so adding a status
   // is a compile error here instead of a silently missing chart segment. That
@@ -74,6 +89,12 @@ export type DashboardData = {
   checklistBreakdown: FreqBreakdown[];
   period: string;
   trendDays: number;
+  /**
+   * Staff only: absent, not empty, for anyone else, so the card can tell "not
+   * yours to see" from "nothing set yet". `unset` counts the sites whose
+   * current contract names no headcount.
+   */
+  headcount?: { rows: HeadcountEntry[]; unset: number };
 };
 
 export type OpenOrder = {
@@ -245,5 +266,6 @@ export function buildDashboardModel(input: ModelInput) {
     priorityCounts,
     priorityTotal,
     stalledWork,
+    headcount: data?.headcount ?? null,
   };
 }

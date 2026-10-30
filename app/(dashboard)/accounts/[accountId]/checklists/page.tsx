@@ -12,6 +12,7 @@ import { frequencyMeta } from "@/lib/maintenancePlans";
 import { CUSTOM_DAYS, getPeriodStart, pmSchedule, type PmSchedule } from "@/lib/pmPeriod";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ArchivedList from "@/components/ArchivedList";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
 type PMLog = {
   id: string;
@@ -24,6 +25,7 @@ type Assignment = {
   id: string;
   checklist: { id: string; name: string; frequency: string; intervalDays?: number | null; sections: { items: unknown[] }[] };
   asset: { id: string; name: string } | null;
+  location?: AssetLocationRef | null;
   /** Where an "every N days" checklist's cycle starts on this site. */
   startDate?: string;
   logs: PMLog[];
@@ -164,6 +166,9 @@ export default function ChecklistsPage() {
             <p className="font-semibold text-[var(--tu-text-heading)] text-sm">{a.checklist.name}</p>
             {a.asset && (
               <p className="text-xs text-[var(--tu-text-brand)] mt-0.5">› {a.asset.name}</p>
+            )}
+            {a.location && (
+              <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">{locationPath(a.location)}</p>
             )}
             <div className="flex flex-wrap gap-1.5 mt-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${freqCfg.cls}`}>

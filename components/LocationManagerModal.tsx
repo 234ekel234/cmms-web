@@ -4,6 +4,7 @@ import { useState } from "react";
 import api from "@/lib/api";
 import { type AssetLocationNode, PATH_SEPARATOR } from "@/lib/assetLocations";
 import { useConfirm } from "@/components/ConfirmDialog";
+import Link from "next/link";
 
 /**
  * Adds, renames, moves and removes the locations on one account.
@@ -114,7 +115,10 @@ export default function LocationManagerModal({
           <>
             <span className="flex-1 text-sm text-[var(--tu-text-body)]">
               {depth > 0 && <span className="text-[var(--tu-text-disabled)]">{parentName}{PATH_SEPARATOR}</span>}
-              {node.name}
+              {/* Its page: the work done there, and what its QR sticker opens. */}
+              <Link href={`/accounts/${accountId}/assets/locations/${node.id}`} className="hover:underline" onClick={onClose}>
+                {node.name}
+              </Link>
             </span>
             <span className="tu-figure text-xs text-[var(--tu-text-subtle)]">
               {depth === 0 ? (node.totalAssetCount ?? node.assetCount) : node.assetCount}

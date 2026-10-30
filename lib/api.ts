@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearSession, noteSignedOut } from "@/lib/auth";
+import { clearSession, loginUrl, noteSignedOut } from "@/lib/auth";
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
 
@@ -49,7 +49,7 @@ api.interceptors.response.use(
       // Said on the login page: "you were signed out" beats an unexplained form.
       const reason = err.response?.data?.error;
       if (typeof reason === "string" && reason) noteSignedOut(reason);
-      if (window.location.pathname !== "/login") window.location.href = "/login";
+      if (window.location.pathname !== "/login") window.location.href = loginUrl();
     }
     // A password someone else chose must be replaced first; the API refuses
     // everything else until it is (backend withCurrentRole).

@@ -20,6 +20,8 @@ import { useConfirm } from "@/components/ConfirmDialog";
 import { startLoad } from "@/lib/startLoad";
 import WorkOrderLinks from "@/components/WorkOrderLinks";
 import AcceptAndAssign from "@/components/AcceptAndAssign";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 import type { WorkOrderLinks as Links } from "@/lib/linkedWorkOrders";
 
 const PIPELINE_STEPS = ["Requested", "Accepted", "In Progress", "Completed", "Verified"];
@@ -52,6 +54,7 @@ type WorkOrder = StageFacts & Links & {
   timerStartedAt: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
+  location?: AssetLocationRef | null;
   comments: {
     id: string;
     body: string;
@@ -207,10 +210,10 @@ export default function WorkOrderDetailPage() {
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     priority: "MEDIUM" as WorkOrderPriority, dueDate: "", category: "", estimatedMinutes: "",
-    title: "", description: "", assetId: "",
+    title: "", description: "", assetId: "", locationId: "",
   });
   // The site's assets, loaded when the edit form first opens.
-  const [editAssets, setEditAssets] = useState<{ id: string; name: string; assetCode?: string | null }[]>([]);
+  const [editAssets, setEditAssets] = useState<{ id: string; name: string; assetCode?: string | null; location?: AssetLocationRef | null }[]>([]);
   const [editError, setEditError] = useState("");
   const [savingBreakdown, setSavingBreakdown] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
@@ -368,6 +371,7 @@ export default function WorkOrderDetailPage() {
       title: order.title,
       description: order.description ?? "",
       assetId: order.asset?.id ?? "",
+      locationId: order.location?.id ?? "",
     });
     setEditError("");
     setEditing(true);
@@ -388,6 +392,7 @@ export default function WorkOrderDetailPage() {
         title: editForm.title.trim(),
         description: editForm.description.trim() || null,
         assetId: editForm.assetId || null,
+        locationId: editForm.locationId || null,
         priority: editForm.priority,
         dueDate: editForm.dueDate || null,
         category: editForm.category.trim() || null,
@@ -923,7 +928,10 @@ export default function WorkOrderDetailPage() {
                   id="edit-asset"
                   className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={editForm.assetId}
-                  onChange={(e) => setEditForm((f) => ({ ...f, assetId: e.target.value }))}
+                  onChange={(e) => {
+                    const assetId = e.target.value;
+                    setEditForm((f) => ({ ...f, assetId, locationId: placeForAsset(editAssets, assetId, f.locationId) }));
+                  }}
                 >
                   <option value="">No asset</option>
                   {/* The current asset stays offered even before the list loads. */}
@@ -934,6 +942,15 @@ export default function WorkOrderDetailPage() {
                     <option key={a.id} value={a.id}>{a.name}{a.assetCode ? ` (${a.assetCode})` : ""}</option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label htmlFor="edit-location" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Location</label>
+                <WorkLocationSelect
+                  id="edit-location"
+                  accountId={accountId}
+                  value={editForm.locationId}
+                  onChange={(locationId) => setEditForm((f) => ({ ...f, locationId }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 mb-3">
@@ -1032,6 +1049,19 @@ export default function WorkOrderDetailPage() {
               className="text-[var(--tu-text-brand)] hover:underline"
             >
               {order.asset.name}
+            </Link>
+          </p>
+        )}
+
+        {/* Where — links to the place's page, the one its QR sticker opens. */}
+        {order.location && (
+          <p className="text-sm mb-4">
+            <span className="text-[var(--tu-text-subtle)]">Location: </span>
+            <Link
+              href={`/accounts/${accountId}/assets/locations/${order.location.id}`}
+              className="text-[var(--tu-text-brand)] hover:underline"
+            >
+              {locationPath(order.location)}
             </Link>
           </p>
         )}

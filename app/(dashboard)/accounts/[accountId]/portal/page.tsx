@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import StatusPipeline, { APPROVAL_STEPS } from "@/components/StatusPipeline";
@@ -11,6 +11,8 @@ import type { WorkOrderStatus } from "@/lib/statuses";
 import { awaitingClient, isCancellation, isClosed, isDone, needsClientApproval, signOffCue, surveyable, workOrderRef } from "@/lib/workOrders";
 import { SurveyForm } from "@/components/ClientSurvey";
 import DuplicateHint from "@/components/DuplicateHint";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import type { AssetLocationRef } from "@/lib/assetLocations";
 import { ACCEPT, MAX_MB, contentUrl, formatSize, thumbUrl, type BaseAttachment } from "@/lib/attachments";
 import { startLoad } from "@/lib/startLoad";
 
@@ -32,7 +34,7 @@ type Comment = {
   createdAt: string;
   attachments?: BaseAttachment[];
 };
-type Asset = { id: string; name: string };
+type Asset = { id: string; name: string; location?: AssetLocationRef | null };
 
 type WorkOrder = {
   id: string;
@@ -522,8 +524,14 @@ export default function ClientPortalPage() {
   const isClient = user?.role === "CLIENT";
 
   // New request form
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", description: "", priority: "MEDIUM" as Priority, category: "", assetId: "" });
+  // `?locationId=` arrives from a location's page — a QR sticker on the wall —
+  // and opens the form already saying where.
+  const searchParams = useSearchParams();
+  const [showForm, setShowForm] = useState(() => !!searchParams.get("locationId"));
+  const [form, setForm] = useState(() => ({
+    title: "", description: "", priority: "MEDIUM" as Priority, category: "", assetId: "",
+    locationId: searchParams.get("locationId") ?? "",
+  }));
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [formFiles, setFormFiles] = useState<File[]>([]);
@@ -563,6 +571,7 @@ export default function ClientPortalPage() {
         priority: form.priority,
         category: form.category.trim() || null,
         assetId: form.assetId || null,
+        locationId: form.locationId || undefined,
       });
       let created: WorkOrder = { ...res.data, comments: res.data.comments ?? [] };
       // Photos ride on a first comment rather than the request itself, so the
@@ -585,7 +594,7 @@ export default function ClientPortalPage() {
       }
       setOrders((prev) => [created, ...prev]);
       setShowForm(false);
-      setForm({ title: "", description: "", priority: "MEDIUM", category: "", assetId: "" });
+      setForm({ title: "", description: "", priority: "MEDIUM", category: "", assetId: "", locationId: "" });
       setFormFiles([]);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
@@ -719,7 +728,10 @@ export default function ClientPortalPage() {
                   id="req-asset"
                   className="w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]"
                   value={form.assetId}
-                  onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
+                  onChange={(e) => {
+                    const assetId = e.target.value;
+                    setForm((f) => ({ ...f, assetId, locationId: placeForAsset(assets, assetId, f.locationId) }));
+                  }}
                 >
                   <option value="">None / not sure</option>
                   {assets.map((a) => (
@@ -728,6 +740,15 @@ export default function ClientPortalPage() {
                 </select>
               </div>
             )}
+            <div className="col-span-2">
+              <label htmlFor="req-location" className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Where is it?</label>
+              <WorkLocationSelect
+                id="req-location"
+                accountId={accountId}
+                value={form.locationId}
+                onChange={(locationId) => setForm((f) => ({ ...f, locationId }))}
+              />
+            </div>
             <div className="col-span-2">
               <DuplicateHint orders={orders} assetId={form.assetId} title={form.title} accountId={accountId} />
             </div>

@@ -22,6 +22,8 @@ import { workOrderStatusFor } from "@/lib/statuses";
 import { startLoad } from "@/lib/startLoad";
 import { readRaiseDraft, type RaiseLink } from "@/lib/linkedWorkOrders";
 import DuplicateHint from "@/components/DuplicateHint";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import type { AssetLocationRef } from "@/lib/assetLocations";
 
 type WorkOrderStatus = "REQUESTED" | "PENDING" | "IN_PROGRESS" | "ON_HOLD" | "COMPLETED" | "APPROVED" | "REJECTED";
 type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
@@ -35,6 +37,7 @@ type WorkOrderPriority = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 // StageFacts: why the clock stopped and when sign-off closes itself — the queue's stage line.
 type WorkOrder = StageFacts & {
   id: string;
+  location?: AssetLocationRef | null;
   number: number;
   title: string;
   description: string | null;
@@ -94,6 +97,7 @@ const EMPTY_FORM = {
   category: "",
   dueDate: "",
   assetId: "",
+  locationId: "",
   estHours: "",
   estMinutes: "",
   isSpecialProject: false,
@@ -144,6 +148,8 @@ export default function WorkOrdersPage() {
     ].map((x) => x.trim());
     return new Set((["OVERDUE", "AWAITING", "REVIEW"] as WorkOrderFlag[]).filter((f) => raw.includes(f)));
   });
+  // `?location=` arrives from a location's page ("See all work here").
+  const [placeFilter, setPlaceFilter] = useState(() => searchParams.get("location") ?? "");
   // The card that just changed. Nothing moves any more — the tabs that used to
   // make it vanish are gone — but a status change still has to *read* as having
   // happened, and a badge quietly swapping colour mid-list does not.
@@ -201,7 +207,7 @@ export default function WorkOrdersPage() {
   // (lib/linkedWorkOrders.ts). Read once — the URL is rewritten just below.
   const [raised] = useState(() => readRaiseDraft(new URLSearchParams(searchParams.toString())));
   const [link, setLink] = useState<RaiseLink | null>(() => raised?.link ?? null);
-  const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId") || !!raised);
+  const [showForm, setShowForm] = useState(() => !!searchParams.get("assetId") || !!searchParams.get("locationId") || !!raised);
   const [form, setForm] = useState(() => {
     const f = raised?.fields ?? {};
     return {
@@ -211,9 +217,11 @@ export default function WorkOrdersPage() {
       priority: (["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(f.priority ?? "") ? f.priority : "MEDIUM") as WorkOrderPriority,
       category: f.category ?? "",
       assetId: f.assetId ?? searchParams.get("assetId") ?? "",
+      // Arrived from a location's page ("Report a problem here").
+      locationId: searchParams.get("locationId") ?? "",
     };
   });
-  const [assets, setAssets] = useState<{ id: string; name: string }[]>([]);
+  const [assets, setAssets] = useState<{ id: string; name: string; location?: AssetLocationRef | null }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
@@ -334,6 +342,9 @@ export default function WorkOrdersPage() {
         title: form.title.trim(),
         description: form.description.trim() || null,
         assetId: form.assetId || null,
+        // Left out when blank, so the job takes its asset's place (or the
+        // place of the job it follows) on the server.
+        locationId: form.locationId || undefined,
         priority: form.priority,
         category: form.category.trim() || null,
         dueDate: form.dueDate || null,
@@ -399,7 +410,11 @@ export default function WorkOrdersPage() {
     }
   }
 
-  const inView = orders.filter((o) => view === "special" ? o.isSpecialProject : !o.isSpecialProject);
+  // A building includes its floors: a job's location carries its parent, so
+  // no tree is needed to tell.
+  const inView = orders.filter((o) =>
+    (view === "special" ? o.isSpecialProject : !o.isSpecialProject) &&
+    (!placeFilter || o.location?.id === placeFilter || o.location?.parentId === placeFilter));
   // APPROVED was missing from the hand-written list here, so work a client had
   // signed off still counted as overdue, showed the red badge and appeared under
   // the OVERDUE filter — signed-off work reading as outstanding, which is the
@@ -531,6 +546,14 @@ export default function WorkOrdersPage() {
             // Review is staff business; a client sees unreviewed work as "being checked".
             availableFlags={isClient ? ["OVERDUE", "AWAITING"] : undefined}
           />
+          <WorkLocationSelect
+            accountId={accountId}
+            value={placeFilter}
+            onChange={setPlaceFilter}
+            emptyLabel="All locations"
+            ariaLabel="Filter by location"
+            style={{ minWidth: 170, width: "auto", padding: "6px 30px 6px 10px", fontSize: 12.5 }}
+          />
           <label className="tu-toolbar-spacer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 500, color: "var(--tu-text-subtle)" }}>
             Sort
             <select
@@ -626,13 +649,25 @@ export default function WorkOrdersPage() {
               <select
                 className="tu-select" style={{ width: "100%" }}
                 value={form.assetId}
-                onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
+                onChange={(e) => {
+                  const assetId = e.target.value;
+                  setForm((f) => ({ ...f, assetId, locationId: placeForAsset(assets, assetId, f.locationId) }));
+                }}
               >
                 <option value="">No asset</option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
+            </div>
+            <div>
+              <label className="tu-label" htmlFor="wo-location">Location</label>
+              <WorkLocationSelect
+                id="wo-location"
+                accountId={accountId}
+                value={form.locationId}
+                onChange={(locationId) => setForm((f) => ({ ...f, locationId }))}
+              />
             </div>
             {/* Two people reporting the same fault. A follow-up is new work
                 on purpose, so it is not second-guessed. */}

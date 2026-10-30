@@ -189,6 +189,13 @@ decides who gets it.
   The QR encodes the asset page's URL and is drawn locally by `qrcode`. A filter rather than
   an id list, so a large register is not a URL too long to send. Geometry is Avery L7160
   under `@page labels`.
+- **Location stickers** (`/print/accounts/<id>/locations/labels`, `?location=` for one,
+  `?under=` for a building and its floors). Same sheet; the QR encodes `/r/<reportCode>`
+  (`app/r/[code]`, outside the signed-in app): signed in it goes on to the location page with
+  `?scan=1` (the visit is recorded), signed out it shows the public report form when the site
+  allows it, else a sign-in button. Sign-in comes back to a scanned page through `?next=`
+  (`loginUrl` / `nextAfterLogin` in `lib/auth.ts`).
+
 
 - **Reports** print in place, not from a print route: **Save as PDF** on the four report
   pages (`components/ReportPrint.tsx`). `PrintReportHeader` is the paper-only letterhead

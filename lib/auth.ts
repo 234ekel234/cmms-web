@@ -53,3 +53,26 @@ export function signedOutReason(): string | null {
 export function isLoggedIn(): boolean {
   return !!getToken();
 }
+
+/**
+ * The sign-in page's address, remembering where the person was headed — a QR
+ * sticker on a wall opens a page, and signing in should land back on that page
+ * rather than the home screen.
+ */
+export function loginUrl(): string {
+  if (typeof window === "undefined") return "/login";
+  const here = window.location.pathname + window.location.search;
+  return here === "/" || here.startsWith("/login") ? "/login" : `/login?next=${encodeURIComponent(here)}`;
+}
+
+/**
+ * Where to go after signing in: `?next=` when it is a path on this site, else
+ * null. Only a same-site path is honoured — "//evil.example" and full URLs are
+ * dropped, or the sign-in page would forward people anywhere a link said.
+ */
+export function nextAfterLogin(): string | null {
+  if (typeof window === "undefined") return null;
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\") || next.startsWith("/login")) return null;
+  return next;
+}

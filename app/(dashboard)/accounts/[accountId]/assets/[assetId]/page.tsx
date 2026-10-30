@@ -701,7 +701,14 @@ export default function AssetDetailPage() {
                 { label: "Model", value: asset.model },
                 { label: "Serial No.", value: asset.serialNumber },
                 { label: "Capacity", value: formatCapacity(asset.capacity, asset.capacityUnit) },
-                { label: "Location", value: locationPath(asset.location) || null },
+                {
+                  label: "Location",
+                  value: asset.location ? (
+                    <Link href={`/accounts/${accountId}/assets/locations/${asset.location.id}`} className="text-[var(--tu-text-brand)] hover:underline">
+                      {locationPath(asset.location)}
+                    </Link>
+                  ) : null,
+                },
                 { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
                 { label: "Purchased", value: asset.purchaseDate ? fmtDate(asset.purchaseDate) : null },
                 { label: "Purchase Cost", value: asset.purchaseCost != null ? fmtCost(asset.purchaseCost) : null },

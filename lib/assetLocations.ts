@@ -24,6 +24,8 @@ export type AssetLocationNode = {
   /** Retired kit still filed here. It blocks a delete but is not the headline figure. */
   archivedAssetCount: number;
   totalAssetCount?: number;
+  /** The code on the place's QR sticker (`/r/<code>`). */
+  reportCode?: string | null;
   children: AssetLocationNode[];
 };
 

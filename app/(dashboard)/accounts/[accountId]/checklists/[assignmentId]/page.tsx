@@ -15,6 +15,8 @@ import { canManage } from "@/lib/rbac";
 import { findingDraft, isPmFinding, raiseWorkOrderHref } from "@/lib/linkedWorkOrders";
 import { workOrderRef } from "@/lib/workOrders";
 import { workOrderStatusFor } from "@/lib/statuses";
+import WorkLocationSelect from "@/components/WorkLocationSelect";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
 type PMItem = { id: string; label: string; order: number };
 type PMSection = { id: string; title: string; answerOptions: string[]; order: number; items: PMItem[] };
@@ -28,6 +30,8 @@ type PMLog = {
   createdAt: string;
   isDraft: boolean;
   isLate: boolean;
+  /** Team only: someone who worked on it scanned the place's sticker that day. Null with no location, or a draft. */
+  scannedOnSite?: boolean | null;
   // `answeredByName` is per-answer and internal — the API withholds it from
   // clients, so it is optional here rather than assumed present.
   items: { id: string; itemId: string; answer: string; remarks: string | null; answeredAt: string; answeredByName?: string | null }[];
@@ -38,6 +42,8 @@ type Assignment = {
   id: string;
   checklist: { id: string; name: string; frequency: string; intervalDays?: number | null; sections: PMSection[] };
   asset: { id: string; name: string } | null;
+  /** Where the round is walked. */
+  location?: AssetLocationRef | null;
   /** Where an "every N days" checklist's cycle starts on this site. */
   startDate?: string;
   logs: PMLog[];
@@ -157,6 +163,26 @@ export default function ChecklistFormPage() {
       setError(errorMessage(err, "Could not change the start date."));
     } finally {
       setStartSaving(false);
+    }
+  }
+
+  // Where the round is walked. Staff may move it any time; it says where to
+  // go, not when, so filed rounds are unaffected.
+  const [locEdit, setLocEdit] = useState<string | null>(null);
+  const [locSaving, setLocSaving] = useState(false);
+
+  async function saveLocation() {
+    if (!assignment || locEdit === null) return;
+    setLocSaving(true);
+    setError(null);
+    try {
+      const res = await api.patch(`/accounts/${accountId}/pm-checklists/${assignmentId}`, { locationId: locEdit || null });
+      setAssignment({ ...assignment, location: res.data.location ?? null });
+      setLocEdit(null);
+    } catch (err) {
+      setError(errorMessage(err, "Could not change the location."));
+    } finally {
+      setLocSaving(false);
     }
   }
 
@@ -422,6 +448,23 @@ export default function ChecklistFormPage() {
               › {assignment.asset.name}
             </Link>
           )}
+          {assignment.location && (
+            <Link
+              href={`/accounts/${accountId}/assets/locations/${assignment.location.id}`}
+              className="text-xs text-[var(--tu-text-brand)] hover:underline ml-2"
+            >
+              · {locationPath(assignment.location)}
+            </Link>
+          )}
+          {canManage(user?.role) && locEdit === null && (
+            <button
+              type="button"
+              onClick={() => setLocEdit(assignment.location?.id ?? "")}
+              className="text-xs text-[var(--tu-text-subtle)] hover:underline ml-2 cursor-pointer"
+            >
+              {assignment.location ? "Change location" : "Set location"}
+            </button>
+          )}
         </div>
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold shrink-0 ${freq.cls}`}>
           {freq.label}
@@ -455,6 +498,21 @@ export default function ChecklistFormPage() {
           </button>
         )}
       </div>
+
+      {locEdit !== null && (
+        <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-2 flex flex-wrap items-center gap-2 text-xs">
+          <label htmlFor="pm-location" className="font-semibold text-[var(--tu-text-subtle)]">Walked at</label>
+          <div style={{ minWidth: 220 }}>
+            <WorkLocationSelect id="pm-location" accountId={accountId} value={locEdit} onChange={setLocEdit} />
+          </div>
+          <button type="button" onClick={saveLocation} disabled={locSaving} className="tu-btn-primary text-xs">
+            {locSaving ? "Saving…" : "Save"}
+          </button>
+          <button type="button" onClick={() => setLocEdit(null)} className="text-[var(--tu-text-subtle)] hover:underline cursor-pointer">
+            Cancel
+          </button>
+        </div>
+      )}
 
       {checklist.frequency === CUSTOM_DAYS && assignment.startDate && (
         <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-2 flex flex-wrap items-center gap-2 text-xs text-[var(--tu-text-subtle)]">
@@ -516,6 +574,16 @@ export default function ChecklistFormPage() {
                 </span>
                 {periodLog.isLate && (
                   <span className="bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] text-xs font-bold px-2 py-0.5 rounded-full">Late</span>
+                )}
+                {periodLog.scannedOnSite === true && (
+                  <span className="bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] text-xs font-bold px-2 py-0.5 rounded-full" title="Someone who worked on this round scanned the location's sticker that day">
+                    ✓ Scanned on site
+                  </span>
+                )}
+                {periodLog.scannedOnSite === false && (
+                  <span className="text-xs text-[var(--tu-text-subtle)]" title="Nobody who worked on this round scanned the location's sticker that day">
+                    Not scanned
+                  </span>
                 )}
               </>
             ) : (

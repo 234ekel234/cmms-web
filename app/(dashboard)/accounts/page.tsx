@@ -10,11 +10,16 @@ import EmptyState from "@/components/EmptyState";
 import { NEEDS_ATTENTION_LABEL, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { isClosed } from "@/lib/workOrders";
 import { startLoad } from "@/lib/startLoad";
+import { SITE_STATUS } from "@/lib/siteProfile";
 
 type Account = {
   id: string;
   name: string;
   description: string | null;
+  /** From the site profile (accounts/<id>/profile). */
+  siteCode?: string | null;
+  city?: string | null;
+  status?: string;
   createdAt: string;
 };
 
@@ -228,7 +233,9 @@ export default function AccountsPage() {
       ? accounts.filter(
           (a) =>
             a.name.toLowerCase().includes(q) ||
-            (a.description ?? "").toLowerCase().includes(q),
+            (a.description ?? "").toLowerCase().includes(q) ||
+            (a.siteCode ?? "").toLowerCase().includes(q) ||
+            (a.city ?? "").toLowerCase().includes(q),
         )
       : accounts;
 
@@ -409,7 +416,12 @@ export default function AccountsPage() {
                         <Link href={`/accounts/${acc.id}`} className="tu-row-link" onClick={(e) => e.stopPropagation()}>
                           {acc.name}
                         </Link>
-                        {acc.description && <span className="tu-row-sub">{acc.description}</span>}
+                        {acc.status && acc.status !== "ACTIVE" && SITE_STATUS[acc.status] && (
+                          <span className={SITE_STATUS[acc.status].cls} style={{ marginLeft: 8 }}>{SITE_STATUS[acc.status].label}</span>
+                        )}
+                        {(acc.siteCode || acc.city || acc.description) && (
+                          <span className="tu-row-sub">{[acc.siteCode, acc.city, acc.description].filter(Boolean).join(" · ")}</span>
+                        )}
                       </td>
                       <td {...figureCell(href.open)}>
                         <Figure value={s?.openWorkOrders ?? 0} href={href.open} label="open work orders" />

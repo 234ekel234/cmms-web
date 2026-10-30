@@ -6,6 +6,8 @@ import Link from "next/link";
 import api from "@/lib/api";
 import { frequencyMeta } from "@/lib/maintenancePlans";
 import { CUSTOM_DAYS } from "@/lib/pmPeriod";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import type { AssetLocationRef } from "@/lib/assetLocations";
 
 type PMChecklist = {
   id: string;
@@ -20,6 +22,7 @@ type Asset = {
   name: string;
   category: string;
   isArchived: boolean;
+  location?: AssetLocationRef | null;
 };
 
 export default function AssignChecklistPage() {
@@ -36,7 +39,13 @@ export default function AssignChecklistPage() {
   const [search, setSearch] = useState("");
   const [freqFilter, setFreqFilter] = useState("ALL");
   const [selectedChecklist, setSelectedChecklist] = useState<PMChecklist | null>(null);
-  const [selectedAssetId, setSelectedAssetId] = useState<string>("");
+  const [selectedAssetId, setSelectedAssetIdRaw] = useState<string>("");
+  // Where the round is walked; follows a picked asset's place.
+  const [locationId, setLocationId] = useState<string>("");
+  function setSelectedAssetId(id: string) {
+    setSelectedAssetIdRaw(id);
+    setLocationId((cur) => placeForAsset(assets, id, cur));
+  }
   const [assetSearch, setAssetSearch] = useState("");
   // Where an "every N days" checklist's cycle starts on this site. Today by
   // default; calendar frequencies ignore it.
@@ -78,6 +87,7 @@ export default function AssignChecklistPage() {
       await api.post(`/accounts/${accountId}/pm-checklists`, {
         checklistId: selectedChecklist.id,
         assetId: selectedAssetId || undefined,
+        locationId: locationId || undefined,
         ...(isCustom && startDate ? { startDate } : {}),
       });
       router.push(`/accounts/${accountId}/checklists`);
@@ -286,6 +296,10 @@ export default function AssignChecklistPage() {
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--tu-text-subtle)]">Asset</span>
                     <span className="text-[var(--tu-text-heading)]">{selectedAsset ? selectedAsset.name : "General"}</span>
+                  </div>
+                  <div className="pt-1">
+                    <label htmlFor="pm-location" className="block text-sm text-[var(--tu-text-subtle)] mb-1">Location</label>
+                    <WorkLocationSelect id="pm-location" accountId={accountId} value={locationId} onChange={setLocationId} />
                   </div>
                 </div>
               ) : (

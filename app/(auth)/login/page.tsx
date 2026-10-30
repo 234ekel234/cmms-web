@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { isAxiosError } from "axios";
 import api from "@/lib/api";
-import { saveSession, signedOutReason } from "@/lib/auth";
+import { nextAfterLogin, saveSession, signedOutReason } from "@/lib/auth";
 import { pendingConfirm } from "@/lib/emailConfirm";
 
 export default function LoginPage() {
@@ -41,7 +41,7 @@ export default function LoginPage() {
       // Arrived from a confirm-email link while signed out: finish that first.
       // It is allowed before a forced password change, and sends on to it.
       if (pendingConfirm()) router.push("/confirm-email");
-      else router.push(user.mustChangePassword ? "/change-password" : "/accounts");
+      else router.push(user.mustChangePassword ? "/change-password" : nextAfterLogin() ?? "/accounts");
     } catch (err) {
       setError((isAxiosError(err) && err.response?.data?.error) || "Incorrect email or password.");
     } finally {

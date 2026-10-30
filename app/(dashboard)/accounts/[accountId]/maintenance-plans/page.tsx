@@ -20,8 +20,10 @@ import {
   type MaintenancePlan,
 } from "@/lib/maintenancePlans";
 import { startLoad } from "@/lib/startLoad";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
-type Asset = { id: string; name: string };
+type Asset = { id: string; name: string; location?: AssetLocationRef | null };
 type Employee = { id: string; name: string; position: string | null };
 
 export default function MaintenancePlansPage() {
@@ -46,6 +48,7 @@ export default function MaintenancePlansPage() {
     frequency: "MONTHLY" as Frequency,
     priority: "MEDIUM",
     assetId: "",
+    locationId: "",
     estHrs: "",
     estMins: "",
     leadDays: "",
@@ -96,6 +99,7 @@ export default function MaintenancePlansPage() {
         frequency: form.frequency,
         priority: form.priority,
         assetId: form.assetId || null,
+        locationId: form.locationId || undefined,
         estimatedMinutes: minutes || null,
         // Blank is meaningful on both, and differently: no lead time means the
         // first day of the period, while no deadline means the end of it. Sent
@@ -256,11 +260,18 @@ export default function MaintenancePlansPage() {
               <select
                 className={inputCls}
                 value={form.assetId}
-                onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}
+                onChange={(e) => {
+                  const assetId = e.target.value;
+                  setForm((f) => ({ ...f, assetId, locationId: placeForAsset(assets, assetId, f.locationId) }));
+                }}
               >
                 <option value="">No specific asset</option>
                 {assets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="plan-location">Location</label>
+              <WorkLocationSelect id="plan-location" accountId={accountId} value={form.locationId} onChange={(locationId) => setForm((f) => ({ ...f, locationId }))} />
             </div>
             <div>
               <label className={labelCls}>Priority</label>
@@ -466,7 +477,7 @@ export default function MaintenancePlansPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)]">{FREQUENCY_LABEL[plan.frequency]}</td>
-                    <td className="px-6 py-4 text-[var(--tu-text-subtle)]">{plan.asset?.name ?? "—"}</td>
+                    <td className="px-6 py-4 text-[var(--tu-text-subtle)]">{[plan.asset?.name, locationPath(plan.location)].filter(Boolean).join(" · ") || "—"}</td>
                     <td className="px-6 py-4">
                       <span
                         className={TONE_CLASS[state.tone]}

@@ -25,8 +25,10 @@ import {
 import { workOrderRef } from "@/lib/workOrders";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { startLoad } from "@/lib/startLoad";
+import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
+import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
-type Asset = { id: string; name: string };
+type Asset = { id: string; name: string; location?: AssetLocationRef | null };
 type Employee = { id: string; name: string; position: string | null };
 
 export default function MaintenancePlanDetailPage() {
@@ -51,7 +53,7 @@ export default function MaintenancePlanDetailPage() {
 
   const [form, setForm] = useState({
     title: "", description: "", category: "", frequency: "MONTHLY" as Frequency,
-    priority: "MEDIUM", assetId: "", estHrs: "", estMins: "",
+    priority: "MEDIUM", assetId: "", locationId: "", estHrs: "", estMins: "",
     leadDays: "", dueAfterDays: "", startDate: "", endDate: "",
   });
   const [assignees, setAssignees] = useState<string[]>([]);
@@ -87,6 +89,7 @@ export default function MaintenancePlanDetailPage() {
       frequency: plan.frequency,
       priority: plan.priority,
       assetId: plan.asset?.id ?? "",
+      locationId: plan.location?.id ?? "",
       estHrs: plan.estimatedMinutes ? String(Math.floor(plan.estimatedMinutes / 60)) : "",
       estMins: plan.estimatedMinutes ? String(plan.estimatedMinutes % 60) : "",
       // 0 shows as blank, matching the create form's placeholder: "no lead
@@ -115,6 +118,7 @@ export default function MaintenancePlanDetailPage() {
         frequency: form.frequency,
         priority: form.priority,
         assetId: form.assetId || null,
+        locationId: form.locationId || null,
         estimatedMinutes: minutes || null,
         generateOffsetDays: form.leadDays === "" ? 0 : Number(form.leadDays),
         dueAfterDays: form.dueAfterDays === "" ? null : Number(form.dueAfterDays),
@@ -243,10 +247,21 @@ export default function MaintenancePlanDetailPage() {
             </div>
             <div>
               <label className={labelCls}>Asset</label>
-              <select className={inputCls} value={form.assetId} onChange={(e) => setForm((f) => ({ ...f, assetId: e.target.value }))}>
+              <select
+                className={inputCls}
+                value={form.assetId}
+                onChange={(e) => {
+                  const assetId = e.target.value;
+                  setForm((f) => ({ ...f, assetId, locationId: placeForAsset(assets, assetId, f.locationId) }));
+                }}
+              >
                 <option value="">No specific asset</option>
                 {assets.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
               </select>
+            </div>
+            <div>
+              <label className={labelCls} htmlFor="plan-location">Location</label>
+              <WorkLocationSelect id="plan-location" accountId={accountId} value={form.locationId} onChange={(locationId) => setForm((f) => ({ ...f, locationId }))} />
             </div>
             <div>
               <label className={labelCls}>Priority</label>
@@ -369,6 +384,7 @@ export default function MaintenancePlanDetailPage() {
               <Field label="Priority" value={plan.priority.charAt(0) + plan.priority.slice(1).toLowerCase()} />
               <Field label="Estimated time" value={plan.estimatedMinutes ? `${Math.floor(plan.estimatedMinutes / 60)}h ${plan.estimatedMinutes % 60}m` : "—"} />
               <Field label="Asset" value={plan.asset?.name ?? "—"} />
+              <Field label="Location" value={locationPath(plan.location) || "—"} />
               <Field label="Starts" value={fmtDate(plan.startDate)} />
               <Field label="Ends" value={plan.endDate ? fmtDate(plan.endDate) : "Open-ended"} />
               <Field
