@@ -142,7 +142,7 @@ export default function StickerPage() {
 
         {info?.enabled && (
           <p className="text-center text-xs text-[var(--tu-text-subtle)]">
-            Staff? <Link href={signIn} className="tu-link">Sign in</Link> to see this place&apos;s work.
+            Staff?{" "}<Link href={signIn} className="tu-link">Sign in</Link>{" "}to see this place&apos;s work.
           </p>
         )}
       </div>

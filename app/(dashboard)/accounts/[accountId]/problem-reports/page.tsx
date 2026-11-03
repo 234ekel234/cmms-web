@@ -16,6 +16,8 @@ type Report = {
   category: string;
   notes: string[];
   contact: string | null;
+  /** Set when someone signed in filed it (Report a problem in the app or web). */
+  reportedByName: string | null;
   count: number;
   status: "OPEN" | "CONVERTED" | "DISMISSED";
   handledByName: string | null;
@@ -158,6 +160,7 @@ export default function ProblemReportsPage() {
                       {r.notes.map((n, i) => <li key={i}>{n}</li>)}
                     </ul>
                   )}
+                  {r.reportedByName && <p className="mt-2 text-xs text-[var(--tu-text-subtle)]">Reported by {r.reportedByName}</p>}
                   {r.contact && <p className="mt-2 text-xs text-[var(--tu-text-subtle)]">Left contact: {r.contact}</p>}
                   {r.status !== "OPEN" && (
                     <p className="mt-2 text-xs text-[var(--tu-text-subtle)]">
