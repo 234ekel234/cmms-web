@@ -90,7 +90,7 @@ export default function LocationsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <div className="tu-card tu-card-pad text-sm text-[var(--tu-text-subtle)]">
+        <div className="tu-card tu-card-body text-sm text-[var(--tu-text-subtle)]">
           No locations yet. Add them with <strong>Manage locations</strong> on the Assets page.
         </div>
       ) : (
@@ -100,7 +100,7 @@ export default function LocationsPage() {
               <tr className="text-left text-xs text-[var(--tu-text-subtle)] border-b border-[var(--tu-border)]">
                 <th className="px-5 py-3 font-semibold">Location</th>
                 <th className="px-3 py-3 font-semibold text-right">Open jobs</th>
-                <th className="px-3 py-3 font-semibold text-right">Last {repeatDays} days</th>
+                <th className="px-3 py-3 font-semibold text-right" title="Jobs raised in this period, scheduled and project work aside">Raised, {repeatDays} days</th>
                 {isStaff && <th className="px-3 py-3 font-semibold text-right">Scans today</th>}
                 {isStaff && <th className="px-5 py-3 font-semibold">Last scanned</th>}
               </tr>

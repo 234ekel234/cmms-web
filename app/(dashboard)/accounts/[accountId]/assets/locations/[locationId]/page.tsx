@@ -145,7 +145,7 @@ export default function LocationPage() {
       {visitNote && <div className="rounded-lg px-4 py-2.5 text-sm bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] border border-[var(--tu-bd-success)]" role="status">{visitNote}</div>}
       {data.repeat.flagged && (
         <div className="rounded-lg px-4 py-2.5 text-sm bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] border border-[var(--tu-bd-warning)]" role="status">
-          {data.repeat.jobs} jobs raised here in the last {data.repeat.days} days — this may be a recurring problem worth a closer look.
+          {data.repeat.jobs} problems raised here in the last {data.repeat.days} days (scheduled work aside) — this may be a recurring problem worth a closer look.
         </div>
       )}
       <section className="tu-card">
@@ -279,7 +279,7 @@ export default function LocationPage() {
 
       {/* Photos and documents of the place: how it should look, a floor
           plan, an access map. Anyone on the site may add; staff archive. */}
-      <section className="tu-card tu-card-pad">
+      <section className="tu-card tu-card-body">
         <Attachments parent="asset-locations" parentId={location.id} canUpload canDelete={isStaff} />
       </section>
 

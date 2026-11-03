@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { isAxiosError } from "axios";
 import api, { errorMessage } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { startLoad } from "@/lib/startLoad";
@@ -38,16 +37,16 @@ export default function StickerPage() {
   const load = useCallback(async () => {
     if (getToken()) {
       try {
-        const res = await api.get(`/locations/by-code/${code}`);
+        const res = await api.get(`/locations/by-code/${encodeURIComponent(code)}`);
         router.replace(`/accounts/${res.data.accountId}/assets/locations/${res.data.locationId}?scan=1`);
         return;
-      } catch (err) {
-        // Not one of their sites: carry on as anyone else would.
-        if (!(isAxiosError(err) && err.response?.status === 404)) return;
+      } catch {
+        // Not one of their sites, or the lookup failed: carry on as anyone
+        // else would, rather than leaving the page loading for good.
       }
     }
     try {
-      const res = await api.get(`/public/report/${code}`);
+      const res = await api.get(`/public/report/${encodeURIComponent(code)}`);
       setInfo(res.data);
     } catch {
       setMissing(true);
@@ -61,7 +60,7 @@ export default function StickerPage() {
     setSending(true);
     setError(null);
     try {
-      await api.post(`/public/report/${code}`, { category, note, contact, website });
+      await api.post(`/public/report/${encodeURIComponent(code)}`, { category, note, contact, website });
       setSent(true);
     } catch (err) {
       setError(errorMessage(err, "Couldn't send the report. Please try again."));
@@ -82,7 +81,7 @@ export default function StickerPage() {
           {/* eslint-enable @next/next/no-img-element */}
         </div>
 
-        <section className="tu-card tu-card-pad">
+        <section className="tu-card tu-card-body">
           {missing ? (
             <p className="text-sm text-[var(--tu-text-body)]">This sticker isn&apos;t recognised. It may have been replaced — please let the site team know.</p>
           ) : !info ? (

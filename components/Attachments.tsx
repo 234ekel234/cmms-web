@@ -145,14 +145,19 @@ export default function Attachments({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Kept apart from `error` (uploads, removals): a list that failed to load
+  // must not read as "No attachments", which says the files are not there.
+  const [loadFailed, setLoadFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     try {
       const res = await api.get(`/${parent}/${parentId}/attachments`);
       setItems(res.data);
+      setLoadFailed(false);
     } catch {
       // A failure here should not blank the rest of the page.
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -166,8 +171,9 @@ export default function Attachments({
     let cancelled = false;
     api
       .get(`/${parent}/${parentId}/attachments`)
-      .then((res) => { if (!cancelled) setItems(res.data); })
-      .catch(() => { /* a failure here should not blank the rest of the page */ })
+      .then((res) => { if (!cancelled) { setItems(res.data); setLoadFailed(false); } })
+      // A failure here should not blank the rest of the page.
+      .catch(() => { if (!cancelled) setLoadFailed(true); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [parent, parentId]);
@@ -277,6 +283,8 @@ export default function Attachments({
             <div key={i} className="tu-skeleton" style={{ width: 96, height: 96, borderRadius: 8 }} />
           ))}
         </div>
+      ) : loadFailed && items.length === 0 ? (
+        <p className="tu-danger-text" style={{ fontSize: 12.5 }}>Couldn&apos;t load the files. Try refreshing the page.</p>
       ) : items.length === 0 ? (
         <EmptyState
           compact

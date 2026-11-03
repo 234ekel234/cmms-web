@@ -68,11 +68,20 @@ export function loginUrl(): string {
 /**
  * Where to go after signing in: `?next=` when it is a path on this site, else
  * null. Only a same-site path is honoured — "//evil.example" and full URLs are
- * dropped, or the sign-in page would forward people anywhere a link said.
+ * dropped, or the sign-in page would forward people anywhere a link said. The
+ * check resolves the URL rather than reading its prefix: browsers drop tabs and
+ * newlines, so "/<tab>/evil.example" passes a prefix test and lands off-site.
  */
 export function nextAfterLogin(): string | null {
   if (typeof window === "undefined") return null;
   const next = new URLSearchParams(window.location.search).get("next");
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\") || next.startsWith("/login")) return null;
-  return next;
+  if (!next || !next.startsWith("/")) return null;
+  let url: URL;
+  try {
+    url = new URL(next, window.location.origin);
+  } catch {
+    return null;
+  }
+  if (url.origin !== window.location.origin || url.pathname.startsWith("/login")) return null;
+  return url.pathname + url.search + url.hash;
 }

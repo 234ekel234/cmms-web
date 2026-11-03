@@ -134,7 +134,7 @@ export default function ProblemReportsPage() {
       </div>
 
       {shown.length === 0 ? (
-        <div className="tu-card tu-card-pad text-sm text-[var(--tu-text-subtle)]">
+        <div className="tu-card tu-card-body text-sm text-[var(--tu-text-subtle)]">
           {tab === "OPEN"
             ? enabled ? "Nothing reported. New reports appear here and in your notifications." : "Nothing reported. Turn reporting on to let people report problems from the stickers."
             : "Nothing dealt with yet."}
@@ -142,7 +142,7 @@ export default function ProblemReportsPage() {
       ) : (
         <ul className="flex flex-col gap-3">
           {shown.map((r) => (
-            <li key={r.id} className="tu-card tu-card-pad">
+            <li key={r.id} className="tu-card tu-card-body">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div style={{ minWidth: 0 }}>
                   <p className="font-semibold text-[var(--tu-text-heading)]">
