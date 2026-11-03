@@ -162,7 +162,7 @@ export default function NotificationsPage() {
           <EmptyState
             icon="notification"
             title="No notifications yet"
-            hint="Overdue work orders, PM reminders, and status changes on your accounts land here."
+            hint="Overdue work orders, PM reminders, and status changes on your sites land here."
           />
         </div>
       ) : (

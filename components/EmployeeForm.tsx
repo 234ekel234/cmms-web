@@ -117,8 +117,8 @@ export default function EmployeeForm<T>({ employee, onSaved, onCancel }: Props<T
           value={form.isReliever ? "RELIEVER" : "DEDICATED"}
           onChange={(e) => setForm((f) => ({ ...f, isReliever: e.target.value === "RELIEVER" }))}
         >
-          <option value="DEDICATED">Regular — one account</option>
-          <option value="RELIEVER">Reliever — multiple accounts</option>
+          <option value="DEDICATED">Regular — one site</option>
+          <option value="RELIEVER">Reliever — multiple sites</option>
         </select>
       </div>
       <div className="tu-span-2">

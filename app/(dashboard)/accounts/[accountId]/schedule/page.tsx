@@ -287,7 +287,7 @@ export default function SchedulePage() {
             {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-[var(--tu-bg-secondary-strong)] rounded animate-pulse" />)}
           </div>
         ) : availability.length === 0 ? (
-          <EmptyState compact icon="employee" title="No employees in this account" hint="Assign employees to this account before scheduling them." />
+          <EmptyState compact icon="employee" title="No employees on this site" hint="Assign employees to this site before scheduling them." />
         ) : (
           <div className="divide-y divide-[var(--tu-border)]">
             {availability.map((emp) => {
@@ -397,7 +397,7 @@ export default function SchedulePage() {
           <EmptyState
             icon="schedule"
             title="No shifts yet"
-            hint="Add a shift to start scheduling employees and tracking attendance for this account."
+            hint="Add a shift to start scheduling employees and tracking attendance for this site."
             action={
               !showShiftForm && (
                 <button onClick={openShiftForm} className="tu-btn-primary" type="button">
@@ -495,7 +495,7 @@ export default function SchedulePage() {
               <p className="text-xs font-bold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-2">One-time Assignment</p>
               <div className="space-y-2 mb-4">
                 {employees.length === 0 ? (
-                  <EmptyState compact icon="employee" title="No employees in this account" hint="Assign employees to this account to schedule them on a shift." />
+                  <EmptyState compact icon="employee" title="No employees on this site" hint="Assign employees to this site to schedule them on a shift." />
                 ) : employees.map((emp) => {
                   const scheduled = !!findEntry(modalSlot.template.id, modalSlot.date, emp.id);
                   const isToggling = toggling === emp.id;

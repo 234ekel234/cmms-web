@@ -157,7 +157,7 @@ export default function AccountsPage() {
   }
 
   async function createAccount() {
-    if (!name.trim()) { setFormError("Account name is required."); return; }
+    if (!name.trim()) { setFormError("Site name is required."); return; }
 
     for (const [i, s] of shifts.entries()) {
       if (!s.name.trim()) { setFormError(`Shift ${i + 1}: name is required.`); return; }
@@ -182,7 +182,7 @@ export default function AccountsPage() {
       setShifts([{ ...DEFAULT_SHIFT }]);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setFormError(e?.response?.data?.error ?? "Failed to create account.");
+      setFormError(e?.response?.data?.error ?? "Failed to create site.");
     } finally {
       setSaving(false);
     }
@@ -197,7 +197,7 @@ export default function AccountsPage() {
 
   async function saveEdit() {
     if (!editing) return;
-    if (!editName.trim()) { setEditError("Account name is required."); return; }
+    if (!editName.trim()) { setEditError("Site name is required."); return; }
     setEditSaving(true);
     setEditError("");
     try {
@@ -302,23 +302,23 @@ export default function AccountsPage() {
     <div className="tu-page">
       <div className="tu-page-header">
         <div>
-          <h1 className="tu-page-title">Accounts</h1>
+          <h1 className="tu-page-title">Sites</h1>
           <p className="tu-page-sub">
             {totals
-              ? `${accounts.length} account${accounts.length === 1 ? "" : "s"} · ${totals.open} open work order${totals.open === 1 ? "" : "s"}${totals.overdue > 0 ? ` · ${totals.overdue} overdue` : ""}`
-              : "All maintenance accounts"}
+              ? `${accounts.length} site${accounts.length === 1 ? "" : "s"} · ${totals.open} open work order${totals.open === 1 ? "" : "s"}${totals.overdue > 0 ? ` · ${totals.overdue} overdue` : ""}`
+              : "All maintenance sites"}
           </p>
         </div>
         {canManage && (
           <button onClick={() => setShowForm(true)} className="tu-btn-primary">
-            + New Account
+            + New Site
           </button>
         )}
       </div>
 
       {error && (
         <div className="tu-error-banner" role="alert">
-          Failed to load accounts. Try refreshing.
+          Failed to load sites. Try refreshing.
         </div>
       )}
 
@@ -331,8 +331,8 @@ export default function AccountsPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search accounts…"
-              aria-label="Search accounts"
+              placeholder="Search sites…"
+              aria-label="Search sites"
             />
           </label>
           <label className="tu-toolbar-spacer" style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12.5, fontWeight: 500, color: "var(--tu-text-subtle)" }}>
@@ -342,7 +342,7 @@ export default function AccountsPage() {
               style={{ minWidth: 160, padding: "6px 30px 6px 10px", fontSize: 12.5 }}
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as SortKey)}
-              aria-label="Sort accounts"
+              aria-label="Sort sites"
             >
               {SORT_OPTIONS.map((s) => (
                 <option key={s.key} value={s.key}>{s.label}</option>
@@ -371,16 +371,16 @@ export default function AccountsPage() {
         ) : accounts.length === 0 ? (
           <EmptyState
             icon="account"
-            title="No accounts yet"
+            title="No sites yet"
             hint={
               canManage
-                ? "Accounts are the sites you maintain. Create the first one to start logging work orders and assets."
-                : "You have not been assigned to any account yet. Ask a manager to add you."
+                ? "Sites are the places you maintain. Create the first one to start logging work orders and assets."
+                : "You have not been assigned to any site yet. Ask a manager to add you."
             }
             action={
               canManage && (
                 <button onClick={() => setShowForm(true)} className="tu-btn-primary" type="button">
-                  + New Account
+                  + New Site
                 </button>
               )
             }
@@ -388,7 +388,7 @@ export default function AccountsPage() {
         ) : visible.length === 0 ? (
           <EmptyState
             icon="search"
-            title="No matching accounts"
+            title="No matching sites"
             hint={`Nothing matches “${query}”. Try a shorter search.`}
           />
         ) : (
@@ -396,7 +396,7 @@ export default function AccountsPage() {
             <table className="tu-table tu-table-interactive">
               <thead>
                 <tr>
-                  <th scope="col">Account</th>
+                  <th scope="col">Site</th>
                   <th scope="col" className="tu-center">Open work orders</th>
                   <th scope="col" className="tu-center">Overdue</th>
                   <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
@@ -482,16 +482,16 @@ export default function AccountsPage() {
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
-            aria-label="New account"
+            aria-label="New site"
           >
             <div className="tu-modal-header">
-              <h2 className="tu-modal-title">New Account</h2>
+              <h2 className="tu-modal-title">New Site</h2>
               <button className="tu-btn-ghost" onClick={closeForm} aria-label="Close" disabled={saving}>✕</button>
             </div>
 
             <div className="tu-modal-body">
               <div className="tu-field">
-                <label className="tu-label" htmlFor="acc-name">Account Name *</label>
+                <label className="tu-label" htmlFor="acc-name">Site Name *</label>
                 <input
                   id="acc-name"
                   className="tu-input"
@@ -557,7 +557,7 @@ export default function AccountsPage() {
                         onClick={() => removeShift(i)}
                         disabled={shifts.length === 1}
                         aria-label={`Remove shift ${i + 1}`}
-                        title={shifts.length === 1 ? "An account needs at least one shift" : "Remove shift"}
+                        title={shifts.length === 1 ? "A site needs at least one shift" : "Remove shift"}
                         className="tu-shift-remove"
                       >
                         ×
@@ -567,7 +567,7 @@ export default function AccountsPage() {
                 </div>
 
                 <p className="tu-empty-hint" style={{ marginTop: 10, maxWidth: "none" }}>
-                  An account needs at least one shift. Overnight shifts are fine — set the end time earlier than the start.
+                  A site needs at least one shift. Overnight shifts are fine — set the end time earlier than the start.
                 </p>
               </div>
 
@@ -579,7 +579,7 @@ export default function AccountsPage() {
             <div className="tu-modal-footer">
               <button onClick={closeForm} className="tu-btn-secondary" disabled={saving}>Cancel</button>
               <button onClick={createAccount} disabled={saving} className="tu-btn-primary">
-                {saving ? "Creating…" : "Create Account"}
+                {saving ? "Creating…" : "Create Site"}
               </button>
             </div>
           </div>
@@ -597,13 +597,13 @@ export default function AccountsPage() {
             aria-label={`Edit ${editing.name}`}
           >
             <div className="tu-modal-header">
-              <h2 className="tu-modal-title">Edit account</h2>
+              <h2 className="tu-modal-title">Edit site</h2>
               <button className="tu-btn-ghost" onClick={() => setEditing(null)} aria-label="Close" disabled={editSaving}>✕</button>
             </div>
 
             <div className="tu-modal-body">
               <div className="tu-field">
-                <label className="tu-label" htmlFor="edit-name">Account Name *</label>
+                <label className="tu-label" htmlFor="edit-name">Site Name *</label>
                 <input
                   id="edit-name"
                   className="tu-input"
@@ -623,7 +623,7 @@ export default function AccountsPage() {
                 />
               </div>
               <p className="tu-empty-hint" style={{ maxWidth: "none" }}>
-                Shifts and members are managed inside the account workspace.
+                Shifts and members are managed inside the site workspace.
               </p>
               {editError && <p className="tu-form-error" role="alert">{editError}</p>}
             </div>

@@ -109,8 +109,8 @@ function exportCSV(accounts: AccountSummary[], employees: EmployeeReport[], peri
   const { line, download } = csvBuilder();
 
   // ── Per-account summary ──
-  line(["Account Summary"]);
-  line(["Account", "Open work orders", "Overdue work orders", "Assets needing attention", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"]);
+  line(["Site Summary"]);
+  line(["Site", "Open work orders", "Overdue work orders", "Assets needing attention", "Checklists Done", "Checklist Total", "Attendance Present", "Attendance Total", "Attendance %"]);
   for (const a of accounts) {
     line([
       a.name,
@@ -221,7 +221,7 @@ export default function ReportsPage() {
       <div className="tu-page-header tu-no-print">
         <div>
           <h1 className="tu-page-title">Reports</h1>
-          <p className="tu-page-sub">Cross-account performance overview</p>
+          <p className="tu-page-sub">Cross-site performance overview</p>
         </div>
         <div className="tu-page-actions">
           {data && (
@@ -308,14 +308,14 @@ export default function ReportsPage() {
       {/* Per-account breakdown table */}
       <div className="tu-card">
         <div className="tu-card-header">
-          <h2 className="tu-card-title">Per-Account Breakdown</h2>
-          <span className="tu-result-count tu-no-print">Click a row for the full account report</span>
+          <h2 className="tu-card-title">Per-Site Breakdown</h2>
+          <span className="tu-result-count tu-no-print">Click a row for the full site report</span>
         </div>
         <div className="tu-scroll-x">
-          <table className="tu-table tu-table-interactive" aria-label="Per-account report">
+          <table className="tu-table tu-table-interactive" aria-label="Per-site report">
             <thead>
               <tr>
-                <th scope="col">Account</th>
+                <th scope="col">Site</th>
                 <th scope="col" className="tu-center">Open work orders</th>
                 <th scope="col" className="tu-center">Overdue</th>
                 <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
@@ -339,8 +339,8 @@ export default function ReportsPage() {
                 <tr>
                   <td colSpan={7}>
                     <div className="tu-empty tu-empty-sm">
-                      <p className="tu-empty-title">No accounts to report on</p>
-                      <p className="tu-empty-hint">Once an account has work orders or shifts, its figures appear here.</p>
+                      <p className="tu-empty-title">No sites to report on</p>
+                      <p className="tu-empty-hint">Once a site has work orders or shifts, its figures appear here.</p>
                     </div>
                   </td>
                 </tr>

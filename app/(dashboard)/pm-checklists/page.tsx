@@ -185,7 +185,7 @@ export default function PMChecklistsPage() {
           <EmptyState
             icon="checklist"
             title="No checklists yet"
-            hint="Templates define the preventive-maintenance rounds you assign to accounts and assets."
+            hint="Templates define the preventive-maintenance rounds you assign to sites and assets."
             action={
               canCreate && (
                 <button onClick={() => setShowForm(true)} className="tu-btn-primary" type="button">

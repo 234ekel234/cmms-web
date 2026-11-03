@@ -843,7 +843,7 @@ export default function WorkOrdersPage() {
             <EmptyState
               icon="workOrder"
               title="No work orders yet"
-              hint="Create the first work order for this account with the + New button."
+              hint="Create the first work order for this site with the + New button."
             />
           ) : (
             <EmptyState
@@ -1027,7 +1027,7 @@ export default function WorkOrdersPage() {
               {employeesLoading ? (
                 <p className="tu-empty-hint" style={{ textAlign: "center", padding: "40px 0", margin: 0 }}>Loading employees…</p>
               ) : employees.length === 0 ? (
-                <p className="tu-empty-hint" style={{ textAlign: "center", padding: "40px 0", margin: 0 }}>No employees on this account.</p>
+                <p className="tu-empty-hint" style={{ textAlign: "center", padding: "40px 0", margin: 0 }}>No employees on this site.</p>
               ) : (
                 employees.map((emp) => {
                   const assigned = assigningOrder.assignments.some((a) => a.employeeId === emp.id);

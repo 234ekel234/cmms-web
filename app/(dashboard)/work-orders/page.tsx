@@ -77,7 +77,7 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "DUE_SOON", label: "Due date (soonest)" },
   { key: "PRIORITY", label: "Priority (highest)" },
   { key: "TITLE",    label: "Title (A–Z)"       },
-  { key: "ACCOUNT",  label: "Account (A–Z)"     },
+  { key: "ACCOUNT",  label: "Site (A–Z)"     },
 ];
 
 // Highest first, so a descending sort surfaces CRITICAL at the top.
@@ -148,7 +148,7 @@ function IconSearch() {
 // state as the dropdown instead of duplicating the sort logic.
 const COLUMN_SORT: Partial<Record<string, SortKey>> = {
   Title: "TITLE",
-  Account: "ACCOUNT",
+  Site: "ACCOUNT",
   Priority: "PRIORITY",
   "Due Date": "DUE_SOON",
 };
@@ -374,7 +374,7 @@ export default function WorkOrdersPage() {
       <div className="tu-page-header">
         <div>
           <h1 className="tu-page-title">Work Orders</h1>
-          <p className="tu-page-sub">Maintenance tasks across all your accounts</p>
+          <p className="tu-page-sub">Maintenance tasks across all your sites</p>
         </div>
 
         <div className="tu-page-actions" style={{ alignItems: "flex-end" }}>
@@ -438,7 +438,7 @@ export default function WorkOrdersPage() {
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, asset, account, assignee…"
+              placeholder="Search title, asset, site, assignee…"
               aria-label="Search work orders"
             />
           </label>
@@ -485,7 +485,7 @@ export default function WorkOrdersPage() {
             <table className="tu-table tu-table-interactive" aria-label="Work orders">
               <thead>
                 <tr>
-                  {["Title", "Account", "Asset", "Status", "Priority", "Due Date", "Man-Hours", "Assigned To"].map((col) => {
+                  {["Title", "Site", "Asset", "Status", "Priority", "Due Date", "Man-Hours", "Assigned To"].map((col) => {
                     const key = COLUMN_SORT[col];
                     if (!key) {
                       return (
@@ -528,7 +528,7 @@ export default function WorkOrdersPage() {
                     colSpan={9}
                     icon="workOrder"
                     title="No work orders yet"
-                    hint="Work orders raised on any of your accounts will appear here."
+                    hint="Work orders raised on any of your sites will appear here."
                   />
                 ) : sorted.length === 0 ? (
                   <EmptyRow
@@ -664,7 +664,7 @@ export default function WorkOrdersPage() {
                             label={wo.title}
                             actions={[
                               { label: "Open work order", onSelect: () => router.push(`/accounts/${wo.accountId}/work-orders/${wo.id}`) },
-                              { label: "Open account", onSelect: () => router.push(`/accounts/${wo.accountId}`) },
+                              { label: "Open site", onSelect: () => router.push(`/accounts/${wo.accountId}`) },
                               ...(wo.asset
                                 ? [{ label: "View asset", onSelect: () => router.push(`/accounts/${wo.accountId}/assets/${wo.asset!.id}`) }]
                                 : []),

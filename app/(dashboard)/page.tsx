@@ -288,19 +288,19 @@ export default function DashboardPage() {
           <h1 className="tu-page-title">Dashboard</h1>
           <p className="tu-page-sub">
             {accountFilter
-              ? accountList.find((a) => a.id === accountFilter)?.name ?? "Account overview"
-              : "Overview across all accounts"}
+              ? accountList.find((a) => a.id === accountFilter)?.name ?? "Site overview"
+              : "Overview across all sites"}
           </p>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <select
             className="tu-select"
-            aria-label="Filter by account"
+            aria-label="Filter by site"
             value={accountFilter}
             onChange={(e) => setAccountFilter(e.target.value)}
           >
-            <option value="">All accounts</option>
+            <option value="">All sites</option>
             {accountList.map((a) => (
               <option key={a.id} value={a.id}>{a.name}</option>
             ))}

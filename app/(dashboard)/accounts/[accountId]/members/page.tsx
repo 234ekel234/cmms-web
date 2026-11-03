@@ -87,7 +87,7 @@ export default function MembersPage() {
   async function remove(member: Member) {
     if (!(await confirm({
       title: "Remove access?",
-      message: `${member.name} will lose access to this account. Their login stays, and they can be added back.`,
+      message: `${member.name} will lose access to this site. Their login stays, and they can be added back.`,
       confirmLabel: "Remove",
     }))) return;
     setRemovingId(member.id);
@@ -114,7 +114,7 @@ export default function MembersPage() {
             {[1, 2, 3].map((i) => <div key={i} className="h-14 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
           </div>
         ) : members.length === 0 ? (
-          <EmptyState compact icon="employee" title="No members yet" hint="Members are the users who can see and work on this account." />
+          <EmptyState compact icon="employee" title="No members yet" hint="Members are the users who can see and work on this site." />
         ) : (
           <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm divide-y divide-[var(--tu-border)] overflow-hidden">
             {members.map((m) => (

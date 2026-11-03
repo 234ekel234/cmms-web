@@ -343,7 +343,7 @@ export default function MaintenancePlansPage() {
             <div className="col-span-3">
               <label className={labelCls}>Assign to</label>
               {employees.length === 0 ? (
-                <p className="text-xs text-[var(--tu-text-subtle)]">No employees on this account yet.</p>
+                <p className="text-xs text-[var(--tu-text-subtle)]">No employees on this site yet.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {employees.map((emp) => {
@@ -441,7 +441,7 @@ export default function MaintenancePlansPage() {
             hint={
               plans.length === 0
                 ? "Set up the recurring jobs this site needs — filter changes, greasing, deep cleans — and a work order will be raised for each period."
-                : "Every plan on this account is paused."
+                : "Every plan on this site is paused."
             }
           />
         </div>

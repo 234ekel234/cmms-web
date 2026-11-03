@@ -136,7 +136,7 @@ const NAV_SECTIONS: { heading?: string; items: NavItem[] }[] = [
   {
     items: [
       { href: "/",         label: "Dashboard", Icon: IconGrid     },
-      { href: "/accounts", label: "Accounts",  Icon: IconBuilding },
+      { href: "/accounts", label: "Sites",  Icon: IconBuilding },
     ],
   },
   {
@@ -237,7 +237,7 @@ function NavContent({
       {/* Accounts quick access */}
       {accounts.length > 0 && (
         <div className="tu-section">
-          <p className="tu-section-heading">Accounts</p>
+          <p className="tu-section-heading">Sites</p>
           <ul role="list">
             {accounts.map((acc) => {
               const active = acc.id === activeAccountId;

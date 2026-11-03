@@ -171,7 +171,7 @@ export default function ActivityPage() {
             title={activeFilter === "all" ? "No activity yet" : `No ${filterDef.label.toLowerCase()} activity`}
             hint={
               activeFilter === "all"
-                ? "Every change made on this account is recorded here."
+                ? "Every change made on this site is recorded here."
                 : "Nothing has been recorded under this filter yet."
             }
           />

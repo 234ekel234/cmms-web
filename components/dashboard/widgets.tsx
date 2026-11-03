@@ -526,7 +526,7 @@ function OpenWorkByAccount({ model: m, limit }: { model: DashboardModel; limit: 
   return (
     <div className="tu-card">
       <div className="tu-card-header">
-        <h2 className="tu-card-title">Open Work by Account</h2>
+        <h2 className="tu-card-title">Open Work by Site</h2>
         <span className="tu-chart-cap">
           {hidden > 0 ? `busiest ${shown.length} of ${m.accountLoad.length}` : "outstanding now"}
         </span>
@@ -534,7 +534,7 @@ function OpenWorkByAccount({ model: m, limit }: { model: DashboardModel; limit: 
       <div className="tu-card-body">
         <GroupedBars
           unit="work orders"
-          headLabel="Account"
+          headLabel="Site"
           series={[
             { key: "open", label: "Open", color: "var(--tu-chart-open)" },
             { key: "overdue", label: "Overdue", color: "var(--tu-chart-overdue)" },
@@ -736,14 +736,14 @@ function AccountSummary({ model: m, columns }: { model: DashboardModel; columns:
     <section aria-labelledby="accounts-heading">
       <div className="tu-card">
         <div className="tu-card-header">
-          <h2 id="accounts-heading" className="tu-card-title">Account Summary</h2>
-          <span className="tu-chart-cap">{loading ? "" : `${data?.accounts.length ?? 0} accounts`}</span>
+          <h2 id="accounts-heading" className="tu-card-title">Site Summary</h2>
+          <span className="tu-chart-cap">{loading ? "" : `${data?.accounts.length ?? 0} sites`}</span>
         </div>
         <div className="tu-scroll-x">
-          <table className="tu-table tu-table-interactive" aria-label="Account metrics">
+          <table className="tu-table tu-table-interactive" aria-label="Site metrics">
             <thead>
               <tr>
-                <th scope="col">Account</th>
+                <th scope="col">Site</th>
                 {shown.map((c) => (
                   <th key={c.value} scope="col" className="tu-center">{c.label}</th>
                 ))}
@@ -755,7 +755,7 @@ function AccountSummary({ model: m, columns }: { model: DashboardModel; columns:
               ) : !data?.accounts.length ? (
                 <tr>
                   <td colSpan={shown.length + 1} style={{ textAlign: "center", padding: "32px 24px", color: "var(--tu-text-body)", fontSize: 14 }}>
-                    No accounts found.
+                    No sites found.
                   </td>
                 </tr>
               ) : (
@@ -1049,14 +1049,14 @@ export const CATALOGUE: DashboardWidget[] = [
   },
   {
     key: "open-work-by-account",
-    title: "Open Work by Account",
+    title: "Open Work by Site",
     group: "Comparisons",
     defaultSpan: 12,
     spans: [6, 8, 12],
     options: [
       {
         key: "limit",
-        label: "Accounts shown",
+        label: "Sites shown",
         kind: "number",
         min: 3,
         max: 30,
@@ -1095,7 +1095,7 @@ export const CATALOGUE: DashboardWidget[] = [
 
   {
     key: "account-summary",
-    title: "Account Summary",
+    title: "Site Summary",
     group: "Lists",
     defaultSpan: 8,
     spans: [6, 8, 12],
@@ -1106,7 +1106,7 @@ export const CATALOGUE: DashboardWidget[] = [
         kind: "multi",
         choices: ACCOUNT_COLUMNS,
         default: ALL_ACCOUNT_COLUMNS,
-        help: "The account name always shows.",
+        help: "The site name always shows.",
       },
     ],
     summary: (o) => {

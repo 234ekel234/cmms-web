@@ -258,14 +258,14 @@ export default function EmployeeDetailPage() {
           className="flex-1 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4 hover:shadow-md transition-shadow text-center"
         >
           <p className="text-sm font-semibold text-[var(--tu-text-heading)]">Work Orders</p>
-          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">View account work orders</p>
+          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">View site work orders</p>
         </Link>
         <Link
           href={`/accounts/${accountId}/attendance`}
           className="flex-1 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-4 hover:shadow-md transition-shadow text-center"
         >
           <p className="text-sm font-semibold text-[var(--tu-text-heading)]">Attendance</p>
-          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">View account attendance log</p>
+          <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">View site attendance log</p>
         </Link>
       </div>
     </div>

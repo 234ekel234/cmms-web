@@ -109,7 +109,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
       <div className="tu-acct-header">
         <div style={{ marginBottom: 12 }}>
           <Link href="/accounts" className="tu-acct-back">
-            ← Accounts
+            ← Sites
           </Link>
           <h1 className="tu-acct-title">
             {account ? account.name : "Loading…"}
@@ -130,11 +130,11 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
               <path d="M15 21V9a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v12" />
               <path d="M9 7h2M9 11h2M9 15h2" />
             </svg>
-            <span className="tu-scope-name">{account ? account.name : "Account"}</span>
+            <span className="tu-scope-name">{account ? account.name : "Site"}</span>
           </span>
           <span className="tu-scope-divider" aria-hidden="true" />
 
-          <nav className="tu-subnav" aria-label="Account sections">
+          <nav className="tu-subnav" aria-label="Site sections">
             {pinned.map((tab) => {
               const active = isActive(tab.path);
               return (

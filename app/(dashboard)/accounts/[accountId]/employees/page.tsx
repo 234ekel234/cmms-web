@@ -130,7 +130,7 @@ export default function EmployeesPage() {
       setShowAssign(false);
     } catch (err: unknown) {
       const e = err as { response?: { data?: { error?: string } } };
-      setAssignError(e?.response?.data?.error ?? "Failed to assign. Regular employees can only belong to one account.");
+      setAssignError(e?.response?.data?.error ?? "Failed to assign. Regular employees can only belong to one site.");
     } finally {
       setAssigning(false);
     }
@@ -154,7 +154,7 @@ export default function EmployeesPage() {
 
   async function unassign(emp: Employee) {
     if (!(await confirm({
-      title: "Remove from this account?",
+      title: "Remove from this site?",
       message: `${emp.name} will no longer be on this site's roster, and their weekly shifts and upcoming schedule here are cleared. Past shifts and attendance stay on record, and they can be added back.`,
       confirmLabel: "Remove",
     }))) return;

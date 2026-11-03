@@ -270,9 +270,9 @@ export default function EmployeesPage() {
             style={{ minWidth: 180 }}
             value={companyFilter}
             onChange={(e) => setCompanyFilter(e.target.value)}
-            aria-label="Filter by account"
+            aria-label="Filter by site"
           >
-            <option value="ALL">All accounts</option>
+            <option value="ALL">All sites</option>
             {allCompanies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -367,7 +367,7 @@ export default function EmployeesPage() {
                   colSpan={6}
                   icon="employee"
                   title="No employees yet"
-                  hint="The registry holds every technician you can assign to an account. Add the first one to get started."
+                  hint="The registry holds every technician you can assign to a site. Add the first one to get started."
                 />
               ) : filtered.length === 0 ? (
                 <EmptyRow

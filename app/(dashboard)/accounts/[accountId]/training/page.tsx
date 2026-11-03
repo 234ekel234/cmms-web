@@ -160,7 +160,7 @@ export default function TrainingPage() {
           <EmptyState
             icon="employee"
             title="No employees found"
-            hint="Assign employees to this account before tracking their training."
+            hint="Assign employees to this site before tracking their training."
           />
         </div>
       ) : (

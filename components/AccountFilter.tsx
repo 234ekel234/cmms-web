@@ -54,14 +54,14 @@ export default function AccountFilter({
 
   const label =
     selected.size === 0 || selected.size === accounts.length
-      ? "All accounts"
+      ? "All sites"
       : selected.size === 1
-      ? accounts.find((a) => selected.has(a.id))?.name ?? "1 account"
-      : `${selected.size} accounts`;
+      ? accounts.find((a) => selected.has(a.id))?.name ?? "1 site"
+      : `${selected.size} sites`;
 
   return (
     <div ref={wrapRef} style={{ position: "relative" }}>
-      <label className="tu-select-label" htmlFor="account-filter-trigger">Accounts</label>
+      <label className="tu-select-label" htmlFor="account-filter-trigger">Sites</label>
       <button
         id="account-filter-trigger"
         type="button"
@@ -79,7 +79,7 @@ export default function AccountFilter({
         <div
           role="listbox"
           aria-multiselectable="true"
-          aria-label="Filter by account"
+          aria-label="Filter by site"
           style={{
             position: "absolute",
             top: "100%",
@@ -110,7 +110,7 @@ export default function AccountFilter({
               color: selected.size === 0 ? "var(--tu-text-brand)" : "var(--tu-text-body)",
             }}
           >
-            All accounts
+            All sites
           </button>
 
           <div style={{ borderTop: "1px solid var(--tu-border)", margin: "8px 0" }} />

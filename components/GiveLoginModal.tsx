@@ -51,7 +51,7 @@ export default function GiveLoginModal({
 
   async function submit() {
     if (noAccounts) {
-      setError("Assign this employee to an account before giving them a login.");
+      setError("Assign this employee to a site before giving them a login.");
       return;
     }
     if (!email.trim()) { setError("An email address is required."); return; }

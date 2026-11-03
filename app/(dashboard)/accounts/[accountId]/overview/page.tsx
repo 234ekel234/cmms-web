@@ -169,7 +169,7 @@ export default function AccountOverviewPage() {
             <Link href={`${base}/work-orders`} className="text-xs text-[var(--tu-text-brand)] hover:underline">View all →</Link>
           </div>
           {workOrders.length === 0 ? (
-            <EmptyState compact icon="workOrder" title="No work orders yet" hint="Raised work for this account will show up here." />
+            <EmptyState compact icon="workOrder" title="No work orders yet" hint="Raised work for this site will show up here." />
           ) : (
             <>
               <Breakdown segments={woSegments} total={workOrders.length} />
@@ -227,7 +227,7 @@ export default function AccountOverviewPage() {
             <Link href={`${base}/activity`} className="text-xs text-[var(--tu-text-brand)] hover:underline">View all →</Link>
           </div>
           {activity.length === 0 ? (
-            <EmptyState compact icon="activity" title="No activity yet" hint="Changes made on this account are logged here." />
+            <EmptyState compact icon="activity" title="No activity yet" hint="Changes made on this site are logged here." />
           ) : (
             <ul className="space-y-3">
               {activity.slice(0, 6).map((a) => (
@@ -243,7 +243,7 @@ export default function AccountOverviewPage() {
 
       {/* Account info */}
       <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-[var(--tu-text-body)] mb-4">Account Info</h2>
+        <h2 className="text-sm font-semibold text-[var(--tu-text-body)] mb-4">Site Info</h2>
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3 text-xs mb-4">
           <div>
             <dt className="font-semibold text-[var(--tu-text-subtle)]">Created</dt>

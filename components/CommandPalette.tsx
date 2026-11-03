@@ -17,13 +17,13 @@ import { workOrderRef } from "@/lib/workOrders";
 // PAGES alone: the per-account entries are built from whatever /accounts
 // returns, so a section closed to the caller must drop out here too.
 
-type Kind = "Page" | "Account" | "Asset" | "Work Order";
+type Kind = "Page" | "Site" | "Asset" | "Work Order";
 type Item = { id: string; label: string; sub?: string; kind: Kind; href: string };
 
 const PAGES: Item[] = [
   { id: "p-dash", label: "Dashboard", kind: "Page", href: "/" },
   { id: "p-wo", label: "Work Orders", kind: "Page", href: "/work-orders" },
-  { id: "p-acc", label: "Accounts", kind: "Page", href: "/accounts" },
+  { id: "p-acc", label: "Sites", kind: "Page", href: "/accounts" },
   { id: "p-assets", label: "Assets", kind: "Page", href: "/assets" },
   { id: "p-emp", label: "Employees", kind: "Page", href: "/employees" },
   { id: "p-pm", label: "PM Checklists", kind: "Page", href: "/pm-checklists" },
@@ -53,7 +53,7 @@ export default function CommandPalette() {
       const accRes = await api.get("/accounts");
       const accounts: { id: string; name: string }[] = accRes.data;
       const accItems: Item[] = accounts.map((a) => ({
-        id: `acc-${a.id}`, label: a.name, kind: "Account", href: `/accounts/${a.id}/work-orders`,
+        id: `acc-${a.id}`, label: a.name, kind: "Site", href: `/accounts/${a.id}/work-orders`,
       }));
       const perAccount = await Promise.all(
         accounts.map(async (a) => {
@@ -151,7 +151,7 @@ export default function CommandPalette() {
           value={query}
           onChange={(e) => { setQuery(e.target.value); setActiveIdx(0); }}
           onKeyDown={onInputKey}
-          placeholder="Search accounts, assets, work orders, pages…"
+          placeholder="Search sites, assets, work orders, pages…"
           className="w-full px-4 py-3.5 text-sm border-b border-[var(--tu-border)] focus:outline-none"
           aria-label="Search"
         />

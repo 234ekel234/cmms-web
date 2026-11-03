@@ -300,7 +300,7 @@ export default function AttendancePage() {
               {[1, 2, 3].map((i) => <div key={i} className="h-20 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />)}
             </div>
           ) : attendance.length === 0 ? (
-            <EmptyState icon="employee" title="No employees in this account" hint="Assign employees to this account before tracking their attendance." />
+            <EmptyState icon="employee" title="No employees on this site" hint="Assign employees to this site before tracking their attendance." />
           ) : (
             <div className="space-y-3">
               {attendance.map((row) => (
@@ -396,7 +396,7 @@ export default function AttendancePage() {
           {loadingGrid ? (
             <div className="h-48 bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] animate-pulse" />
           ) : !grid || grid.rows.length === 0 ? (
-            <EmptyState icon="employee" title="No employees in this account" hint="Assign employees to this account before tracking their attendance." />
+            <EmptyState icon="employee" title="No employees on this site" hint="Assign employees to this site before tracking their attendance." />
           ) : (
             <div>
               <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-x-auto">

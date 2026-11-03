@@ -290,8 +290,8 @@ export default function ReportsPage() {
     const completions = data.checklists.completedLogs;
     const onTime = completions > 0 ? Math.round(((completions - totalLate) / completions) * 100) : "";
 
-    line(["Account Report"]);
-    line(["Account", data.accountName]);
+    line(["Site Report"]);
+    line(["Site", data.accountName]);
     line(["Period", data.period.from, "to", data.period.to]);
     line([]);
     line(["Assigned", data.checklists.assigned]);
@@ -755,7 +755,7 @@ export default function ReportsPage() {
                   compact
                   icon="asset"
                   title="No assets to measure"
-                  hint="Reliability is calculated per asset. Add assets to this account to see downtime and failure rates."
+                  hint="Reliability is calculated per asset. Add assets to this site to see downtime and failure rates."
                 />
               ) : (
                 <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden mb-4">
@@ -821,7 +821,7 @@ export default function ReportsPage() {
             <h3 className="text-sm font-bold text-[var(--tu-text-body)] mb-3">Employee Performance</h3>
             {data.employees.length === 0 ? (
               <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm p-8 text-center text-[var(--tu-text-subtle)] text-sm">
-                No employees in this account.
+                No employees on this site.
               </div>
             ) : (
               <div className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm divide-y divide-[var(--tu-border)]">

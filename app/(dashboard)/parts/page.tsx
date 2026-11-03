@@ -15,7 +15,7 @@ type SortKey = "NAME" | "ACCOUNT" | "STOCK" | "VALUE";
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "NAME",    label: "Name (A–Z)" },
-  { key: "ACCOUNT", label: "Account (A–Z)" },
+  { key: "ACCOUNT", label: "Site (A–Z)" },
   { key: "STOCK",   label: "Stock (lowest first)" },
   { key: "VALUE",   label: "Stock value (highest first)" },
 ];
@@ -93,7 +93,7 @@ export default function PartsPage() {
       <div className="tu-page-header">
         <div>
           <h1 className="tu-page-title">Spare Parts</h1>
-          <p className="tu-page-sub">Stocked spares and reorder levels across all your accounts</p>
+          <p className="tu-page-sub">Stocked spares and reorder levels across all your sites</p>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
           {!loading && accounts.length > 1 && (
@@ -109,7 +109,7 @@ export default function PartsPage() {
           <div className="tu-stat-card">
             <p className="tu-stat-label">Catalogued Parts</p>
             <p className="tu-stat-value">{parts.filter((p) => !p.archivedAt).length}</p>
-            <p className="tu-stat-sub">across all accounts</p>
+            <p className="tu-stat-sub">across all sites</p>
           </div>
           <div className="tu-stat-card">
             <p className="tu-stat-label">At or below minimum</p>
@@ -137,7 +137,7 @@ export default function PartsPage() {
             style={{ width: 280 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, part number, account, location…"
+            placeholder="Search name, part number, site, location…"
             aria-label="Search spare parts"
           />
 
@@ -191,7 +191,7 @@ export default function PartsPage() {
             <thead>
               <tr>
                 <th scope="col">Part</th>
-                <th scope="col">Account</th>
+                <th scope="col">Site</th>
                 <th scope="col">Part No.</th>
                 <th scope="col" className="tu-center">On Hand</th>
                 <th scope="col" className="tu-center">Minimum</th>
@@ -215,7 +215,7 @@ export default function PartsPage() {
                   colSpan={7}
                   icon="part"
                   title="No spare parts catalogued"
-                  hint="Add them from an account's Spare Parts tab to track stock levels here."
+                  hint="Add them from a site's Spare Parts tab to track stock levels here."
                 />
               ) : sorted.length === 0 ? (
                 <EmptyRow

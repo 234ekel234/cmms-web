@@ -42,7 +42,7 @@ const HEALTH_TABS: { key: HealthFilter; label: string }[] = [
 
 const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "NAME",       label: "Name (A–Z)"          },
-  { key: "ACCOUNT",    label: "Account (A–Z)"       },
+  { key: "ACCOUNT",    label: "Site (A–Z)"       },
   { key: "HEALTH",     label: "Health (worst first)" },
   { key: "OPEN_WOS",   label: "Open work orders"    },
   { key: "LAST_MAINT", label: "Least recently maintained" },
@@ -177,7 +177,7 @@ export default function AssetsPage() {
       <div className="tu-page-header">
         <div>
           <h1 className="tu-page-title">Assets</h1>
-          <p className="tu-page-sub">Equipment and facility registry across all your accounts</p>
+          <p className="tu-page-sub">Equipment and facility registry across all your sites</p>
         </div>
         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
           {!loading && accounts.length > 1 && (
@@ -251,7 +251,7 @@ export default function AssetsPage() {
             style={{ width: 280 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, category, account, location…"
+            placeholder="Search name, category, site, location…"
             aria-label="Search assets"
           />
 
@@ -306,7 +306,7 @@ export default function AssetsPage() {
             <thead>
               <tr>
                 <th scope="col">Name</th>
-                <th scope="col">Account</th>
+                <th scope="col">Site</th>
                 <th scope="col">Category</th>
                 <th scope="col">Health</th>
                 <th scope="col">Status</th>
@@ -331,7 +331,7 @@ export default function AssetsPage() {
                   colSpan={8}
                   icon="asset"
                   title="No assets yet"
-                  hint="Assets are the equipment you maintain. Add them from an account's Assets tab."
+                  hint="Assets are the equipment you maintain. Add them from a site's Assets tab."
                 />
               ) : sorted.length === 0 ? (
                 <EmptyRow

@@ -402,7 +402,7 @@ export default function PartDetailPage() {
         {editingAssets ? (
           <div className="p-6">
             {assets.length === 0 ? (
-              <p className="text-sm text-[var(--tu-text-subtle)]">This account has no assets yet.</p>
+              <p className="text-sm text-[var(--tu-text-subtle)]">This site has no assets yet.</p>
             ) : (
               <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto">
                 {assets.map((a) => (
