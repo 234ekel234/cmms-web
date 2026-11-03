@@ -37,7 +37,10 @@ export default function StickerPage() {
   const load = useCallback(async () => {
     if (getToken()) {
       try {
-        const res = await api.get(`/locations/by-code/${encodeURIComponent(code)}`);
+        // A session that has ended (signed out elsewhere, expired) is cleared
+        // and the page carries on signed out — not sent to the login page,
+        // which hid the report form from anyone with an old sign-in.
+        const res = await api.get(`/locations/by-code/${encodeURIComponent(code)}`, { keepPageOn401: true });
         router.replace(`/accounts/${res.data.accountId}/assets/locations/${res.data.locationId}?scan=1`);
         return;
       } catch {

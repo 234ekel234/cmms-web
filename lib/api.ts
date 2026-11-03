@@ -1,6 +1,18 @@
 import axios from "axios";
 import { clearSession, loginUrl, noteSignedOut } from "@/lib/auth";
 
+declare module "axios" {
+  interface AxiosRequestConfig {
+    /**
+     * A 401 on this request is the caller's to handle: the session is still
+     * cleared, but nobody is sent to the login page. For pages open to people
+     * signed out (a location sticker), where a dead session must fall back to
+     * the signed-out page rather than hide it behind a sign-in form.
+     */
+    keepPageOn401?: boolean;
+  }
+}
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000/api";
 
 const api = axios.create({
@@ -49,7 +61,7 @@ api.interceptors.response.use(
       // Said on the login page: "you were signed out" beats an unexplained form.
       const reason = err.response?.data?.error;
       if (typeof reason === "string" && reason) noteSignedOut(reason);
-      if (window.location.pathname !== "/login") window.location.href = loginUrl();
+      if (window.location.pathname !== "/login" && !err.config?.keepPageOn401) window.location.href = loginUrl();
     }
     // A password someone else chose must be replaced first; the API refuses
     // everything else until it is (backend withCurrentRole).
