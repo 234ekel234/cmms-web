@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { FIELD_STAFF, MANAGERS, STAFF, hasRole } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
 import Attachments from "@/components/Attachments";
+import ReportProblemModal, { type ReportCategory } from "@/components/ReportProblemModal";
 import { startLoad } from "@/lib/startLoad";
 import type { AssetLocationRef } from "@/lib/assetLocations";
 import { assetHealthMeta, roleLabel, workOrderPriorityMeta, workOrderStatusFor } from "@/lib/statuses";
@@ -51,6 +52,7 @@ type Overview = {
     scannedOnSite?: boolean | null;
   }[];
   repeat: { jobs: number; days: number; flagged: boolean };
+  reportCategories?: ReportCategory[];
   /** Staff only: who scanned the sticker, newest first. */
   visits?: { id: string; userName: string; userRole: string; createdAt: string; locationId: string }[];
 };
@@ -73,7 +75,6 @@ export default function LocationPage() {
   const { user } = useAuth();
   const isStaff = hasRole(user?.role, STAFF);
   const canFillIn = hasRole(user?.role, FIELD_STAFF);
-  const isClient = user?.role === "CLIENT";
   const isManager = hasRole(user?.role, MANAGERS);
   const confirm = useConfirm();
 
@@ -83,6 +84,8 @@ export default function LocationPage() {
   // the API records it. Opening the page from a desk records nothing.
   const scanned = useSearchParams().get("scan") === "1";
   const [visitNote, setVisitNote] = useState<string | null>(null);
+  const [reporting, setReporting] = useState(false);
+  const [reportNote, setReportNote] = useState<string | null>(null);
 
   const recordScan = useCallback(async () => {
     if (!scanned) return;
@@ -133,20 +136,29 @@ export default function LocationPage() {
       setError(errorMessage(err, "Couldn't replace the sticker."));
     }
   }
-  // Clients raise requests from the portal; everyone else from the queue.
-  const reportHref = isClient
-    ? `/accounts/${accountId}/portal?locationId=${location.id}`
-    : `/accounts/${accountId}/work-orders?locationId=${location.id}`;
+  // Report a problem files a triage report for the Problem Reports inbox, for
+  // every role (as on mobile); staff may also raise a work order directly.
   const sub = (l: AssetLocationRef | null) => (l && l.id !== location.id ? l.name : null);
 
   return (
     <div className="px-4 py-5 sm:p-8 flex flex-col gap-5">
       {error && <div className="tu-action-error" role="alert"><span>{error}</span></div>}
       {visitNote && <div className="rounded-lg px-4 py-2.5 text-sm bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] border border-[var(--tu-bd-success)]" role="status">{visitNote}</div>}
+      {reportNote && <div className="rounded-lg px-4 py-2.5 text-sm bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] border border-[var(--tu-bd-success)]" role="status">{reportNote}</div>}
       {data.repeat.flagged && (
         <div className="rounded-lg px-4 py-2.5 text-sm bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] border border-[var(--tu-bd-warning)]" role="status">
           {data.repeat.jobs} problems raised here in the last {data.repeat.days} days (scheduled work aside) — this may be a recurring problem worth a closer look.
         </div>
+      )}
+      {reporting && (
+        <ReportProblemModal
+          accountId={accountId}
+          locationId={location.id}
+          placeName={location.parent ? `${location.parent.name} · ${location.name}` : location.name}
+          categories={data.reportCategories ?? []}
+          onClose={() => setReporting(false)}
+          onSent={(merged) => setReportNote(merged ? "Added to a report already with the site team." : "Report sent to the site team.")}
+        />
       )}
       <section className="tu-card">
         <div className="tu-card-pad" style={{ paddingTop: 20 }}>
@@ -172,7 +184,10 @@ export default function LocationPage() {
               {isManager && (
                 <button type="button" className="tu-btn-secondary" onClick={replaceSticker}>Replace sticker</button>
               )}
-              <Link href={reportHref} className="tu-btn-primary">Report a problem here</Link>
+              {isStaff && (
+                <Link href={`/accounts/${accountId}/work-orders?locationId=${location.id}`} className="tu-btn-secondary">New work order here</Link>
+              )}
+              <button type="button" className="tu-btn-primary" onClick={() => setReporting(true)}>Report a problem here</button>
             </div>
           </div>
           <div className="flex flex-wrap gap-4 mt-4 text-sm">
