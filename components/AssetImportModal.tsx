@@ -15,6 +15,7 @@ type Row = {
   status: string;
   health: string;
   serialNumber: string;
+  ownership: string;
   location: string;
   purchaseDate: string;
   purchaseCost: string;
@@ -27,7 +28,7 @@ type Row = {
 };
 
 const COLUMNS = [
-  "name", "category", "assetCode", "brand", "model", "status", "health", "serialNumber",
+  "name", "category", "assetCode", "brand", "model", "status", "health", "serialNumber", "ownership",
   "location", "purchaseDate", "purchaseCost", "warrantyExpiry", "manufacturedDate",
   "capacity", "capacityUnit", "findings",
 ] as const;
@@ -54,6 +55,7 @@ function toRows(text: string): Row[] {
       status: get("status"),
       health: get("health").toUpperCase().replace(/[ -]/g, "_"),
       serialNumber: get("serialNumber"),
+      ownership: get("ownership"),
       location: get("location"),
       purchaseDate: get("purchaseDate"),
       purchaseCost: get("purchaseCost"),
@@ -78,7 +80,7 @@ function toRows(text: string): Row[] {
 
 function downloadTemplate() {
   const header = COLUMNS.join(",");
-  const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01", "150", "kVA", ""].join(",");
+  const example = ["Generator A", "Electrical", "MKT-EL-001", "Cummins", "C150D5", "Operational", "FUNCTIONAL", "SN-1234", "Proprietary", "Rooftop", "2024-01-15", "150000", "2026-01-15", "2023-11-01", "150", "kVA", ""].join(",");
   // Through lib/csv for the byte-order mark: a template that opens in Excel as
   // UTF-8 is saved back as UTF-8, so an "ñ" typed into it survives the import.
   downloadCsv([header, example], "cmms-asset-import-template.csv");
@@ -130,7 +132,7 @@ export default function AssetImportModal({
           // import silently dropped them.
           name: r.name, category: r.category, assetCode: r.assetCode, brand: r.brand, model: r.model,
           status: r.status, health: r.health,
-          serialNumber: r.serialNumber, location: r.location, purchaseDate: r.purchaseDate,
+          serialNumber: r.serialNumber, ownership: r.ownership, location: r.location, purchaseDate: r.purchaseDate,
           purchaseCost: r.purchaseCost, warrantyExpiry: r.warrantyExpiry, manufacturedDate: r.manufacturedDate,
           capacity: r.capacity, capacityUnit: r.capacityUnit, findings: r.findings,
         })),

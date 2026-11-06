@@ -32,6 +32,7 @@ type Asset = {
   assetCode: string | null;
   brand: string | null;
   model: string | null;
+  ownership: string | null;
   location: AssetLocationRef | null;
   capacity: number | null;
   capacityUnit: string | null;
@@ -52,7 +53,7 @@ const INPUT_CLS =
   "w-full border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]";
 
 const BLANK_FORM = {
-  name: "", category: "", assetCode: "", brand: "", model: "", status: "",
+  name: "", category: "", assetCode: "", brand: "", model: "", status: "", ownership: "",
   serialNumber: "", manufacturedDate: "", purchaseDate: "",
   purchaseCost: "", warrantyExpiry: "",
   capacity: "", capacityUnit: "", findings: "",
@@ -85,6 +86,8 @@ export default function AssetsPage() {
   const [showLocations, setShowLocations] = useState(false);
   // "" is every location; otherwise the id of the node being filtered on.
   const [locationFilter, setLocationFilter] = useState("");
+  // "" is every asset; otherwise one ownership value exactly as stored.
+  const [ownershipFilter, setOwnershipFilter] = useState("");
   // `?health=attention` is how the Accounts page's "Needs attention" figure
   // lands here: the same set the dashboard counted, nothing else.
   const searchParams = useSearchParams();
@@ -171,6 +174,7 @@ export default function AssetsPage() {
         model: form.model.trim(),
         // Left blank the API applies its own default rather than storing "".
         status: form.status.trim(),
+        ownership: form.ownership.trim(),
         serialNumber: form.serialNumber.trim(),
         locationId: form.locationId,
         // Dates and cost go as null rather than "" when untouched: the API
@@ -199,7 +203,8 @@ export default function AssetsPage() {
   // alone would return only the assets filed at the building itself and quietly
   // hide the rest — which is the failure the free-text column had, one level up.
   const visible = useMemo(() => {
-    const byHealth = attentionOnly ? assets.filter((a) => NEEDS_ATTENTION_HEALTH.includes(a.health)) : assets;
+    const byAttention = attentionOnly ? assets.filter((a) => NEEDS_ATTENTION_HEALTH.includes(a.health)) : assets;
+    const byHealth = ownershipFilter ? byAttention.filter((a) => (a.ownership ?? "") === ownershipFilter) : byAttention;
     if (!locationFilter) return byHealth;
     const node =
       locations.find((r) => r.id === locationFilter) ??
@@ -207,7 +212,14 @@ export default function AssetsPage() {
     if (!node) return byHealth;
     const scope = new Set(locationScopeIds(node));
     return byHealth.filter((a) => a.location && scope.has(a.location.id));
-  }, [assets, locations, locationFilter, attentionOnly]);
+  }, [assets, locations, locationFilter, attentionOnly, ownershipFilter]);
+
+  // Offered from what is on file rather than a fixed list: ownership is free
+  // text, and each company has its own words for it.
+  const ownershipValues = useMemo(
+    () => [...new Set(assets.map((a) => a.ownership).filter((o): o is string => !!o))].sort((a, b) => a.localeCompare(b)),
+    [assets],
+  );
 
   const sorted = [...visible].sort((a, b) => {
     if (!!a.archivedAt !== !!b.archivedAt) return a.archivedAt ? 1 : -1;
@@ -299,6 +311,15 @@ export default function AssetsPage() {
             </optgroup>
           ))}
         </select>
+        {ownershipValues.length > 0 && (
+          <>
+            <span className="text-xs text-[var(--tu-text-subtle)] ml-2">Ownership:</span>
+            <select className="tu-select" value={ownershipFilter} onChange={(e) => setOwnershipFilter(e.target.value)}>
+              <option value="">All</option>
+              {ownershipValues.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </>
+        )}
         {locationFilter ? (
           <Link href={`/accounts/${accountId}/assets/locations/${locationFilter}`} className="text-xs font-semibold text-[var(--tu-text-brand)] hover:underline">
             Open location page →
@@ -368,6 +389,15 @@ export default function AssetsPage() {
                 placeholder="Operational"
               />
               <p className="text-[11px] text-[var(--tu-text-subtle)] mt-1">Free text — a note for your team.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Ownership</label>
+              <input
+                className={INPUT_CLS}
+                value={form.ownership}
+                onChange={(e) => setForm((f) => ({ ...f, ownership: e.target.value }))}
+                placeholder="e.g. Rental, Proprietary"
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold text-[var(--tu-text-subtle)] mb-1">Brand</label>
@@ -524,7 +554,7 @@ export default function AssetsPage() {
       ) : sorted.length === 0 ? (
         <div className="tu-card">
           {/* A filter that matches nothing is good news, not an empty register. */}
-          {assets.length > 0 && (attentionOnly || locationFilter) ? (
+          {assets.length > 0 && (attentionOnly || locationFilter || ownershipFilter) ? (
             <EmptyState
               icon="asset"
               title={attentionOnly ? "Nothing needs attention" : "No assets here"}
@@ -610,6 +640,9 @@ export default function AssetsPage() {
                         <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-bg-secondary)] text-[var(--tu-text-body)]">
                           {asset.status || "—"}
                         </span>
+                      )}
+                      {asset.ownership && (
+                        <p className="text-xs text-[var(--tu-text-subtle)] mt-1">{asset.ownership}</p>
                       )}
                     </td>
                     <td className="px-6 py-4 text-center">

@@ -36,6 +36,7 @@ type Asset = {
   brand: string | null;
   model: string | null;
   serialNumber: string | null;
+  ownership: string | null;
   location: AssetLocationRef | null;
   purchaseDate: string | null;
   purchaseCost: number | null;
@@ -130,7 +131,7 @@ function WorkOrderRow({ wo }: { wo: WorkOrder }) {
 const INPUT_CLS =
   "w-full border border-[var(--tu-border)] rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]";
 
-// The nine editable fields of the Details block, in the order they are shown.
+// The ten editable fields of the Details block, in the order they are shown.
 // `kind` drives both the input type and how the value is sent: text fields go
 // as trimmed strings (the API turns "" into null), dates as yyyy-mm-dd, and
 // cost as a number or null — never "", which would reach `parseFloat` as NaN.
@@ -139,6 +140,7 @@ const DETAIL_FIELDS = [
   { key: "brand",            label: "Brand",         kind: "text" },
   { key: "model",            label: "Model",         kind: "text" },
   { key: "serialNumber",     label: "Serial No.",    kind: "text" },
+  { key: "ownership",        label: "Ownership",     kind: "text" },
   { key: "manufacturedDate", label: "Manufactured",  kind: "date" },
   { key: "purchaseDate",     label: "Purchase Date", kind: "date" },
   { key: "purchaseCost",     label: "Purchase Cost", kind: "cost" },
@@ -168,6 +170,7 @@ const draftFromAsset = (a: Asset): DetailsDraft => ({
   brand: a.brand ?? "",
   model: a.model ?? "",
   serialNumber: a.serialNumber ?? "",
+  ownership: a.ownership ?? "",
   manufacturedDate: a.manufacturedDate?.slice(0, 10) ?? "",
   purchaseDate: a.purchaseDate?.slice(0, 10) ?? "",
   purchaseCost: a.purchaseCost != null ? String(a.purchaseCost) : "",
@@ -309,6 +312,7 @@ export default function AssetDetailPage() {
       brand: detailsDraft.brand.trim() || null,
       model: detailsDraft.model.trim() || null,
       serialNumber: detailsDraft.serialNumber.trim() || null,
+      ownership: detailsDraft.ownership.trim() || null,
       locationId: locationDraft,
       manufacturedDate: detailsDraft.manufacturedDate || null,
       purchaseDate: detailsDraft.purchaseDate || null,
@@ -700,6 +704,7 @@ export default function AssetDetailPage() {
                 { label: "Brand", value: asset.brand },
                 { label: "Model", value: asset.model },
                 { label: "Serial No.", value: asset.serialNumber },
+                { label: "Ownership", value: asset.ownership },
                 { label: "Capacity", value: formatCapacity(asset.capacity, asset.capacityUnit) },
                 {
                   label: "Location",

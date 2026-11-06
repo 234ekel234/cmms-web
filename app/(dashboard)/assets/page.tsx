@@ -20,6 +20,7 @@ type Asset = {
   brand: string | null;
   model: string | null;
   serialNumber: string | null;
+  ownership: string | null;
   location: AssetLocationRef | null;
   openWorkOrders: number;
   lastCompletedAt: string | null;
@@ -112,7 +113,8 @@ export default function AssetsPage() {
         !!a.serialNumber?.toLowerCase().includes(q) ||
         !!a.assetCode?.toLowerCase().includes(q) ||
         !!a.brand?.toLowerCase().includes(q) ||
-        !!a.model?.toLowerCase().includes(q);
+        !!a.model?.toLowerCase().includes(q) ||
+        !!a.ownership?.toLowerCase().includes(q);
       return matchAccount && matchStatus && matchSearch;
     });
   }, [assets, selectedAccounts, statusFilter, search]);
