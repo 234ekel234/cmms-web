@@ -3049,6 +3049,7 @@ figure:hover .tu-attachment-remove,
   background: var(--tu-bg-secondary);
   display: block;
 }
+.tu-asset-thumb-empty { display: inline-flex; align-items: center; justify-content: center; color: var(--tu-text-disabled); }
 .tu-asset-thumb {
   width: 32px;
   height: 32px;

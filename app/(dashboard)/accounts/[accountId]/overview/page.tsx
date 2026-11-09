@@ -213,8 +213,8 @@ export default function AccountOverviewPage() {
               </div>
               <div className="flex gap-4 text-xs">
                 <span className="text-[var(--tu-on-success)] font-semibold">{pmCounts.done} done</span>
-                <span className="text-[var(--tu-on-warning)] font-semibold">{pmCounts.draft} draft</span>
-                <span className="text-[var(--tu-text-subtle)] font-semibold">{pmCounts.unanswered} unanswered</span>
+                <span className="text-[var(--tu-on-warning)] font-semibold">{pmCounts.draft} started</span>
+                <span className="text-[var(--tu-text-subtle)] font-semibold">{pmCounts.unanswered} not done yet</span>
               </div>
             </>
           )}

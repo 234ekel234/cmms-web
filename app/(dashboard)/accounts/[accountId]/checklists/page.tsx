@@ -56,12 +56,12 @@ const STATUS_META: Record<ChecklistState, { label: string; activeCls: string; ba
     badgeCls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]",
   },
   draft: {
-    label: "Partial",
+    label: "Started, not submitted",
     activeCls: "bg-[var(--tu-priority-high)] text-white border-[var(--tu-priority-high)]",
     badgeCls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]",
   },
   unanswered: {
-    label: "Unanswered",
+    label: "Not done yet",
     activeCls: "bg-[var(--tu-text-body)] text-white border-[var(--tu-text-body)]",
     badgeCls: "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)]",
   },

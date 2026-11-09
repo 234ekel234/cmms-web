@@ -240,10 +240,13 @@ export default function AssetsPage() {
 
   return (
     <div className="px-4 py-5 sm:p-8">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assets</h2>
+      <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Assets</h2>
+          <p className="text-sm text-[var(--tu-text-subtle)]">The equipment at this site. Click a name to see its history and photos.</p>
+        </div>
         {writable && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* QR tags for the kit in view — the location filter carries over,
                 so "label everything in Tower B" is pick the building, press this. */}
             <Link
@@ -290,10 +293,12 @@ export default function AssetsPage() {
           style={{ width: 280, maxWidth: "100%" }}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search name, code, brand, serial, location…"
+          placeholder="Search assets…"
+          title="Searches name, code, brand, model, serial, category, status and location"
           aria-label="Search assets"
         />
-        <span className="text-xs text-[var(--tu-text-subtle)]">Sort:</span>
+        <span className="inline-flex items-center gap-2">
+        <span className="text-xs text-[var(--tu-text-subtle)]">Sort by:</span>
         {(["name", "condition"] as const).map((k) => (
           <button
             key={k}
@@ -305,16 +310,21 @@ export default function AssetsPage() {
             {k === "name" ? "Name" : "Condition"}
           </button>
         ))}
+        </span>
+        <span className="inline-flex items-center gap-2">
+        <span className="text-xs text-[var(--tu-text-subtle)]">Show only:</span>
         <button
           onClick={() => setAttentionOnly((v) => !v)}
           aria-pressed={attentionOnly}
-          className={`ml-2 px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
             attentionOnly ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
           }`}
         >
           {NEEDS_ATTENTION_LABEL}
         </button>
-        <span className="text-xs text-[var(--tu-text-subtle)] ml-2">Location:</span>
+        </span>
+        <span className="inline-flex items-center gap-2">
+        <span className="text-xs text-[var(--tu-text-subtle)]">Location:</span>
         <select
           className="tu-select"
           value={locationFilter}
@@ -330,6 +340,7 @@ export default function AssetsPage() {
             </optgroup>
           ))}
         </select>
+        </span>
         {ownershipValues.length > 0 && (
           <>
             <span className="text-xs text-[var(--tu-text-subtle)] ml-2">Ownership:</span>
@@ -630,7 +641,13 @@ export default function AssetsPage() {
                             onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
                           />
                         ) : (
-                          <span className="tu-asset-thumb" aria-hidden="true" />
+                          <span className="tu-asset-thumb tu-asset-thumb-empty" title="No photo yet" aria-hidden="true">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                              <line x1="12" y1="22.08" x2="12" y2="12" />
+                            </svg>
+                          </span>
                         )}
                         <div className="min-w-0">
                           <Link

@@ -15,24 +15,24 @@ type Account = {
 
 type Tab = { label: string; path: string };
 
-// Two always-visible tabs, then grouped dropdown menus so the bar never has to
-// side-scroll. Tabs still filter by role, and a menu with nothing visible is
-// hidden entirely.
+// The sections people use every day are always-visible tabs; the rest sit in
+// grouped dropdowns so the bar never has to side-scroll. Tabs filter by role,
+// and a menu with nothing visible is hidden entirely. When the page you are on
+// lives in a dropdown, the dropdown is labelled with that page's name, so the
+// bar always says where you are.
 const PINNED: Tab[] = [
-  { label: "Members", path: "members" },
   { label: "Overview", path: "overview" },
-  { label: "Site Profile", path: "profile" },
+  { label: "Work Orders", path: "work-orders" },
+  { label: "Assets", path: "assets" },
+  { label: "PM Checklists", path: "checklists" },
 ];
 
 const GROUPS: { label: string; tabs: Tab[] }[] = [
   {
     label: "Maintenance",
     tabs: [
-      { label: "Work Orders", path: "work-orders" },
       { label: "Maintenance Plans", path: "maintenance-plans" },
-      { label: "Assets", path: "assets" },
       { label: "Spare Parts", path: "parts" },
-      { label: "PM Checklists", path: "checklists" },
       { label: "Problem Reports", path: "problem-reports" },
     ],
   },
@@ -48,6 +48,8 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
   {
     label: "More",
     tabs: [
+      { label: "Site Profile", path: "profile" },
+      { label: "Site Access", path: "members" },
       { label: "Reports", path: "reports" },
       { label: "Activity", path: "activity" },
       { label: "Client Portal", path: "portal" },
@@ -151,7 +153,8 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
             })}
 
             {groups.map((group) => {
-              const groupActive = group.tabs.some((t) => isActive(t.path));
+              const activeTab = group.tabs.find((t) => isActive(t.path));
+              const groupActive = !!activeTab;
               const open = openMenu === group.label;
               return (
                 <div key={group.label} className="relative flex">
@@ -162,7 +165,7 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
                     onClick={() => setOpenMenu(open ? null : group.label)}
                     className={`tu-subnav-tab${groupActive ? " tu-active" : ""}`}
                   >
-                    {group.label}
+                    {activeTab ? activeTab.label : group.label}
                     <svg
                       width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                       strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"

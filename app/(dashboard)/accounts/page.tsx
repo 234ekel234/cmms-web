@@ -7,7 +7,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import RowMenu from "@/components/RowMenu";
 import EmptyState from "@/components/EmptyState";
-import { NEEDS_ATTENTION_LABEL, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
+import { WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { isClosed } from "@/lib/workOrders";
 import { startLoad } from "@/lib/startLoad";
 import { SITE_STATUS } from "@/lib/siteProfile";
@@ -446,7 +446,7 @@ export default function AccountsPage() {
                   <th scope="col" className="tu-center">Assets</th>
                   <th scope="col" className="tu-center">Team</th>
                   <th scope="col" className="tu-center">Open work</th>
-                  <th scope="col" className="tu-center" title="Checklists whose round for the current period is filed, out of those due">Checklists this period</th>
+                  <th scope="col" className="tu-center" title="Checklists whose round for the current period is filed, out of those due">Checklists</th>
                   <th scope="col">Last activity</th>
                   <th scope="col"><span className="tu-sr-only">Actions</span></th>
                 </tr>
@@ -477,7 +477,7 @@ export default function AccountsPage() {
                       <td {...figureCell(href.assets)}>
                         <Figure value={s?.assetCount ?? 0} href={href.assets} label="assets" />
                         {s && s.poorHealthAssets > 0 && (
-                          <Note href={href.attention} tone="warning">{s.poorHealthAssets} {NEEDS_ATTENTION_LABEL.toLowerCase()}</Note>
+                          <Note href={href.attention} tone="warning">{s.poorHealthAssets} need{s.poorHealthAssets === 1 ? "s" : ""} attention</Note>
                         )}
                       </td>
                       <td {...figureCell(href.team)}>
@@ -523,6 +523,7 @@ export default function AccountsPage() {
                             {s.checklistsUpToDate} / {s.checklistsDue}
                           </Link>
                         )}
+                        {s && s.checklistsDue > 0 && <span className="tu-figure-note">done this period</span>}
                       </td>
                       <td {...figureCell(href.activity)} className="tu-figure-cell">
                         {!stats ? (

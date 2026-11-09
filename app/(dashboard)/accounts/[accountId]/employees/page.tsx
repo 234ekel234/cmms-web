@@ -207,7 +207,8 @@ export default function EmployeesPage() {
             value={listSearch}
             onChange={(e) => setListSearch(e.target.value)}
           />
-          <div className="inline-flex gap-1" role="group" aria-label="Filter by type">
+          <div className="inline-flex items-center gap-1" role="group" aria-label="Filter by type">
+            <span className="text-xs text-[var(--tu-text-subtle)] mr-1">Type:</span>
             {(["ALL", "REGULAR", "RELIEVER"] as const).map((s) => (
               <button
                 key={s}
@@ -221,7 +222,8 @@ export default function EmployeesPage() {
               </button>
             ))}
           </div>
-          <div className="inline-flex gap-1" role="group" aria-label="Filter by availability">
+          <div className="inline-flex items-center gap-1 ml-2" role="group" aria-label="Filter by availability">
+            <span className="text-xs text-[var(--tu-text-subtle)] mr-1" title="On a job now = has a job with the clock running">Right now:</span>
             {(["ALL", "AVAILABLE", "OCCUPIED"] as const).map((a) => (
               <button
                 key={a}
@@ -231,7 +233,7 @@ export default function EmployeesPage() {
                   availFilter === a ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
-                {a === "ALL" ? "Any" : a === "AVAILABLE" ? "Available" : "Occupied"}
+                {a === "ALL" ? "Anyone" : a === "AVAILABLE" ? "Free" : "On a job now"}
               </button>
             ))}
           </div>
@@ -281,8 +283,8 @@ export default function EmployeesPage() {
                       {emp.isReliever ? "Reliever" : "Regular"}
                     </span>
                     {emp.occupied && (
-                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]">
-                        Occupied
+                      <span className="rounded-full px-2 py-0.5 text-xs font-semibold bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]" title="Has a job with the clock running">
+                        On a job now
                       </span>
                     )}
                     {emp.openWorkOrders > 0 && (

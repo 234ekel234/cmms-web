@@ -246,7 +246,8 @@ export default function AssetsPage() {
             style={{ width: 280 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, code, brand, serial, site, location…"
+            placeholder="Search assets…"
+            title="Searches name, code, brand, model, serial, category, status, site and location"
             aria-label="Search assets"
           />
 

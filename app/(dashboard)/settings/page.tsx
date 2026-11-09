@@ -140,13 +140,9 @@ export default function SettingsPage() {
                 {roleLabel(role)}
               </span>
             </div>
-            <div style={{ flex: 1, minWidth: 160 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, color: "var(--tu-text-subtle)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 4 }}>User ID</p>
-              <p style={{ fontSize: 13, color: "var(--tu-text-body)", fontFamily: "monospace" }}>{user.id.slice(0, 8)}…</p>
-            </div>
           </div>
           <p style={{ fontSize: 12, color: "var(--tu-text-subtle)" }}>
-            To update your name or email, contact your system administrator.
+            To change your name or email, ask a manager.
           </p>
         </div>
       </div>

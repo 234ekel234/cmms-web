@@ -23,6 +23,9 @@ export type AccountSummary = {
   poorHealthAssets: number;
   checklistsDone: number;
   checklistsTotal: number;
+  /** Checklists whose current period has started, and how many have that round filed. */
+  checklistsDue?: number;
+  checklistsUpToDate?: number;
   attendancePresent: number;
   attendanceTotal: number;
 };
@@ -183,8 +186,11 @@ export function buildDashboardModel(input: ModelInput) {
   const absent = data?.attendance.absent ?? 0;
   const attendanceTotal = present + absent;
   const attendanceRate = attendanceTotal > 0 ? Math.round((present / attendanceTotal) * 100) : null;
-  const checklistsDone = data?.checklists.completed ?? 0;
-  const checklistsTotal = data?.checklists.total ?? 0;
+  // Done *for the current period* (a weekly checklist filed on Monday is still
+  // done on Thursday), from the per-frequency breakdown — not checklists.completed,
+  // which counts rounds filed inside the page's date window.
+  const checklistsDone = (data?.checklistBreakdown ?? []).reduce((n, f) => n + f.completed, 0);
+  const checklistsTotal = (data?.checklistBreakdown ?? []).reduce((n, f) => n + f.total, 0);
   const checklistsBehind = checklistsTotal > 0 && checklistsDone < checklistsTotal;
 
   // The full series as fetched. Each trend card slices it to its own window —

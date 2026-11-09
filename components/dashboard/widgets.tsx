@@ -259,7 +259,7 @@ function kpiDefs(m: DashboardModel): Record<string, KpiDef> {
       icon: <IconCheck />,
       value: loading ? "—" : `${m.checklistsDone}/${m.checklistsTotal}`,
       valueClass: m.checklistsBehind ? "tu-stat-warning" : "",
-      sub: `completed ${m.periodCaption}`,
+      sub: "done this period",
       href: m.checklistHref,
       cta: "Open checklists",
     },
@@ -797,7 +797,7 @@ function AccountSummary({ model: m, columns }: { model: DashboardModel; columns:
                     )}
                     {has("checklists") && (
                       <td className="tu-center" style={{ color: "var(--tu-text-body)" }}>
-                        {acc.checklistsDone}/{acc.checklistsTotal}
+                        {acc.checklistsUpToDate ?? acc.checklistsDone}/{acc.checklistsDue ?? acc.checklistsTotal}
                       </td>
                     )}
                     {has("attendance") && (

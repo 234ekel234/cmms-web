@@ -104,7 +104,8 @@ export default function MembersPage() {
   return (
     <div className="px-4 py-5 sm:p-8 max-w-3xl mx-auto">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
-      <h2 className="text-lg font-bold text-[var(--tu-text-heading)] mb-6">Members</h2>
+      <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Site Access</h2>
+      <p className="text-sm text-[var(--tu-text-subtle)] mb-6">People who can sign in and see this site.</p>
 
       {/* Current members */}
       <div className="mb-8">

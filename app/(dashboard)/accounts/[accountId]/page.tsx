@@ -4,9 +4,9 @@ import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 
-// Landing for an account: managers get Members, supervisors (who can't open
-// Members) get the Overview, and clients and technicians keep going straight to
-// Work Orders — the Overview is an account-wide summary neither of them reads.
+// Landing for a site: staff get the Overview (the site at a glance), and clients
+// and technicians go straight to Work Orders — the Overview is a site-wide
+// summary neither of them reads. Site Access (members) is under More.
 export default function AccountRootPage() {
   const router = useRouter();
   const params = useParams();
@@ -17,7 +17,6 @@ export default function AccountRootPage() {
     if (!user) return;
     let dest = "overview";
     if (user.role === "CLIENT" || user.role === "TECHNICIAN") dest = "work-orders";
-    else if (user.role === "GENERAL_MANAGER" || user.role === "MANAGER") dest = "members";
     router.replace(`/accounts/${accountId}/${dest}`);
   }, [user, accountId, router]);
 
