@@ -48,9 +48,9 @@ type AvailabilityEntry = {
 };
 
 const AVAIL_CONFIG = {
-  AVAILABLE: { label: "Available", cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]", dot: "bg-[var(--tu-status-completed)]" },
-  OCCUPIED:  { label: "Occupied",  cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]", dot: "bg-[var(--tu-health-poor)]" },
-  BUSY:      { label: "Busy",      cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]", dot: "bg-[var(--tu-priority-high)]" },
+  AVAILABLE: { label: "Free", cls: "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)]", dot: "bg-[var(--tu-status-completed)]" },
+  OCCUPIED:  { label: "On a job now", cls: "bg-[var(--tu-soft-accent)] text-[var(--tu-on-accent)]", dot: "bg-[var(--tu-health-poor)]" },
+  BUSY:      { label: "Job paused", cls: "bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)]", dot: "bg-[var(--tu-priority-high)]" },
   ABSENT:    { label: "Absent",    cls: "bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)]", dot: "bg-[var(--tu-priority-critical)]" },
 };
 
