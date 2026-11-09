@@ -88,13 +88,15 @@ export default function AssetsPage() {
   const [locations, setLocations] = useState<AssetLocationNode[]>([]);
   const [showLocations, setShowLocations] = useState(false);
   // "" is every location; otherwise the id of the node being filtered on.
-  const [locationFilter, setLocationFilter] = useState("");
+
   // "" is every asset; otherwise one ownership value exactly as stored.
   const [ownershipFilter, setOwnershipFilter] = useState("");
   const [search, setSearch] = useState("");
   // `?health=attention` is how the Accounts page's "Needs attention" figure
   // lands here: the same set the dashboard counted, nothing else.
   const searchParams = useSearchParams();
+  // `?location=<id>` is how the Locations list's asset count opens this page.
+  const [locationFilter, setLocationFilter] = useState(() => searchParams.get("location") ?? "");
   const [attentionOnly, setAttentionOnly] = useState(() => searchParams.get("health") === "attention");
 
   // Kept as a callable rather than folded into the effect below: the picker and

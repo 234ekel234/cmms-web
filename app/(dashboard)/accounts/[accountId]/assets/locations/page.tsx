@@ -12,6 +12,8 @@ type Row = {
   id: string;
   name: string;
   parentId: string | null;
+  /** Live assets filed here; a building's include its floors. */
+  assets: number;
   openJobs: number;
   recentJobs: number;
   repeatFlagged: boolean;
@@ -26,9 +28,9 @@ const fmtTime = (iso: string) =>
 /**
  * Every place on the site, for the supervisor's morning question: where is
  * work open, where does it keep coming back, and which places has nobody
- * scanned today. Each row opens the place's page. Figures are per place — a
- * building's row is what is filed at the building itself, its floors are their
- * own rows beneath it.
+ * scanned today. Each row opens the place's page; its asset count opens the
+ * register filtered to it. A building's assets and jobs include its floors,
+ * as its page does; the repeat flag and the scans stay the place's own.
  */
 export default function LocationsPage() {
   const { accountId } = useParams<{ accountId: string }>();
@@ -99,6 +101,7 @@ export default function LocationsPage() {
             <thead>
               <tr className="text-left text-xs text-[var(--tu-text-subtle)] border-b border-[var(--tu-border)]">
                 <th className="px-5 py-3 font-semibold">Location</th>
+                <th className="px-3 py-3 font-semibold text-right" title="Assets filed here; a building's count includes its floors">Assets</th>
                 <th className="px-3 py-3 font-semibold text-right">Open jobs</th>
                 <th className="px-3 py-3 font-semibold text-right" title="Jobs raised in this period, scheduled and project work aside">Raised, {repeatDays} days</th>
                 {isStaff && <th className="px-3 py-3 font-semibold text-right">Scans today</th>}
@@ -113,6 +116,19 @@ export default function LocationsPage() {
                       {depth > 0 && notVisitedOnly && <span className="text-[var(--tu-text-subtle)]">{parentName(row.parentId)} / </span>}
                       <span className={depth ? "" : "font-semibold text-[var(--tu-text-heading)]"}>{row.name}</span>
                     </Link>
+                  </td>
+                  <td className="px-3 py-3 text-right tu-figure-cell">
+                    {row.assets > 0 ? (
+                      <Link
+                        href={`/accounts/${accountId}/assets?location=${row.id}`}
+                        className="tu-figure tu-figure-link"
+                        title={`View the ${row.assets} asset${row.assets === 1 ? "" : "s"} here`}
+                      >
+                        {row.assets}
+                      </Link>
+                    ) : (
+                      <span className="tu-figure-zero">—</span>
+                    )}
                   </td>
                   <td className="px-3 py-3 text-right tu-figure">{row.openJobs}</td>
                   <td className="px-3 py-3 text-right">
