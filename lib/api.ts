@@ -71,6 +71,9 @@ api.interceptors.response.use(
       typeof window !== "undefined" &&
       window.location.pathname !== "/change-password"
     ) {
+      // A full load on purpose: this runs in an axios interceptor, outside React
+      // (no router to hand), and a fresh page drops state the session left behind.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/change-password";
     }
     return Promise.reject(err);
