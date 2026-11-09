@@ -18,6 +18,7 @@ type Account = {
   description: string | null;
   /** From the site profile (accounts/<id>/profile). */
   siteCode?: string | null;
+  clientName?: string | null;
   city?: string | null;
   status?: string;
   createdAt: string;
@@ -30,8 +31,14 @@ type AccountStats = {
   requestedWorkOrders: number;
   overdueWorkOrders: number;
   poorHealthAssets: number;
-  checklistsDone: number;
-  checklistsTotal: number;
+  attendancePresent: number;
+  attendanceTotal: number;
+  assetCount: number;
+  rosterCount: number;
+  /** Checklists whose current period has started, and how many have that round filed. */
+  checklistsDue: number;
+  checklistsUpToDate: number;
+  lastActivityAt: string | null;
 };
 
 // "Open" on this page is the dashboard's count: every status outside
@@ -47,10 +54,29 @@ function figureHrefs(accountId: string) {
   return {
     open: `${base}/work-orders?status=${OPEN_STATUS_PARAM}`,
     overdue: `${base}/work-orders?flag=OVERDUE`,
+    requested: `${base}/work-orders?status=REQUESTED`,
+    assets: `${base}/assets`,
     attention: `${base}/assets?health=attention`,
+    team: `${base}/employees`,
     pm: `${base}/checklists`,
+    activity: `${base}/activity`,
+    profile: `${base}/profile`,
   };
 }
+
+/** "Today", "Yesterday", "5 days ago", then the date — how stale a site is, at a glance. */
+function lastActivityLabel(iso: string, now: Date): string {
+  const then = new Date(iso);
+  const day = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const days = Math.round((day(now) - day(then)) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 30) return `${days} days ago`;
+  return then.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
+/** A site nobody has recorded anything on for this long is flagged as quiet. */
+const QUIET_AFTER_DAYS = 14;
 
 type ShiftInput = { name: string; startTime: string; endTime: string };
 
@@ -82,6 +108,9 @@ export default function AccountsPage() {
 
   // Stats arrive separately — see loadStats().
   const [stats, setStats] = useState<Record<string, AccountStats> | null>(null);
+
+  // Read once, on mount: "5 days ago" does not need to tick while the page is open.
+  const [nowMs] = useState(() => Date.now());
 
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("ATTENTION");
@@ -235,6 +264,7 @@ export default function AccountsPage() {
             a.name.toLowerCase().includes(q) ||
             (a.description ?? "").toLowerCase().includes(q) ||
             (a.siteCode ?? "").toLowerCase().includes(q) ||
+            (a.clientName ?? "").toLowerCase().includes(q) ||
             (a.city ?? "").toLowerCase().includes(q),
         )
       : accounts;
@@ -285,6 +315,21 @@ export default function AccountsPage() {
         {value}
       </Link>
     );
+  }
+
+  /** A short line under a figure that opens its own list. */
+  function Note({ href, tone, children }: { href: string; tone?: "warning" | "danger"; children: React.ReactNode }) {
+    return (
+      <span className="tu-figure-note">
+        <Link href={href} className={tone ? `tu-figure-note-${tone}` : undefined} onClick={(e) => e.stopPropagation()}>
+          {children}
+        </Link>
+      </span>
+    );
+  }
+
+  function quiet(iso: string) {
+    return nowMs - new Date(iso).getTime() > QUIET_AFTER_DAYS * 86_400_000;
   }
 
   /** A figure cell clicks through to its list rather than to the account. */
@@ -363,6 +408,7 @@ export default function AccountsPage() {
                   <td className="tu-center"><div className="tu-skeleton" style={{ height: 16, width: 28, margin: "0 auto" }} /></td>
                   <td className="tu-center"><div className="tu-skeleton" style={{ height: 16, width: 28, margin: "0 auto" }} /></td>
                   <td className="tu-center"><div className="tu-skeleton" style={{ height: 16, width: 40, margin: "0 auto" }} /></td>
+                  <td><div className="tu-skeleton" style={{ height: 16, width: 70 }} /></td>
                   <td />
                 </tr>
               ))}
@@ -397,10 +443,11 @@ export default function AccountsPage() {
               <thead>
                 <tr>
                   <th scope="col">Site</th>
-                  <th scope="col" className="tu-center">Open work orders</th>
-                  <th scope="col" className="tu-center">Overdue</th>
-                  <th scope="col" className="tu-center">{NEEDS_ATTENTION_LABEL}</th>
-                  <th scope="col" className="tu-center">PM today</th>
+                  <th scope="col" className="tu-center">Assets</th>
+                  <th scope="col" className="tu-center">Team</th>
+                  <th scope="col" className="tu-center">Open work</th>
+                  <th scope="col" className="tu-center" title="Checklists whose round for the current period is filed, out of those due">Checklists this period</th>
+                  <th scope="col">Last activity</th>
                   <th scope="col"><span className="tu-sr-only">Actions</span></th>
                 </tr>
               </thead>
@@ -419,36 +466,77 @@ export default function AccountsPage() {
                         {acc.status && acc.status !== "ACTIVE" && SITE_STATUS[acc.status] && (
                           <span className={SITE_STATUS[acc.status].cls} style={{ marginLeft: 8 }}>{SITE_STATUS[acc.status].label}</span>
                         )}
-                        {(acc.siteCode || acc.city || acc.description) && (
-                          <span className="tu-row-sub">{[acc.siteCode, acc.city, acc.description].filter(Boolean).join(" · ")}</span>
+                        {acc.clientName || acc.siteCode || acc.city || acc.description ? (
+                          <span className="tu-row-sub">{[acc.clientName, acc.city, acc.siteCode, acc.description].filter(Boolean).join(" · ")}</span>
+                        ) : canManage ? (
+                          <Link href={href.profile} className="tu-row-sub tu-row-sub-hint" onClick={(e) => e.stopPropagation()}>
+                            Profile not filled in
+                          </Link>
+                        ) : null}
+                      </td>
+                      <td {...figureCell(href.assets)}>
+                        <Figure value={s?.assetCount ?? 0} href={href.assets} label="assets" />
+                        {s && s.poorHealthAssets > 0 && (
+                          <Note href={href.attention} tone="warning">{s.poorHealthAssets} {NEEDS_ATTENTION_LABEL.toLowerCase()}</Note>
+                        )}
+                      </td>
+                      <td {...figureCell(href.team)}>
+                        <Figure value={s?.rosterCount ?? 0} href={href.team} label="people on the roster" />
+                        {s && s.attendanceTotal > 0 && (
+                          <span className="tu-figure-note">{s.attendancePresent} present today</span>
                         )}
                       </td>
                       <td {...figureCell(href.open)}>
                         <Figure value={s?.openWorkOrders ?? 0} href={href.open} label="open work orders" />
-                      </td>
-                      <td {...figureCell(href.overdue)}>
-                        <Figure value={s?.overdueWorkOrders ?? 0} tone="danger" href={href.overdue} label="overdue work orders" />
-                      </td>
-                      <td {...figureCell(href.attention)}>
-                        <Figure value={s?.poorHealthAssets ?? 0} tone="warning" href={href.attention} label="assets needing attention" />
+                        {s && (s.overdueWorkOrders > 0 || s.requestedWorkOrders > 0) && (
+                          <span className="tu-figure-note">
+                            {s.overdueWorkOrders > 0 && (
+                              <Link href={href.overdue} className="tu-figure-note-danger" onClick={(e) => e.stopPropagation()}>
+                                {s.overdueWorkOrders} overdue
+                              </Link>
+                            )}
+                            {s.overdueWorkOrders > 0 && s.requestedWorkOrders > 0 && " · "}
+                            {s.requestedWorkOrders > 0 && (
+                              <Link href={href.requested} onClick={(e) => e.stopPropagation()}>
+                                {s.requestedWorkOrders} request{s.requestedWorkOrders === 1 ? "" : "s"}
+                              </Link>
+                            )}
+                          </span>
+                        )}
                       </td>
                       <td {...figureCell(href.pm)}>
                         {!stats ? (
                           <span className="tu-figure-pending" aria-hidden="true">—</span>
-                        ) : !s || s.checklistsTotal === 0 ? (
+                        ) : !s || s.checklistsDue === 0 ? (
                           <span className="tu-figure-zero">—</span>
                         ) : (
                           <Link
                             href={href.pm}
                             className={
-                              s.checklistsDone >= s.checklistsTotal
+                              s.checklistsUpToDate >= s.checklistsDue
                                 ? "tu-figure tu-figure-link tu-figure-success"
                                 : "tu-figure tu-figure-link"
                             }
-                            title={`${s.checklistsDone} of ${s.checklistsTotal} active checklists completed today`}
+                            title={`${s.checklistsUpToDate} of ${s.checklistsDue} checklists have this period's round filed`}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {s.checklistsDone}/{s.checklistsTotal}
+                            {s.checklistsUpToDate} / {s.checklistsDue}
+                          </Link>
+                        )}
+                      </td>
+                      <td {...figureCell(href.activity)} className="tu-figure-cell">
+                        {!stats ? (
+                          <span className="tu-figure-pending" aria-hidden="true">—</span>
+                        ) : !s?.lastActivityAt ? (
+                          <span className="tu-figure-zero">Nothing yet</span>
+                        ) : (
+                          <Link
+                            href={href.activity}
+                            className={`tu-figure-link tu-last-activity${quiet(s.lastActivityAt) ? " tu-last-activity-quiet" : ""}`}
+                            title={new Date(s.lastActivityAt).toLocaleString()}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {lastActivityLabel(s.lastActivityAt, new Date(nowMs))}
                           </Link>
                         )}
                       </td>

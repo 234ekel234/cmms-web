@@ -51,6 +51,7 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
       { label: "Reports", path: "reports" },
       { label: "Activity", path: "activity" },
       { label: "Client Portal", path: "portal" },
+      { label: "Export data", path: "export" },
     ],
   },
 ];

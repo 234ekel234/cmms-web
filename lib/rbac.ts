@@ -57,7 +57,8 @@ export const ROLE_HOME: Record<Role, string> = {
 // ordinary work orders on their account.
 //
 // backend/helpers/clientVisibility.js is the authority — keep this in step.
-const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts", "maintenance-plans", "problem-reports"];
+// "export" carries cost, internal notes and phone numbers (backend/helpers/siteExport.js).
+const STAFF_ONLY_ACCOUNT_SECTIONS = ["parts", "maintenance-plans", "problem-reports", "export"];
 
 // The only account sections a TECHNICIAN reaches: the work they were given, and
 // the kit they were given it on. Everything else under an account — the roster,

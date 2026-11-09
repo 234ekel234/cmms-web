@@ -139,7 +139,7 @@ const day = (key: string | null) => (key ? new Date(key + "T00:00:00Z") : null);
  * and exceljs writes a Date's UTC fields, so a 9 am Manila submission would
  * read 1 am without this shift.
  */
-const local = (iso: string | null) => {
+export const local = (iso: string | null) => {
   if (!iso) return null;
   const t = new Date(iso);
   return new Date(t.getTime() - t.getTimezoneOffset() * 60_000);
@@ -150,16 +150,16 @@ const frac = (pct: number | null) => (pct == null ? null : pct / 100);
 
 // ── Layout helpers ──────────────────────────────────────────
 
-type Col = { header: string; width: number; fmt?: string };
+export type Col = { header: string; width: number; fmt?: string };
 
-const FMT = {
+export const FMT = {
   date: "yyyy-mm-dd",
   dateTime: "yyyy-mm-dd hh:mm",
   pct: "0.0%",
   int: "0",
 };
 
-function addTable(ws: Worksheet, name: string, top: number, cols: Col[], rows: unknown[][]) {
+export function addTable(ws: Worksheet, name: string, top: number, cols: Col[], rows: unknown[][]) {
   cols.forEach((c, i) => {
     const col = ws.getColumn(i + 1);
     col.width = Math.max(col.width ?? 0, c.width);
