@@ -150,6 +150,25 @@ shown, not swallowed.
    the token dies on the server; Settings → Signed-in devices lists and ends sessions.
 5. Protected pages check `isLoggedIn()` on mount and redirect if not authenticated
 
+## Site tabs, lists and wording
+
+- **Site tab bar** (`app/(dashboard)/accounts/[accountId]/layout.tsx`): Overview, Work Orders,
+  Assets and PM Checklists are pinned; Maintenance / Workforce / More are dropdowns, and a
+  dropdown holding the current page is labelled with that page. `members` is shown as
+  **Site Access** (under More); staff land on Overview, clients and technicians on Work Orders.
+  Paths are unchanged, so `rbac.ts` and the mobile app need nothing — but the mobile app's
+  labels (Members, Partial, Occupied) have not caught up.
+- **Long lists page in the browser**: `components/Pager.tsx` (`usePaging(items, resetKey)` +
+  `<Pager>`), over a list already filtered and sorted. Pass a `resetKey` built from the search
+  and filters so a narrowed list goes back to page 1. Used by both asset lists.
+- **Asset search** is one rule, `assetMatchesSearch` in `lib/assetSearch.ts`: every word, any
+  order, across name, code, brand, model, serial, category, status, ownership, location path
+  (and site); a one-letter word must start a word.
+- **Plain words on screen**: say what a state means to the reader ("On a job now", "Started,
+  not submitted", "Not done yet", "done this period"), not the field behind it.
+- `lib/api.ts` keeps a hard `window.location.href` redirect in its axios interceptor on
+  purpose (outside React; a fresh page is wanted), with the lint rule disabled on that line.
+
 ## Loading data in effects
 
 Lint is blocking in CI, and `react-hooks/set-state-in-effect` flags an effect that calls a
