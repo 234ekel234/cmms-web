@@ -234,6 +234,9 @@ export default function ReportsPage() {
             </button>
           )}
           <PrintReportButton disabled={!data} />
+          <Link href="/reports/kpis" className="tu-btn-secondary">
+            KPIs
+          </Link>
           <Link href="/reports/response-times" className="tu-btn-secondary">
             Response times
           </Link>

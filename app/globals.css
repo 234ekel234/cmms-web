@@ -3819,3 +3819,20 @@ figure:hover .tu-attachment-remove,
   .tu-pager-num:not([aria-current="page"]) { display: none; }
   .tu-pager-gap { display: none; }
 }
+
+/* ── KPI page (reports/kpis) ─────────────────────────────── */
+.tu-kpi-group { margin-bottom: 8px; }
+.tu-kpi-group-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 12px; }
+.tu-kpi-group-head p { margin: 0; font-size: 13px; }
+@media (min-width: 1024px) {
+  .tu-kpi-grid.tu-kpi-grid-4 { grid-template-columns: repeat(4, 1fr); }
+}
+.tu-kpi-links { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.tu-kpi-links a { color: var(--tu-text-brand); text-decoration: none; }
+.tu-kpi-links a:hover { text-decoration: underline; }
+.tu-mix-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--tu-border); gap: 2px; }
+.tu-mix-bar span { display: block; min-width: 3px; }
+.tu-mix-legend { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px 20px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); font-size: 13px; }
+.tu-mix-legend li { display: flex; align-items: center; gap: 8px; }
+.tu-mix-legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
+.tu-mix-legend .tu-figure { margin-left: auto; }
