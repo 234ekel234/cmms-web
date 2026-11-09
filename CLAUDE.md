@@ -156,8 +156,8 @@ shown, not swallowed.
   Assets and PM Checklists are pinned; Maintenance / Workforce / More are dropdowns, and a
   dropdown holding the current page is labelled with that page. `members` is shown as
   **Site Access** (under More); staff land on Overview, clients and technicians on Work Orders.
-  Paths are unchanged, so `rbac.ts` and the mobile app need nothing — but the mobile app's
-  labels (Members, Partial, Occupied) have not caught up.
+  Paths are unchanged, so `rbac.ts` and the mobile app need nothing; the mobile app uses the
+  same labels (`frontend/constants/siteSections.ts`).
 - **Long lists page in the browser**: `components/Pager.tsx` (`usePaging(items, resetKey)` +
   `<Pager>`), over a list already filtered and sorted. Pass a `resetKey` built from the search
   and filters so a narrowed list goes back to page 1. Used by both asset lists.
