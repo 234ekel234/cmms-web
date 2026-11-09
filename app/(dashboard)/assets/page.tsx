@@ -7,6 +7,8 @@ import AccountFilter from "@/components/AccountFilter";
 import { EmptyRow } from "@/components/EmptyState";
 import { type AssetLocationRef, locationPath } from "@/lib/assetLocations";
 import { ASSET_HEALTH, assetHealthMeta } from "@/lib/statuses";
+import { assetMatchesSearch } from "@/lib/assetSearch";
+import Pager, { usePaging } from "@/components/Pager";
 
 type Account = { id: string; name: string };
 
@@ -102,19 +104,7 @@ export default function AssetsPage() {
     return assets.filter((a) => {
       const matchAccount = selectedAccounts.size === 0 || selectedAccounts.has(a.accountId);
       const matchStatus = statusFilter === "ALL" || a.status === statusFilter;
-      const matchSearch =
-        !q ||
-        a.name.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q) ||
-        a.account.name.toLowerCase().includes(q) ||
-        // The whole written path, so searching "Tower B" finds what is on its
-        // floors as well as what is filed at the building itself.
-        locationPath(a.location).toLowerCase().includes(q) ||
-        !!a.serialNumber?.toLowerCase().includes(q) ||
-        !!a.assetCode?.toLowerCase().includes(q) ||
-        !!a.brand?.toLowerCase().includes(q) ||
-        !!a.model?.toLowerCase().includes(q) ||
-        !!a.ownership?.toLowerCase().includes(q);
+      const matchSearch = !q || assetMatchesSearch(a, q);
       return matchAccount && matchStatus && matchSearch;
     });
   }, [assets, selectedAccounts, statusFilter, search]);
@@ -149,6 +139,9 @@ export default function AssetsPage() {
     });
     return rows;
   }, [preHealth, healthFilter, sortKey]);
+
+  // Any change to what is in view starts again at page 1.
+  const paging = usePaging(sorted, [search, healthFilter, sortKey, statusFilter, [...selectedAccounts].sort().join(","), showArchived].join("|"));
 
   const findingsCount = assets.filter((a) => a.health === "FUNCTIONAL_WITH_FINDINGS").length;
   const breakdownCount = assets.filter((a) => a.health === "BREAKDOWN").length;
@@ -253,7 +246,7 @@ export default function AssetsPage() {
             style={{ width: 280 }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name, category, site, location…"
+            placeholder="Search name, code, brand, serial, site, location…"
             aria-label="Search assets"
           />
 
@@ -343,7 +336,7 @@ export default function AssetsPage() {
                   hint="Nothing matches the current filters."
                 />
               ) : (
-                sorted.map((asset) => {
+                paging.pageItems.map((asset) => {
                   const health = assetHealthMeta(asset.health);
                   return (
                     <tr key={asset.id} style={asset.archivedAt ? { opacity: 0.5 } : undefined}>
@@ -387,6 +380,7 @@ export default function AssetsPage() {
             </tbody>
           </table>
         </div>
+        <Pager {...paging} noun="assets" />
       </div>
     </div>
   );

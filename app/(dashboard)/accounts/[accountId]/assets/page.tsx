@@ -20,6 +20,8 @@ import { canManage } from "@/lib/rbac";
 import CapacityUnitSelect from "@/components/CapacityUnitSelect";
 import { MAX_FINDINGS, formatCapacity } from "@/lib/assetCapacity";
 import { thumbUrl, type BaseAttachment } from "@/lib/attachments";
+import { assetMatchesSearch } from "@/lib/assetSearch";
+import Pager, { usePaging } from "@/components/Pager";
 
 type AssetHealth = "FUNCTIONAL" | "FUNCTIONAL_WITH_FINDINGS" | "BREAKDOWN";
 
@@ -32,6 +34,7 @@ type Asset = {
   assetCode: string | null;
   brand: string | null;
   model: string | null;
+  serialNumber?: string | null;
   ownership: string | null;
   location: AssetLocationRef | null;
   capacity: number | null;
@@ -88,6 +91,7 @@ export default function AssetsPage() {
   const [locationFilter, setLocationFilter] = useState("");
   // "" is every asset; otherwise one ownership value exactly as stored.
   const [ownershipFilter, setOwnershipFilter] = useState("");
+  const [search, setSearch] = useState("");
   // `?health=attention` is how the Accounts page's "Needs attention" figure
   // lands here: the same set the dashboard counted, nothing else.
   const searchParams = useSearchParams();
@@ -204,7 +208,8 @@ export default function AssetsPage() {
   // hide the rest — which is the failure the free-text column had, one level up.
   const visible = useMemo(() => {
     const byAttention = attentionOnly ? assets.filter((a) => NEEDS_ATTENTION_HEALTH.includes(a.health)) : assets;
-    const byHealth = ownershipFilter ? byAttention.filter((a) => (a.ownership ?? "") === ownershipFilter) : byAttention;
+    const byOwnership = ownershipFilter ? byAttention.filter((a) => (a.ownership ?? "") === ownershipFilter) : byAttention;
+    const byHealth = search.trim() ? byOwnership.filter((a) => assetMatchesSearch(a, search)) : byOwnership;
     if (!locationFilter) return byHealth;
     const node =
       locations.find((r) => r.id === locationFilter) ??
@@ -212,7 +217,7 @@ export default function AssetsPage() {
     if (!node) return byHealth;
     const scope = new Set(locationScopeIds(node));
     return byHealth.filter((a) => a.location && scope.has(a.location.id));
-  }, [assets, locations, locationFilter, attentionOnly, ownershipFilter]);
+  }, [assets, locations, locationFilter, attentionOnly, ownershipFilter, search]);
 
   // Offered from what is on file rather than a fixed list: ownership is free
   // text, and each company has its own words for it.
@@ -221,12 +226,15 @@ export default function AssetsPage() {
     [assets],
   );
 
-  const sorted = [...visible].sort((a, b) => {
+  const sorted = useMemo(() => [...visible].sort((a, b) => {
     if (!!a.archivedAt !== !!b.archivedAt) return a.archivedAt ? 1 : -1;
     return sortKey === "name"
       ? a.name.localeCompare(b.name)
       : HEALTH_RANK[a.health] - HEALTH_RANK[b.health] || a.name.localeCompare(b.name);
-  });
+  }), [visible, sortKey]);
+
+  // Any change to what is in view starts again at page 1.
+  const paging = usePaging(sorted, [search, sortKey, attentionOnly, locationFilter, ownershipFilter, showArchived].join("|"));
 
   return (
     <div className="px-4 py-5 sm:p-8">
@@ -274,6 +282,15 @@ export default function AssetsPage() {
 
       {/* Toolbar */}
       <div className="flex items-center gap-3 mb-6 flex-wrap">
+        <input
+          type="search"
+          className="tu-input"
+          style={{ width: 280, maxWidth: "100%" }}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search name, code, brand, serial, location…"
+          aria-label="Search assets"
+        />
         <span className="text-xs text-[var(--tu-text-subtle)]">Sort:</span>
         {(["name", "condition"] as const).map((k) => (
           <button
@@ -554,7 +571,13 @@ export default function AssetsPage() {
       ) : sorted.length === 0 ? (
         <div className="tu-card">
           {/* A filter that matches nothing is good news, not an empty register. */}
-          {assets.length > 0 && (attentionOnly || locationFilter || ownershipFilter) ? (
+          {assets.length > 0 && search.trim() ? (
+            <EmptyState
+              icon="search"
+              title="No matching assets"
+              hint={`Nothing matches “${search.trim()}”${attentionOnly || locationFilter || ownershipFilter ? " with the current filters" : ""}.`}
+            />
+          ) : assets.length > 0 && (attentionOnly || locationFilter || ownershipFilter) ? (
             <EmptyState
               icon="asset"
               title={attentionOnly ? "Nothing needs attention" : "No assets here"}
@@ -583,7 +606,7 @@ export default function AssetsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--tu-border)]">
-              {sorted.map((asset) => {
+              {paging.pageItems.map((asset) => {
                 const hCfg = { label: ASSET_HEALTH[asset.health].label, cls: ASSET_HEALTH_CLS[asset.health] };
                 const isArchived = !!asset.archivedAt;
                 const daysSince = asset.lastCompletedAt
@@ -658,6 +681,7 @@ export default function AssetsPage() {
               })}
             </tbody>
           </table>
+          <Pager {...paging} noun="assets" />
         </div>
       )}
 

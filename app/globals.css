@@ -3794,3 +3794,27 @@ figure:hover .tu-attachment-remove,
 .tu-export-option input { margin-top: 3px; accent-color: var(--tu-text-brand); flex-shrink: 0; }
 .tu-export-option-label { display: block; font-size: 14px; font-weight: 600; color: var(--tu-text-heading); }
 .tu-export-option-hint { display: block; font-size: 12.5px; color: var(--tu-text-subtle); }
+
+/* ── Pager (components/Pager.tsx) ────────────────────────── */
+.tu-pager {
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px;
+  padding: 12px 20px; border-top: 1px solid var(--tu-border); font-size: 13px; color: var(--tu-text-subtle);
+}
+.tu-pager-summary { font-variant-numeric: tabular-nums; }
+.tu-pager-pages { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.tu-pager-btn {
+  min-width: 32px; height: 30px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--tu-border);
+  background: var(--tu-bg-surface); color: var(--tu-text-body); font-size: 13px; font-weight: 500;
+  cursor: pointer; font-variant-numeric: tabular-nums;
+}
+.tu-pager-btn:hover:not(:disabled) { border-color: var(--tu-border-strong); }
+.tu-pager-btn:disabled { opacity: 0.45; cursor: default; }
+.tu-pager-btn[aria-current="page"] { background: var(--tu-text-brand); border-color: var(--tu-text-brand); color: #fff; font-weight: 600; }
+.tu-pager-gap { padding: 0 4px; }
+.tu-pager-size { display: inline-flex; align-items: center; gap: 8px; }
+.tu-pager-size .tu-select { padding: 4px 28px 4px 8px; font-size: 13px; min-width: 0; }
+@media (max-width: 640px) {
+  .tu-pager { justify-content: center; }
+  .tu-pager-num:not([aria-current="page"]) { display: none; }
+  .tu-pager-gap { display: none; }
+}
