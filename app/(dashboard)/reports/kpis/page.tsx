@@ -38,7 +38,7 @@ type Report = {
   to: string;
   totals: Kpis;
   bySite: (Kpis & { account: { id: string; name: string } })[];
-  byMonth: { month: string; completed: number; mix: Mix; plannedPct: number | null; onTimePct: number | null; hoursLogged: number }[];
+  byMonth: { month: string; partial: boolean; completed: number; mix: Mix; plannedPct: number | null; onTimePct: number | null; hoursLogged: number }[];
   paceDays: number;
 };
 
@@ -163,7 +163,8 @@ export default function KpiPage() {
           <h1 className="tu-page-title tu-no-print">Maintenance KPIs</h1>
           <p className="tu-page-sub">
             How the maintenance is going, in a dozen figures: the work finished in the period, the queue as it
-            stands today, checklists and equipment, and what clients said.
+            stands today, checklists and equipment, and what clients said. Sites marked Ended are left out
+            unless you pick them.
           </p>
         </div>
         <div className="tu-no-print">
@@ -291,7 +292,7 @@ export default function KpiPage() {
                   <tbody>
                     {data.byMonth.map((m) => (
                       <tr key={m.month}>
-                        <td className="tu-strong">{monthLabel(m.month)}</td>
+                        <td className="tu-strong">{monthLabel(m.month)}{m.partial && <span className="tu-person-muted" style={{ fontWeight: 400 }}> · part of the month</span>}</td>
                         <td className="tu-center"><span className="tu-figure">{m.completed}</span></td>
                         <td className="tu-center">{pct(m.plannedPct)}</td>
                         <td className="tu-center">{pct(m.onTimePct)}</td>
