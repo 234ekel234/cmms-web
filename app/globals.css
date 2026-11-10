@@ -1444,7 +1444,19 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 }
 
 .tu-subnav-row { display: flex; align-items: center; gap: 12px; }
-.tu-subnav { display: flex; align-items: stretch; gap: 2px; }
+/* Wraps at every width, not only on a phone: a dropdown is labelled with the
+   page inside it ("Client Portal", "Locations"), so the bar grows, and on a
+   1280px laptop it pushed every page under More into a sideways scroll. It
+   still sits on one row whenever it fits. The last menu opens leftwards so it
+   stays on screen at the right edge. */
+.tu-subnav { display: flex; align-items: stretch; gap: 2px; flex-wrap: wrap; min-width: 0; }
+.tu-subnav > div:last-child .tu-menu { left: auto; right: 0; }
+/* On a laptop the scope chip goes too, as on a phone: the site's name is the
+   heading just above, and the room keeps the tabs on one row. */
+@media (max-width: 1400px) {
+  .tu-subnav-tab { padding: 10px 10px; }
+  .tu-scope-chip, .tu-scope-divider { display: none; }
+}
 
 .tu-subnav-tab {
   display: inline-flex;

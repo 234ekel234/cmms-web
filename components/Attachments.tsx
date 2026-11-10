@@ -120,9 +120,9 @@ type Props = {
   canDelete?: boolean;
   /** Hides the upload control on terminal or read-only records. */
   canUpload?: boolean;
-  /** Assets only: the photo currently shown as the asset's cover. */
+  /** Assets and locations: the photo currently shown as the cover. */
   coverId?: string | null;
-  /** Assets only, staff only: offered as "Make cover" on each photo. */
+  /** Assets and locations, staff only: offered as "Make cover" on each photo. */
   onSetCover?: (id: string | null) => void;
   onUploaded?: (a: Attachment) => void;
   onRemoved?: (id: string) => void;

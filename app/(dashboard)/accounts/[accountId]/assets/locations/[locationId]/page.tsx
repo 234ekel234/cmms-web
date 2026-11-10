@@ -11,6 +11,7 @@ import Attachments from "@/components/Attachments";
 import ReportProblemModal, { type ReportCategory } from "@/components/ReportProblemModal";
 import { startLoad } from "@/lib/startLoad";
 import type { AssetLocationRef } from "@/lib/assetLocations";
+import { contentUrl, thumbUrl, type BaseAttachment } from "@/lib/attachments";
 import { assetHealthMeta, roleLabel, workOrderPriorityMeta, workOrderStatusFor } from "@/lib/statuses";
 import { isOverdue, workOrderRef } from "@/lib/workOrders";
 import { getPeriodStart, pmSchedule, scheduleLabel } from "@/lib/pmPeriod";
@@ -32,7 +33,8 @@ type Job = {
 };
 
 type Overview = {
-  location: AssetLocationRef & { children: { id: string; name: string }[] };
+  /** `cover`: the photo that stands for the place, as an attachment DTO. */
+  location: AssetLocationRef & { children: { id: string; name: string }[]; cover: BaseAttachment | null };
   account: { id: string; name: string };
   assets: { id: string; name: string; assetCode: string | null; category: string; health: string; location: AssetLocationRef | null }[];
   openWork: Job[];
@@ -109,6 +111,19 @@ export default function LocationPage() {
   }, [accountId, locationId]);
   useEffect(() => startLoad(load), [load]);
 
+  // Staff choose which of the place's photos stands for it (the first staff
+  // photo becomes it on its own). The API checks it is this place's own.
+  const [coverError, setCoverError] = useState<string | null>(null);
+  async function setCover(id: string | null) {
+    setCoverError(null);
+    try {
+      const res = await api.put(`/accounts/${accountId}/asset-locations/${locationId}`, { coverAttachmentId: id });
+      setData((d) => (d ? { ...d, location: { ...d.location, cover: res.data.cover } } : d));
+    } catch (err) {
+      setCoverError(errorMessage(err, "Couldn't change the cover photo."));
+    }
+  }
+
   if (error && !data) return <div className="px-4 py-5 sm:p-8"><div className="tu-error-banner" role="alert">{error}</div></div>;
   if (!data) {
     return (
@@ -169,11 +184,26 @@ export default function LocationPage() {
             )}
           </p>
           <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="flex items-start gap-4" style={{ minWidth: 0 }}>
+            {location.cover && (
+              <a href={contentUrl(location.cover)} target="_blank" rel="noopener noreferrer" className="shrink-0" title="Open the full photo">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={thumbUrl(location.cover)}
+                  alt={`Photo of ${location.name}`}
+                  className="tu-asset-cover"
+                  // The view token in the URL expires; a page left open shows
+                  // nothing rather than a broken image.
+                  onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+                />
+              </a>
+            )}
             <div style={{ minWidth: 0 }}>
               <h1 className="tu-card-title" style={{ fontSize: 22 }}>{location.name}</h1>
               <p className="text-sm text-[var(--tu-text-subtle)]">
                 {data.account.name}{location.parent ? ` · ${location.parent.name}` : ""}
               </p>
+            </div>
             </div>
             <div className="tu-page-actions">
               {isStaff && (
@@ -295,7 +325,18 @@ export default function LocationPage() {
       {/* Photos and documents of the place: how it should look, a floor
           plan, an access map. Anyone on the site may add; staff archive. */}
       <section className="tu-card tu-card-body">
-        <Attachments parent="asset-locations" parentId={location.id} canUpload canDelete={isStaff} />
+        <Attachments
+          parent="asset-locations"
+          parentId={location.id}
+          canUpload
+          canDelete={isStaff}
+          coverId={location.cover?.id ?? null}
+          onSetCover={isStaff ? setCover : undefined}
+          // The first staff photo becomes the cover on the server; show it.
+          onUploaded={() => { if (!location.cover) load(); }}
+          onRemoved={(id) => { if (id === location.cover?.id) setData((d) => (d ? { ...d, location: { ...d.location, cover: null } } : d)); }}
+        />
+        {coverError && <p className="tu-danger-text" role="alert" style={{ fontSize: 12.5, marginTop: 8 }}>{coverError}</p>}
       </section>
 
       {data.visits && (

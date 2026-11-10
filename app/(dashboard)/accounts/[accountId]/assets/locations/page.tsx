@@ -7,8 +7,11 @@ import api, { errorMessage } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { STAFF, hasRole } from "@/lib/rbac";
 import { startLoad } from "@/lib/startLoad";
+import { thumbUrl, type BaseAttachment } from "@/lib/attachments";
 
 type Row = {
+  /** The photo that stands for the place; null when it has none. */
+  cover: BaseAttachment | null;
   id: string;
   name: string;
   parentId: string | null;
@@ -112,9 +115,32 @@ export default function LocationsPage() {
               {shown.map(({ row, depth }) => (
                 <tr key={row.id}>
                   <td className="px-5 py-3">
-                    <Link href={`/accounts/${accountId}/assets/locations/${row.id}`} className="hover:underline" style={{ paddingLeft: depth ? 18 : 0 }}>
-                      {depth > 0 && notVisitedOnly && <span className="text-[var(--tu-text-subtle)]">{parentName(row.parentId)} / </span>}
-                      <span className={depth ? "" : "font-semibold text-[var(--tu-text-heading)]"}>{row.name}</span>
+                    <Link
+                      href={`/accounts/${accountId}/assets/locations/${row.id}`}
+                      className="group inline-flex items-center gap-3"
+                      style={{ paddingLeft: depth ? 18 : 0 }}
+                    >
+                      {row.cover ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumbUrl(row.cover)}
+                          alt=""
+                          loading="lazy"
+                          className="tu-asset-thumb"
+                          onError={(e) => { e.currentTarget.style.visibility = "hidden"; }}
+                        />
+                      ) : (
+                        <span className="tu-asset-thumb tu-asset-thumb-empty" title="No photo yet" aria-hidden="true">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                          </svg>
+                        </span>
+                      )}
+                      <span className="group-hover:underline">
+                        {depth > 0 && notVisitedOnly && <span className="text-[var(--tu-text-subtle)]">{parentName(row.parentId)} / </span>}
+                        <span className={depth ? "" : "font-semibold text-[var(--tu-text-heading)]"}>{row.name}</span>
+                      </span>
                     </Link>
                   </td>
                   <td className="px-3 py-3 text-right tu-figure-cell">
