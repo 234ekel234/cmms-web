@@ -155,7 +155,8 @@ shown, not swallowed.
 - **Site tab bar** (`app/(dashboard)/accounts/[accountId]/layout.tsx`): Overview, Work Orders,
   Assets and PM Checklists are pinned; Maintenance / Workforce / More are dropdowns, and a
   dropdown holding the current page is labelled with that page. `members` is shown as
-  **Site Access** (under More); staff land on Overview, clients and technicians on Work Orders.
+  **Site Access** (under More); **Locations** (`assets/locations`) is under More too, and the
+  most specific matching path is the active tab, so the pinned Assets tab stays dark there; staff land on Overview, clients and technicians on Work Orders.
   Paths are unchanged, so `rbac.ts` and the mobile app need nothing; the mobile app uses the
   same labels (`frontend/constants/siteSections.ts`).
 - **Long lists page in the browser**: `components/Pager.tsx` (`usePaging(items, resetKey)` +

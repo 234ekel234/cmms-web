@@ -193,9 +193,13 @@ export default function LocationManagerModal({
               )}
             </div>
           ))}
+        </div>
 
-          {adding === null ? (
-            <div className="flex items-center gap-2 pt-3">
+        {/* Outside the scrolling list, so adding a location never means scrolling
+            to the bottom of a long site first. */}
+        <div className="px-6 py-3 border-t border-[var(--tu-border)] shrink-0 space-y-3">
+          {adding === null && (
+            <div className="flex items-center gap-2">
               <input
                 className="tu-input flex-1"
                 autoFocus
@@ -207,17 +211,16 @@ export default function LocationManagerModal({
               <button className="tu-btn-primary text-xs" disabled={busy || !addDraft.trim()} onClick={() => add(null)}>Add</button>
               <button className="tu-btn-secondary text-xs" onClick={() => setAdding(undefined)}>Cancel</button>
             </div>
-          ) : (
-            <button className="tu-btn-ghost text-xs mt-3" onClick={() => { setAdding(null); setAddDraft(""); setError(""); }}>
-              + New location
-            </button>
           )}
-
-          {error && <p className="text-xs text-[var(--tu-on-danger)] mt-3">{error}</p>}
-        </div>
-
-        <div className="px-6 py-3 border-t border-[var(--tu-border)] flex justify-end shrink-0">
-          <button className="tu-btn-secondary text-sm" onClick={onClose}>Done</button>
+          {error && <p className="text-xs text-[var(--tu-on-danger)]" role="alert">{error}</p>}
+          <div className="flex items-center justify-between gap-2">
+            {adding === null ? <span /> : (
+              <button className="tu-btn-secondary text-sm" onClick={() => { setAdding(null); setAddDraft(""); setError(""); }}>
+                + New location
+              </button>
+            )}
+            <button className="tu-btn-secondary text-sm" onClick={onClose}>Done</button>
+          </div>
         </div>
       </div>
     </div>

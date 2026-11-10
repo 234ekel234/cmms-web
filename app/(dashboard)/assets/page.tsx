@@ -5,7 +5,8 @@ import Link from "next/link";
 import api from "@/lib/api";
 import AccountFilter from "@/components/AccountFilter";
 import { EmptyRow } from "@/components/EmptyState";
-import { type AssetLocationRef, locationPath } from "@/lib/assetLocations";
+import { type AssetLocationRef } from "@/lib/assetLocations";
+import LocationLink from "@/components/LocationLink";
 import { ASSET_HEALTH, assetHealthMeta } from "@/lib/statuses";
 import { assetMatchesSearch } from "@/lib/assetSearch";
 import Pager, { usePaging } from "@/components/Pager";
@@ -362,7 +363,12 @@ export default function AssetsPage() {
                       <td><span className={health.badge}>{health.label}</span></td>
                       <td><span className="tu-badge tu-badge-neutral">{asset.status || "—"}</span></td>
                       <td style={{ color: "var(--tu-text-body)" }}>
-                        {locationPath(asset.location) || <span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        <LocationLink
+                          accountId={asset.accountId}
+                          location={asset.location}
+                          className="text-[var(--tu-text-brand)] hover:underline"
+                          fallback={<span style={{ color: "var(--tu-text-subtle)" }}>—</span>}
+                        />
                       </td>
                       <td className="tu-center">
                         {asset.openWorkOrders > 0

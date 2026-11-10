@@ -50,6 +50,7 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
     tabs: [
       { label: "Site Profile", path: "profile" },
       { label: "Site Access", path: "members" },
+      { label: "Locations", path: "assets/locations" },
       { label: "Reports", path: "reports" },
       { label: "Activity", path: "activity" },
       { label: "Client Portal", path: "portal" },
@@ -57,6 +58,8 @@ const GROUPS: { label: string; tabs: Tab[] }[] = [
     ],
   },
 ];
+
+const ALL_PATHS = [...PINNED, ...GROUPS.flatMap((g) => g.tabs)].map((t) => t.path);
 
 export default function AccountLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
@@ -99,7 +102,12 @@ export default function AccountLayout({ children }: { children: React.ReactNode 
   // Only show what the current role is allowed to open (same rule as the route
   // guard), and drop any menu left with no visible tabs.
   const canSee = (path: string) => canAccessRoute(user?.role, `/accounts/${accountId}/${path}`);
-  const isActive = (path: string) => pathname.includes(`/accounts/${accountId}/${path}`);
+  // The most specific tab wins: Locations lives under assets/, and on its page
+  // the pinned Assets tab must not light up as well.
+  const activePath = ALL_PATHS
+    .filter((p) => pathname.includes(`/accounts/${accountId}/${p}`))
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (path: string) => path === activePath;
 
   const pinned = PINNED.filter((t) => canSee(t.path));
   const groups = GROUPS

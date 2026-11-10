@@ -7,11 +7,11 @@ import api from "@/lib/api";
 import AssetImportModal from "@/components/AssetImportModal";
 import LocationPicker from "@/components/LocationPicker";
 import LocationManagerModal from "@/components/LocationManagerModal";
+import LocationLink from "@/components/LocationLink";
 import { ASSET_HEALTH, ASSET_HEALTH_CLS, NEEDS_ATTENTION_HEALTH, NEEDS_ATTENTION_LABEL } from "@/lib/statuses";
 import {
   type AssetLocationNode,
   type AssetLocationRef,
-  locationPath,
   locationScopeIds,
 } from "@/lib/assetLocations";
 import EmptyState from "@/components/EmptyState";
@@ -665,7 +665,12 @@ export default function AssetsPage() {
                     </td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)]">{asset.category}</td>
                     <td className="px-6 py-4 text-[var(--tu-text-subtle)] text-xs">
-                      {locationPath(asset.location) || <span className="text-[var(--tu-text-disabled)]">—</span>}
+                      <LocationLink
+                        accountId={accountId}
+                        location={asset.location}
+                        className="text-[var(--tu-text-brand)] hover:underline"
+                        fallback={<span className="text-[var(--tu-text-disabled)]">—</span>}
+                      />
                     </td>
                     <td className="px-6 py-4">
                       {!isArchived && (

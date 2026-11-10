@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import LocationLink from "@/components/LocationLink";
 import api from "@/lib/api";
 import { isClosed, isDone, workOrderRef } from "@/lib/workOrders";
 import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
@@ -16,7 +17,6 @@ import LocationPicker from "@/components/LocationPicker";
 import {
   type AssetLocationNode,
   type AssetLocationRef,
-  locationPath,
 } from "@/lib/assetLocations";
 import { frequencyMeta } from "@/lib/maintenancePlans";
 import { useConfirm } from "@/components/ConfirmDialog";
@@ -709,9 +709,7 @@ export default function AssetDetailPage() {
                 {
                   label: "Location",
                   value: asset.location ? (
-                    <Link href={`/accounts/${accountId}/assets/locations/${asset.location.id}`} className="text-[var(--tu-text-brand)] hover:underline">
-                      {locationPath(asset.location)}
-                    </Link>
+                    <LocationLink accountId={accountId} location={asset.location} className="text-[var(--tu-text-brand)] hover:underline" />
                   ) : null,
                 },
                 { label: "Manufactured", value: asset.manufacturedDate ? fmtDate(asset.manufacturedDate) : null },
