@@ -102,6 +102,10 @@ const EMPTY_FORM = {
   estMinutes: "",
   isSpecialProject: false,
   isBreakdown: false,
+  // Who does it, picked on the form (staff only). Assigned after the job is
+  // created, through the same route as the Assign button, so the audit lines
+  // and "you've been assigned" notices are the usual ones.
+  assigneeIds: [] as string[],
 };
 
 function formatDate(iso: string) {
@@ -224,6 +228,8 @@ export default function WorkOrdersPage() {
   const [assets, setAssets] = useState<{ id: string; name: string; location?: AssetLocationRef | null }[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
+  // The job was created but someone on the form could not be assigned.
+  const [createWarning, setCreateWarning] = useState("");
 
   // Inline employee assignment (modal opened from a work-order row)
   const [assigningOrder, setAssigningOrder] = useState<WorkOrder | null>(null);
@@ -281,6 +287,18 @@ export default function WorkOrdersPage() {
       .then((res) => setAssets(res.data))
       .catch(() => setAssets([]));
   }, [accountId]);
+
+  // The form's "Assign to" list needs the roster; the assign modal shares it.
+  const loadRoster = useCallback(async (isCancelled: () => boolean) => {
+    if (!showForm || !canAssign || employees.length > 0) return;
+    try {
+      const res = await api.get(`/accounts/${accountId}/employees`);
+      if (!isCancelled()) setEmployees(res.data);
+    } catch {
+      // The form still works without it; the job can be assigned afterwards.
+    }
+  }, [showForm, canAssign, employees.length, accountId]);
+  useEffect(() => startLoad(loadRoster), [loadRoster]);
 
   async function openAssignModal(order: WorkOrder) {
     setAssigningOrder(order);
@@ -356,7 +374,19 @@ export default function WorkOrdersPage() {
       // The create response includes `asset` only, so the relations the card
       // renders have to be defaulted rather than left undefined — a brand new
       // order genuinely has neither, but the card still reads `.length`.
-      setOrders((prev) => [{ checklistItems: [], assignments: [], ...res.data }, ...prev]);
+      const assignments: WorkOrder["assignments"] = [];
+      const failed: string[] = [];
+      for (const employeeId of form.assigneeIds) {
+        try {
+          assignments.push((await api.post(`/work-orders/${res.data.id}/assignments`, { employeeId })).data);
+        } catch {
+          failed.push(employees.find((e) => e.id === employeeId)?.name ?? "someone");
+        }
+      }
+      setCreateWarning(failed.length
+        ? `“${res.data.title}” was created, but ${failed.join(", ")} couldn't be assigned. Assign them from the job.`
+        : "");
+      setOrders((prev) => [{ checklistItems: [], ...res.data, assignments }, ...prev]);
       setShowForm(false);
       setForm({ ...EMPTY_FORM });
       // A linked job was raised from somewhere else on purpose; show it.
@@ -676,6 +706,37 @@ export default function WorkOrdersPage() {
                 <DuplicateHint orders={orders} assetId={form.assetId} title={form.title} accountId={accountId} />
               </div>
             )}
+            {canAssign && (
+              <div className="col-span-2">
+                <span className="tu-label">Assign to</span>
+                {employees.length === 0 ? (
+                  <p className="text-[12px] text-[var(--tu-text-subtle)]">
+                    Nobody on this site&apos;s roster yet. You can assign people later from the job.
+                  </p>
+                ) : (
+                  <ul className="tu-accept-assign-list" aria-label="Assign to">
+                    {employees.map((emp) => (
+                      <li key={emp.id}>
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={form.assigneeIds.includes(emp.id)}
+                            onChange={(e) => setForm((f) => ({
+                              ...f,
+                              assigneeIds: e.target.checked
+                                ? [...f.assigneeIds, emp.id]
+                                : f.assigneeIds.filter((id) => id !== emp.id),
+                            }))}
+                          />
+                          <span>{emp.name}</span>
+                          {emp.position && <span className="tu-accept-assign-pos">{emp.position}</span>}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
             <div>
               <label className="tu-label">Expected Time</label>
               <div className="flex gap-2">
@@ -745,6 +806,7 @@ export default function WorkOrdersPage() {
         </div>
       )}
 
+      {createWarning && <div className="tu-error-banner" role="alert">{createWarning}</div>}
       {error && (
         <div className="tu-error-banner">
           Failed to load work orders.
