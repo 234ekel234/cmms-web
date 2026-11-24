@@ -240,6 +240,9 @@ export default function ReportsPage() {
           <Link href="/reports/response-times" className="tu-btn-secondary">
             Response times
           </Link>
+          <Link href="/reports/sla" className="tu-btn-secondary">
+            Service levels
+          </Link>
           <Link href="/reports/client-satisfaction" className="tu-btn-secondary">
             Client satisfaction
           </Link>

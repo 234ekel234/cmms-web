@@ -269,6 +269,7 @@ export default function KpiPage() {
             <Tile label="Time to start" value={formatMinutes(t.response.medianMinutesToStart)} sub="Typical wait from raised to work started (plan work not counted)" />
             <div className="tu-stat-card tu-kpi-links tu-no-print">
               <p className="tu-stat-label">More detail</p>
+              <Link href="/reports/sla">Service levels →</Link>
               <Link href="/reports/response-times">Response times →</Link>
               <Link href="/reports/client-satisfaction">Client satisfaction →</Link>
               <Link href="/reports">Performance report →</Link>

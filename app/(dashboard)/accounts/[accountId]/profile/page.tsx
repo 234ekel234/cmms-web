@@ -9,6 +9,7 @@ import { MANAGERS, STAFF, hasRole } from "@/lib/rbac";
 import { startLoad } from "@/lib/startLoad";
 import { roleLabel } from "@/lib/statuses";
 import { useConfirm } from "@/components/ConfirmDialog";
+import SlaTargetsCard from "@/components/SlaTargetsCard";
 import { contentUrl, formatSize, type BaseAttachment } from "@/lib/attachments";
 import {
   BILLING_LABEL, CONTRACT_STATUS, SERVICE_LABEL, SITE_STATUS, SITE_TYPE_LABEL,
@@ -112,6 +113,8 @@ export default function SiteProfilePage() {
 
       <Contracts accountId={accountId} contracts={contracts} currentId={currentContractId} canEdit={isManager}
         rosterRegular={profile.rosterRegular} onChange={load} />
+
+      <SlaTargetsCard accountId={accountId} canEdit={isManager} showReportLink={isStaff} />
     </div>
   );
 }
