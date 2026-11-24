@@ -38,5 +38,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # The pure rules in lib/ (test/*.test.ts). The checks against the backend's
+      # own helpers skip here — this job checks out the web repo alone.
+      - name: Unit tests
+        run: npm test
+
       - name: Build
         run: npm run build

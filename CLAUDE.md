@@ -12,7 +12,14 @@ npm install
 npm run dev       # Start dev server (port 3001)
 npm run build     # Production build
 npm run lint      # ESLint check
+npm test          # Vitest: the pure rules in lib/ (test/*.test.ts)
 ```
+
+**Unit tests** cover the rules the UI shares with the API — work-order states and moves,
+route access, PM periods, asset search, CSV. `test/mirrors.test.ts` imports the backend's own
+helpers from `../backend` and checks the web copies agree (transitions, closed / settled,
+default due days, PM periods over two years of days, control numbers); it skips when the
+backend is not beside the web folder, as in CI. Change a mirrored rule on both sides.
 
 ## Environment
 
