@@ -6,6 +6,7 @@ import { STAFF_TRANSITIONS, isClosed, needsClientApproval, isSettled } from "@/l
 import { DEFAULT_DUE_DAYS } from "@/lib/dueDates";
 import { getPeriodStart, pmSchedule } from "@/lib/pmPeriod";
 import { pmControlNumber } from "@/lib/pmControlNumber";
+import { MAX_REPORT_PHOTOS } from "@/lib/reportPhotos";
 
 /**
  * The web copies of backend rules, checked against the backend itself.
@@ -33,6 +34,10 @@ describe.skipIf(!here)("web mirrors agree with the backend", () => {
       }
       expect(isClosed({ status })).toBe((api.CLOSED_STATUSES as string[]).includes(status));
     }
+  });
+
+  it("photos per problem report", async () => {
+    expect(MAX_REPORT_PHOTOS).toBe((await load("publicReports.js")).MAX_PHOTOS_PER_SEND);
   });
 
   it("default due days", async () => {

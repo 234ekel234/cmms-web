@@ -6,6 +6,8 @@ import Link from "next/link";
 import api, { errorMessage } from "@/lib/api";
 import { getToken } from "@/lib/auth";
 import { startLoad } from "@/lib/startLoad";
+import { reportBody } from "@/lib/reportPhotos";
+import ReportPhotoPicker from "@/components/ReportPhotoPicker";
 
 type Info =
   | { enabled: false }
@@ -30,6 +32,7 @@ export default function StickerPage() {
   const [note, setNote] = useState("");
   const [contact, setContact] = useState("");
   const [website, setWebsite] = useState(""); // honeypot — never shown
+  const [photos, setPhotos] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export default function StickerPage() {
     setSending(true);
     setError(null);
     try {
-      await api.post(`/public/report/${encodeURIComponent(code)}`, { category, note, contact, website });
+      await api.post(`/public/report/${encodeURIComponent(code)}`, await reportBody({ category, note, contact, website }, photos));
       setSent(true);
     } catch (err) {
       setError(errorMessage(err, "Couldn't send the report. Please try again."));
@@ -99,7 +102,7 @@ export default function StickerPage() {
             <>
               <h1 className="tu-card-title mb-2">Thank you</h1>
               <p className="text-sm text-[var(--tu-text-body)]">Your report about <strong>{info.place}</strong> has been sent to the maintenance team.</p>
-              <button type="button" className="tu-link text-sm mt-4" onClick={() => { setSent(false); setCategory(""); setNote(""); }}>
+              <button type="button" className="tu-link text-sm mt-4" onClick={() => { setSent(false); setCategory(""); setNote(""); setPhotos([]); }}>
                 Report something else
               </button>
             </>
@@ -127,6 +130,7 @@ export default function StickerPage() {
                 <label className="tu-label" htmlFor="r-note">Details {category === "OTHER" ? "" : "(optional)"}</label>
                 <textarea id="r-note" className="tu-textarea" rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
+              <ReportPhotoPicker photos={photos} onChange={setPhotos} onError={setError} disabled={sending} />
               <div>
                 <label className="tu-label" htmlFor="r-contact">Your name or number (optional)</label>
                 <input id="r-contact" className="tu-input" maxLength={120} value={contact} onChange={(e) => setContact(e.target.value)} />

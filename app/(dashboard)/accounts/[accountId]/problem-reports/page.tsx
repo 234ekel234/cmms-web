@@ -10,6 +10,7 @@ import { startLoad } from "@/lib/startLoad";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 import { workOrderRef } from "@/lib/workOrders";
+import { contentUrl, thumbUrl, type BaseAttachment } from "@/lib/attachments";
 
 type Report = {
   id: string;
@@ -26,6 +27,8 @@ type Report = {
   createdAt: string;
   location: AssetLocationRef;
   workOrder: { id: string; number: number; title: string; status: string } | null;
+  /** Sent with the report; moved onto the job when it is turned into one. */
+  photos: BaseAttachment[];
 };
 
 const CATEGORY_LABEL: Record<string, string> = {
@@ -111,8 +114,8 @@ export default function ProblemReportsPage() {
         <div>
           <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">Problem Reports</h2>
           <p className="text-sm text-[var(--tu-text-subtle)] max-w-2xl">
-            Reported from location stickers by people who aren&apos;t signed in. Only staff see these; turn one into a
-            work order to act on it.
+            Reported from location stickers, by anyone who scans one. Only staff see these; turn one into a work
+            order to act on it, and its photos go with it.
           </p>
         </div>
         <div className="tu-page-actions items-center">
@@ -159,6 +162,22 @@ export default function ProblemReportsPage() {
                     <ul className="mt-2 text-sm text-[var(--tu-text-body)] list-disc pl-5">
                       {r.notes.map((n, i) => <li key={i}>{n}</li>)}
                     </ul>
+                  )}
+                  {r.photos?.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {r.photos.map((p, i) => (
+                        <a key={p.id} href={contentUrl(p)} target="_blank" rel="noreferrer" title={p.uploadedByName ?? undefined}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={thumbUrl(p)}
+                            alt={`Photo ${i + 1} of the problem`}
+                            className="rounded-lg border border-[var(--tu-border)] object-cover"
+                            style={{ width: 72, height: 72 }}
+                            loading="lazy"
+                          />
+                        </a>
+                      ))}
+                    </div>
                   )}
                   {r.reportedByName && <p className="mt-2 text-xs text-[var(--tu-text-subtle)]">Reported by {r.reportedByName}</p>}
                   {r.contact && <p className="mt-2 text-xs text-[var(--tu-text-subtle)]">Left contact: {r.contact}</p>}

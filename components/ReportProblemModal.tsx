@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import api, { errorMessage } from "@/lib/api";
+import { reportBody } from "@/lib/reportPhotos";
+import ReportPhotoPicker from "@/components/ReportPhotoPicker";
 
 export type ReportCategory = { value: string; label: string };
 
@@ -30,6 +32,7 @@ export default function ReportProblemModal({
 }) {
   const [category, setCategory] = useState("");
   const [note, setNote] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,7 +49,10 @@ export default function ReportProblemModal({
     setError("");
     setSending(true);
     try {
-      const res = await api.post(`/accounts/${accountId}/asset-locations/${locationId}/reports`, { category, note: note.trim() });
+      const res = await api.post(
+        `/accounts/${accountId}/asset-locations/${locationId}/reports`,
+        await reportBody({ category, note: note.trim() }, photos),
+      );
       onSent(!!res.data?.merged);
       onClose();
     } catch (err) {
@@ -60,7 +66,7 @@ export default function ReportProblemModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Report a problem">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} aria-hidden="true" />
 
-      <form onSubmit={submit} className="relative w-full max-w-md bg-[var(--tu-bg-surface)] rounded-xl shadow-2xl border border-[var(--tu-border)] flex flex-col">
+      <form onSubmit={submit} className="relative w-full max-w-md bg-[var(--tu-bg-surface)] rounded-xl shadow-2xl border border-[var(--tu-border)] flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-[var(--tu-border)] flex items-center justify-between shrink-0">
           <h3 className="text-sm font-semibold text-[var(--tu-text-heading)]">Report a problem</h3>
           <button type="button" onClick={onClose} className="text-[var(--tu-text-subtle)] hover:text-[var(--tu-text-body)] cursor-pointer text-sm" aria-label="Close">
@@ -68,7 +74,7 @@ export default function ReportProblemModal({
           </button>
         </div>
 
-        <div className="px-6 py-4 flex flex-col gap-4">
+        <div className="px-6 py-4 flex flex-col gap-4 overflow-y-auto">
           <p className="text-xs text-[var(--tu-text-subtle)]">
             {placeName} · goes to the site team, who decide what happens next.
           </p>
@@ -92,6 +98,8 @@ export default function ReportProblemModal({
             <label className="tu-label" htmlFor="report-note">Details {category === "OTHER" ? "*" : "(optional)"}</label>
             <textarea id="report-note" className="tu-textarea" rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} />
           </div>
+
+          <ReportPhotoPicker photos={photos} onChange={setPhotos} onError={setError} disabled={sending} />
 
           {error && <p className="text-[var(--tu-on-danger)] text-xs" role="alert">{error}</p>}
         </div>
