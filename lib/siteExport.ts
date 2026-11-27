@@ -82,7 +82,7 @@ export async function buildSiteWorkbook(data: SiteExport, siteName: string): Pro
   const mod = (await import("exceljs")) as typeof import("exceljs") & { default?: typeof import("exceljs") };
   const { Workbook } = mod.default ?? mod;
   const wb = new Workbook();
-  wb.creator = "FMI CMMS";
+  wb.creator = "FMI HANNI";
   wb.created = new Date(data.generatedAt);
 
   const about = wb.addWorksheet("About");

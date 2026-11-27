@@ -108,7 +108,7 @@ function ConfirmEmail() {
       <>
         <p className="tu-login-lead">Your email is confirmed. Work updates will keep reaching {user?.email ?? "you"}.</p>
         <Link href={next} className="tu-login-submit" style={{ display: "block", textAlign: "center" }}>
-          {user?.mustChangePassword ? "Choose your password" : "Continue to CMMS"}
+          {user?.mustChangePassword ? "Choose your password" : "Continue to FMI HANNI"}
         </Link>
       </>
     );
@@ -119,7 +119,7 @@ function ConfirmEmail() {
       <>
         <p className="tu-login-lead">{error ?? "This confirm link has expired or has already been used."}</p>
         <Link href={user ? ROLE_HOME[user.role] : "/login"} className="tu-login-submit" style={{ display: "block", textAlign: "center" }}>
-          {user ? "Go to CMMS" : "Sign in"}
+          {user ? "Go to FMI HANNI" : "Sign in"}
         </Link>
       </>
     );

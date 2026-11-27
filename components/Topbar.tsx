@@ -164,7 +164,7 @@ export default function Topbar({ onOpenNav }: { onOpenNav: () => void }) {
   // round-trip asking "where were you and who are you?".
   const supportHref =
     `mailto:${SUPPORT_EMAIL}` +
-    `?subject=${encodeURIComponent("CMMS support request")}` +
+    `?subject=${encodeURIComponent("FMI HANNI support request")}` +
     `&body=${encodeURIComponent(
       [
         "Describe the problem here.",

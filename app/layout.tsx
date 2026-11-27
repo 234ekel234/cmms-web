@@ -29,10 +29,10 @@ export const metadata: Metadata = {
   // production.
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cmms.servicemasterph.com"),
   title: {
-    default: "FMI CMMS",
-    template: "%s · FMI CMMS",
+    default: "FMI HANNI",
+    template: "%s · FMI HANNI",
   },
-  description: "Maintenance management — track assets, work orders, and PM checklists across all sites.",
+  description: "FMI HANNI — Hub for Asset Needs, Notices & Inspections. Track assets, work orders, and PM checklists across all sites.",
 };
 
 export default function RootLayout({

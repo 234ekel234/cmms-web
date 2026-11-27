@@ -1,6 +1,6 @@
-# CMMS — Web Client
+# FMI HANNI — Web Client
 
-The primary client of the CMMS: a Next.js app for managers, supervisors, technicians and
+The primary client of FMI HANNI: a Next.js app for managers, supervisors, technicians and
 clients, live at **https://cmms.servicemasterph.com**. It talks to the Express API in
 `../backend` and holds no data of its own.
 

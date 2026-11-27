@@ -61,8 +61,8 @@ export default function LoginPage() {
           {/* eslint-enable @next/next/no-img-element */}
         </div>
         <div className="text-center">
-          <p className="tu-login-headline">Maintenance Management</p>
-          <p className="tu-login-sub">Track assets, work orders, and PM checklists — all in one place.</p>
+          <p className="tu-login-headline">FMI HANNI</p>
+          <p className="tu-login-sub">Hub for Asset Needs, Notices & Inspections</p>
         </div>
         <div className="tu-login-features">
           {[

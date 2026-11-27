@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is the **web frontend** for the CMMS (Computerized Maintenance Management System). It is a Next.js 16 app with Tailwind CSS, targeting managers, supervisors, technicians and
+This is the **web frontend** for FMI HANNI (Hub for Asset Needs, Notices & Inspections — a CMMS). It is a Next.js 16 app with Tailwind CSS, targeting managers, supervisors, technicians and
 clients on desktop browsers. It talks to the shared Express REST API.
 
 ## Development Commands

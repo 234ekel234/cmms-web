@@ -377,7 +377,7 @@ export async function buildPmWorkbook(data: PmExport, scope: string): Promise<Wo
   const mod = (await import("exceljs")) as typeof import("exceljs") & { default?: typeof import("exceljs") };
   const { Workbook } = mod.default ?? mod;
   const wb = new Workbook();
-  wb.creator = "FMI CMMS";
+  wb.creator = "FMI HANNI";
   wb.created = new Date(data.generatedAt);
   summarySheet(wb, data, scope);
   scheduleSheet(wb, data);
