@@ -35,6 +35,7 @@ const ACTION_DOT: Record<string, string> = {
   CHECKLIST_INCOMPLETE: "bg-[var(--tu-priority-high)]",
   PM_CHECKLIST_PENDING: "bg-[var(--tu-status-pending)]",
   PART_LOW_STOCK:       "bg-[var(--tu-health-poor)]",
+  ASSET_BREAKDOWN:      "bg-[var(--tu-priority-critical)]",
 };
 
 // Every action whose `entityId` is a work order, and so can be opened from the
@@ -173,6 +174,7 @@ export default function NotificationsPage() {
             const href = !n.accountId ? null
               : n.action === "PUBLIC_REPORT" ? `/accounts/${n.accountId}/problem-reports`
               : WORK_ORDER_ACTIONS.has(n.action) && n.entityId ? `/accounts/${n.accountId}/work-orders/${n.entityId}`
+              : n.action === "ASSET_BREAKDOWN" && n.entityId ? `/accounts/${n.accountId}/assets/${n.entityId}`
               : null;
             const isDeepLinkable = !!href;
 

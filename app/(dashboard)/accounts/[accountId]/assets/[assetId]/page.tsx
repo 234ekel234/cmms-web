@@ -8,7 +8,7 @@ import api from "@/lib/api";
 import { isClosed, isDone, workOrderRef } from "@/lib/workOrders";
 import { ASSET_HEALTH, ASSET_HEALTH_CLS, ASSET_HEALTH_HINT, WORK_ORDER_STATUS, type WorkOrderStatus } from "@/lib/statuses";
 import { useAuth } from "@/context/AuthContext";
-import { canManage } from "@/lib/rbac";
+import { canManage, FIELD_STAFF, hasRole } from "@/lib/rbac";
 import Breadcrumbs from "@/components/Breadcrumbs";
 import { fmtQty, type Part } from "@/lib/parts";
 import EmptyState from "@/components/EmptyState";
@@ -194,6 +194,9 @@ export default function AssetDetailPage() {
   // A client reads their own site's equipment — the API already withholds
   // purchase cost — but archiving it and editing its health or status is ours.
   const writable = canManage(user?.role);
+  // The condition is the one thing a technician may change here too: the person
+  // at a broken machine knows when the breakdown started (POST .../condition).
+  const canSetCondition = hasRole(user?.role, FIELD_STAFF);
   const accountId = params.accountId as string;
   const assetId = params.assetId as string;
   const [asset, setAsset] = useState<Asset | null>(null);
@@ -323,12 +326,33 @@ export default function AssetDetailPage() {
     });
   }
 
+  // Condition goes through its own route, for staff and technicians alike: it
+  // writes the downtime ledger and the history the same way, and tells the
+  // site's managers and supervisors when an asset breaks down.
+  async function updateCondition(health: AssetHealth, findings?: string) {
+    if (!asset) return;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const res = await api.post(`/accounts/${accountId}/assets/${assetId}/condition`, findings === undefined ? { health } : { health, findings });
+      // A technician's copy comes back without the cost; keep what staff had.
+      setAsset((prev) => (prev ? { ...prev, ...res.data } : res.data));
+      setEditHealth(false);
+      setHealthChoice(null);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setSaveError(e?.response?.data?.error ?? "Could not change the condition.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   // Functional saves at once — the API clears any findings with it. Anything
   // else opens the findings box first: "it has findings" with no findings
   // written down is the gap this field exists to close.
   function chooseHealth(h: AssetHealth) {
     if (h === "FUNCTIONAL") {
-      updateAsset({ health: h });
+      updateCondition(h);
       return;
     }
     setHealthChoice(h);
@@ -342,7 +366,7 @@ export default function AssetDetailPage() {
       setSaveError("Describe what was found.");
       return;
     }
-    await updateAsset({ health: healthChoice, findings: findingsDraft.trim() });
+    await updateCondition(healthChoice, findingsDraft.trim());
   }
 
   // The cover's link carries a view token that expires (minutes), so a page left
@@ -546,7 +570,7 @@ export default function AssetDetailPage() {
           ) : (
             <div className="flex items-center gap-2">
               <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${hCfg.cls}`}>{hCfg.label}</span>
-              {writable && !asset.archivedAt && (
+              {canSetCondition && !asset.archivedAt && (
                 <button onClick={() => setEditHealth(true)} className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer">Edit</button>
               )}
             </div>
@@ -555,7 +579,7 @@ export default function AssetDetailPage() {
             <div className="mt-2 rounded-lg border border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] px-3 py-2">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-[11px] font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide">Findings</p>
-                {writable && !asset.archivedAt && (
+                {canSetCondition && !asset.archivedAt && (
                   <button
                     onClick={() => { setEditHealth(true); chooseHealth(asset.health); }}
                     className="text-xs text-[var(--tu-text-brand)] hover:underline cursor-pointer"
