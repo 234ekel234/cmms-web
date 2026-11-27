@@ -10,6 +10,7 @@ import { roleLabel, roleCls } from "@/lib/statuses";
 import Switch from "@/components/Switch";
 import EmailRulesCard from "@/components/EmailRulesCard";
 import SignedInDevices from "@/components/SignedInDevices";
+import BrowserNotifications from "@/components/BrowserNotifications";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -187,6 +188,8 @@ export default function SettingsPage() {
           <ThemeHint />
         </div>
       </div>
+
+      {user && <BrowserNotifications userId={user.id} />}
 
       {/* Notification preferences */}
       <div className="tu-card">

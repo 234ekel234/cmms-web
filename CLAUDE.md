@@ -146,6 +146,16 @@ well as priority, due date, category and estimate. It loads the site's live asse
 open and keeps the current asset offered even if it has since been archived; save errors are
 shown, not swallowed.
 
+## Notifications on this device (web push)
+
+`lib/webPush.ts` + `public/sw.js`, the switch in `components/BrowserNotifications.tsx` (Settings).
+Browser permission belongs to the site, not the person, so the subscription is remembered against
+the user who made it (`hanni.webpush.user` in localStorage). `syncPush` (AuthContext, on load)
+re-attaches it to the current sign-in, or unsubscribes when someone else is signed in. `dropPush`
+runs first in `logout`, capped at 2.5 s. iPhone only offers push from the Home Screen app
+(`isIosBrowserTab`). The card hides itself when the API has no VAPID keys. `sw.js` has no fetch
+handler on purpose: it only shows notifications and opens their page.
+
 ## Auth Flow
 
 1. User logs in via `POST /api/auth/login`

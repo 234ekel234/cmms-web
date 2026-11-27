@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { getUser, clearSession, loginUrl, type User } from "@/lib/auth";
 import api from "@/lib/api";
+import { dropPush, syncPush } from "@/lib/webPush";
 import { canAccessRoute, ROLE_HOME } from "@/lib/rbac";
 
 type AuthContextType = {
@@ -43,11 +44,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, pathname, router]);
 
+  // Keeps this browser's notifications attached to the current sign-in, or
+  // removes them if they were turned on by somebody else (lib/webPush.ts).
+  useEffect(() => {
+    if (user && !user.mustChangePassword) void syncPush(user.id);
+  }, [user]);
+
   // Ends the session on the server first, so the token stops working rather
   // than only being forgotten here. Best effort: an unreachable API must not
   // keep somebody signed in on a shared computer, so the local session goes
   // regardless.
   async function logout() {
+    // While the token still works, so the server row goes too. Capped at a
+    // couple of seconds: notifications must never hold up signing out.
+    await dropPush();
     try {
       await api.post("/me/sign-out");
     } catch {
