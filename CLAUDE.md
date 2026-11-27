@@ -150,10 +150,11 @@ well as priority, due date, category and estimate. It loads the site's live asse
 open and keeps the current asset offered even if it has since been archived; save errors are
 shown, not swallowed.
 
-## Offline (releases 1–3 of 4: reading, PM rounds, job updates)
+## Offline (releases 1–4: reading, PM rounds, job updates, status and clock)
 
-Pages and their data open without signal. PM rounds, a job's steps, updates (with photos) and
-file uploads can be done offline; status and the clock still need a connection.
+Pages and their data open without signal. PM rounds, a job's steps, updates (with photos), file
+uploads, and starting / pausing / resuming / holding / completing a job can be done offline.
+Accepting, rejecting, assigning and signing off still need a connection.
 - **Pages:** `public/sw.js` keeps the app's code (`/_next/static`, cache-first) and every page
   opened (network-first, 6 s, then the saved copy, then `public/offline.html`). Pages are the same
   shell for everyone; nothing personal is stored there. It never touches the API (another origin)
@@ -186,7 +187,14 @@ file uploads can be done offline; status and the clock still need a connection.
   re-reads the job when one is sent. Anything refused (step deleted, job reassigned — 404) is marked
   failed with the reason, never retried blindly. The queue pane's composer is not wired; technicians
   post from the job page.
-- Next: status and the clock (4), with server-side checks on the reported time.
+- **Status and clock offline (release 4):** `jobAction` entries (a status move to IN_PROGRESS /
+  ON_HOLD / COMPLETED, or the clock's pause / resume) with `doneAt`. The job page shows the job
+  **as it will be** (`projectJob`, applied in `fetchOrder` over the server's or saved copy), so moves
+  can be chained offline; a banner lists them. The API bounds each time by the job's own history
+  (`clockEventFloor`: nothing before its last recorded event — 409 otherwise), caps a stretch over
+  16 h, writes the history line at the time it happened with "done offline at …, sent …", and sets
+  `WorkOrder.offlineRecordedAt`, shown to staff in the man-hours box. One refused move fails the
+  later moves for that job in the same sync.
 
 ## Notifications on this device (web push)
 

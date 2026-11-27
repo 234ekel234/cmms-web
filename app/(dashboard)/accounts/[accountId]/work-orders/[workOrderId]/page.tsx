@@ -18,7 +18,7 @@ import ProgressThread, { type ProgressAttachment } from "@/components/ProgressTh
 import { canManage as canAdministerAccount } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { startLoad } from "@/lib/startLoad";
-import { discardQueued, forJob, listOutbox, OUTBOX_EVENT, queueComment, queueStep, type OutboxComment, type OutboxEntry } from "@/lib/offlineOutbox";
+import { describeMove, discardQueued, forJob, listOutbox, OUTBOX_EVENT, projectJob, queueComment, queueJobAction, queueStep, type OutboxComment, type OutboxEntry, type OutboxJobAction } from "@/lib/offlineOutbox";
 import WorkOrderLinks from "@/components/WorkOrderLinks";
 import AcceptAndAssign from "@/components/AcceptAndAssign";
 import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
@@ -53,6 +53,8 @@ type WorkOrder = StageFacts & Links & {
   estimatedMinutes: number | null;
   actualSeconds: number;
   timerStartedAt: string | null;
+  /** Set when clock or status changes on this job were done offline and sent later. */
+  offlineRecordedAt?: string | null;
   createdAt: string;
   asset: { id: string; name: string } | null;
   location?: AssetLocationRef | null;
@@ -268,8 +270,19 @@ export default function WorkOrderDetailPage() {
         .then((fresh) => setOrder((prev) => prev ? { ...prev, pauses: fresh.data.pauses } : prev))
         .catch(() => {});
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
-      setTimerError(msg ?? "Couldn't update the timer. Try again.");
+      const r = (err as { response?: { data?: { error?: string } } })?.response;
+      // No signal: keep the move on this phone with the time it was made.
+      if ((err as { isAxiosError?: boolean })?.isAxiosError && !r && user && await queueJobAction({
+        userId: user.id, workOrderId: order.id, move: { type: "timer", action, reason },
+        label: `${workOrderRef(order.number)}: ${action === "pause" ? "clock paused" : "clock resumed"}`,
+        href: `/accounts/${accountId}/work-orders/${order.id}`,
+      })) {
+        setPausing(false);
+        setPauseReason("");
+        await fetchOrder(true);
+        return;
+      }
+      setTimerError(r?.data?.error ?? "Couldn't update the timer. Try again.");
     } finally {
       setTimerBusy(false);
     }
@@ -299,8 +312,10 @@ export default function WorkOrderDetailPage() {
   const canAdmin = canAdministerAccount(user?.role);
   const isManager = user?.role === "GENERAL_MANAGER" || user?.role === "MANAGER";
 
-  const fetchOrder = useCallback(async () => {
-    setLoading(true);
+  // `quiet`: re-read without blanking the page to a spinner — used after a move
+  // saved on this phone, to show the job as it will be.
+  const fetchOrder = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
     setError(false);
     try {
       // One order, one request. This used to read the whole account's list and
@@ -309,12 +324,15 @@ export default function WorkOrderDetailPage() {
       const res = await api.get(`/work-orders/${workOrderId}`);
       // Steps ticked on this phone and not sent yet read as ticked: they are
       // newer than anything the server (or the saved copy) has.
-      const waitingSteps = user ? forJob(await listOutbox(user.id), workOrderId).filter((e) => e.kind === "step" && e.status === "waiting") : [];
+      const queuedHere = user ? forJob(await listOutbox(user.id), workOrderId) : [];
+      const waitingSteps = queuedHere.filter((e) => e.kind === "step" && e.status === "waiting");
       if (waitingSteps.length && res.data?.checklistItems) {
         const latest = new Map(waitingSteps.map((e) => [e.kind === "step" ? e.itemId : "", e.kind === "step" ? e.isDone : false]));
         res.data.checklistItems = res.data.checklistItems.map((i: { id: string; isDone: boolean }) => latest.has(i.id) ? { ...i, isDone: latest.get(i.id) } : i);
       }
-      setOrder(res.data);
+      // Starts, pauses, holds and completions saved on this phone: show the job
+      // as it will be once they land (lib/offlineOutbox.ts projectJob).
+      setOrder(projectJob(res.data, queuedHere));
     } catch {
       setError(true);
     } finally {
@@ -322,7 +340,7 @@ export default function WorkOrderDetailPage() {
     }
   }, [workOrderId, user]);
 
-  useEffect(() => startLoad(fetchOrder), [fetchOrder]);
+  useEffect(() => startLoad(() => fetchOrder()), [fetchOrder]);
 
   // This job's changes saved on this phone and not sent yet
   // (lib/offlineOutbox.ts). When one goes, the job is read again so the page
@@ -529,8 +547,23 @@ export default function WorkOrderDetailPage() {
       setSendBackReason("");
       return null;
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      return e?.response?.data?.error ?? "Couldn't change the status. Try again.";
+      const e = err as { response?: { data?: { error?: string } }; isAxiosError?: boolean };
+      // No signal: the moves a person makes on site — start or resume, hold,
+      // complete — are kept on this phone with their time. Anything else
+      // (accepting, rejecting, signing off) still needs a connection.
+      const onSite = status === "IN_PROGRESS" || status === "ON_HOLD" || status === "COMPLETED";
+      if (e?.isAxiosError && !e.response && onSite && user && await queueJobAction({
+        userId: user.id, workOrderId: order.id,
+        move: { type: "status", status, reason: opts.reason, remarks: status === "COMPLETED" ? remarks.trim() || undefined : undefined },
+        label: `${workOrderRef(order.number)}: ${status === "IN_PROGRESS" ? "started" : status === "ON_HOLD" ? "put on hold" : "completed"}`,
+        href: `/accounts/${accountId}/work-orders/${order.id}`,
+      })) {
+        setShowCompleteForm(false);
+        setRemarks("");
+        await fetchOrder(true);
+        return null;
+      }
+      return e?.response?.data?.error ?? errorMessage(err, "Couldn't change the status. Try again.");
     } finally {
       setUpdatingStatus(false);
     }
@@ -817,7 +850,7 @@ export default function WorkOrderDetailPage() {
       <div className="px-4 py-5 sm:p-8">
         <div className="bg-[var(--tu-soft-danger)] border border-[var(--tu-bd-danger)] text-[var(--tu-on-danger)] text-sm rounded-lg px-4 py-3">
           Failed to load work order.{" "}
-          <button onClick={fetchOrder} className="underline cursor-pointer">Try again</button>
+          <button onClick={() => fetchOrder()} className="underline cursor-pointer">Try again</button>
         </div>
       </div>
     );
@@ -864,6 +897,28 @@ export default function WorkOrderDetailPage() {
   return (
     <div className="px-4 py-5 sm:p-8 max-w-4xl mx-auto">
       <ActionError message={actionError} onDismiss={() => setActionError("")} />
+      {onPhone.some((e) => e.kind === "jobAction") && (
+        <div role="status" className="rounded-xl border border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] px-4 py-3 mb-4 text-sm">
+          <p className="font-semibold mb-1">Saved on this phone, not sent yet</p>
+          <ul className="space-y-0.5">
+            {onPhone.filter((e): e is OutboxJobAction => e.kind === "jobAction").map((e) => (
+              <li key={e.id}>
+                {new Date(e.doneAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })} · {describeMove(e.move)}
+                {e.status === "failed" && <span className="text-[var(--tu-on-danger)]"> — couldn&apos;t send: {e.error}</span>}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs">These go automatically when there&apos;s signal, with the times shown. The clock above already counts them.</p>
+          {onPhone.some((e) => e.kind === "jobAction" && e.status === "failed") && (
+            <button type="button" className="tu-btn-secondary tu-btn-sm mt-2" onClick={async () => {
+              if (await confirm({ title: "Discard the changes saved on this phone?", message: "The job stays as the server has it. Start, pause or complete it again if you need to.", confirmLabel: "Discard" })) {
+                for (const e of onPhone) if (e.kind === "jobAction") await discardQueued(e.id);
+                await fetchOrder(true);
+              }
+            }}>Discard them</button>
+          )}
+        </div>
+      )}
       <Breadcrumbs
         items={[
           { label: "Work Orders", href: `/accounts/${accountId}/work-orders` },
@@ -1250,6 +1305,13 @@ export default function WorkOrderDetailPage() {
           return (
             <div className="border border-[var(--tu-border)] rounded-xl p-4 mb-4">
               <p className="text-xs font-semibold text-[var(--tu-text-subtle)] uppercase tracking-wide mb-3">Time Tracking · Man-Hours</p>
+              {canAdmin && order.offlineRecordedAt && (
+                <p className="text-xs text-[var(--tu-on-warning)] bg-[var(--tu-soft-warning)] rounded-lg px-3 py-2 mb-3">
+                  Some clock times on this job were recorded offline on a phone and sent later (last on{" "}
+                  {new Date(order.offlineRecordedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}).
+                  The history marks each one. Long stretches were capped at 16 hours.
+                </p>
+              )}
 
               {/* Expected */}
               <div className="flex items-center justify-between gap-3 mb-3">

@@ -9,6 +9,10 @@ import { isPhotoFile, shrinkPhoto } from "@/lib/reportPhotos";
  *   step      a job's step ticked or unticked (release 3)
  *   comment   an update on a job, with or without photos (release 3)
  *   upload    a photo or file added to a job (release 3)
+ *   jobAction start/resume, hold or complete a job; pause or resume its clock
+ *             (release 4). The server checks the time against the job's own
+ *             history and caps a stretch over 16 hours; one refused makes the
+ *             later ones for that job fail too, since they followed from it.
  *
  * A form puts its change here when the save gets no answer; `syncOutbox` sends
  * everything, oldest first, when the signal comes back — on load, on the
@@ -62,7 +66,15 @@ export type OutboxStep = Base & { kind: "step"; workOrderId: string; itemId: str
 export type OutboxComment = Base & { kind: "comment"; workOrderId: string; body: string; internal: boolean; files: OutboxFile[] };
 /** `parent` is the attachment route's segment: "work-orders", "assets", "asset-locations"… */
 export type OutboxUpload = Base & { kind: "upload"; parent: string; parentId: string; file: OutboxFile };
-export type OutboxEntry = OutboxRound | OutboxStep | OutboxComment | OutboxUpload;
+export type OutboxJobAction = Base & {
+  kind: "jobAction";
+  workOrderId: string;
+  /** A status move (PATCH) or the clock's own buttons (POST /timer). */
+  move:
+    | { type: "status"; status: "IN_PROGRESS" | "ON_HOLD" | "COMPLETED"; reason?: string; remarks?: string }
+    | { type: "timer"; action: "pause" | "resume"; reason?: string };
+};
+export type OutboxEntry = OutboxRound | OutboxStep | OutboxComment | OutboxUpload | OutboxJobAction;
 
 export const OUTBOX_EVENT = "hanni:outbox";
 const notify = () => typeof window !== "undefined" && window.dispatchEvent(new Event(OUTBOX_EVENT));
@@ -106,7 +118,7 @@ export async function listOutbox(userId: string): Promise<OutboxEntry[]> {
 
 export const roundsOf = (rows: OutboxEntry[]) => rows.filter((r): r is OutboxRound => r.kind === "pmRound");
 export const forJob = (rows: OutboxEntry[], workOrderId: string) =>
-  rows.filter((r) => (r.kind === "step" || r.kind === "comment") ? r.workOrderId === workOrderId : r.kind === "upload" && r.parent === "work-orders" && r.parentId === workOrderId);
+  rows.filter((r) => (r.kind === "step" || r.kind === "comment" || r.kind === "jobAction") ? r.workOrderId === workOrderId : r.kind === "upload" && r.parent === "work-orders" && r.parentId === workOrderId);
 export const uploadsFor = (rows: OutboxEntry[], parent: string, parentId: string) =>
   rows.filter((r): r is OutboxUpload => r.kind === "upload" && r.parent === parent && r.parentId === parentId);
 
@@ -171,6 +183,68 @@ export async function queueUpload(e: { userId: string; parent: string; parentId:
   });
 }
 
+export async function queueJobAction(e: { userId: string; workOrderId: string; move: OutboxJobAction["move"]; label: string; href: string }): Promise<boolean> {
+  return put({
+    ...e,
+    id: newId(e.userId, "job"),
+    kind: "jobAction",
+    doneAt: new Date().toISOString(),
+    queuedAt: Date.now(),
+    status: "waiting",
+  });
+}
+
+/** "Started", "Paused: waiting for a gasket"… for the notices. */
+export function describeMove(m: OutboxJobAction["move"]): string {
+  if (m.type === "timer") return m.action === "pause" ? `Paused the clock${m.reason ? `: ${m.reason}` : ""}` : "Resumed the clock";
+  if (m.status === "IN_PROGRESS") return "Started";
+  if (m.status === "ON_HOLD") return `Put on hold${m.reason ? `: ${m.reason}` : ""}`;
+  return "Completed";
+}
+
+type ProjectedOrder = {
+  status: string;
+  timerStartedAt: string | null;
+  actualSeconds: number | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  remarks?: string | null;
+  openPause?: { reason: string; kind?: string; pausedAt?: string } | null;
+};
+
+/**
+ * The job as it will be once the waiting moves land, so a technician can start,
+ * pause, resume and complete in a row with no signal and see each step take.
+ * Mirrors what the API does with them (backend workOrderRoutes, timer and
+ * status), minus the 16-hour cap, which only the server applies.
+ */
+export function projectJob<T extends ProjectedOrder>(order: T, entries: OutboxEntry[]): T {
+  const moves = entries.filter((e): e is OutboxJobAction => e.kind === "jobAction" && e.status === "waiting");
+  if (!moves.length) return order;
+  let o: T = { ...order };
+  const bank = (at: string) => {
+    if (!o.timerStartedAt) return;
+    const secs = Math.max(0, Math.floor((Date.parse(at) - Date.parse(o.timerStartedAt)) / 1000));
+    o = { ...o, actualSeconds: (o.actualSeconds ?? 0) + secs, timerStartedAt: null };
+  };
+  for (const e of moves) {
+    const m = e.move;
+    if (m.type === "timer") {
+      if (m.action === "pause") { bank(e.doneAt); o = { ...o, openPause: { reason: m.reason ?? "", kind: "CLOCK", pausedAt: e.doneAt } }; }
+      else if (!o.timerStartedAt) o = { ...o, timerStartedAt: e.doneAt, openPause: null };
+    } else if (m.status === "IN_PROGRESS") {
+      o = { ...o, status: "IN_PROGRESS", startedAt: o.startedAt ?? e.doneAt, openPause: null, timerStartedAt: o.timerStartedAt ?? e.doneAt };
+    } else if (m.status === "ON_HOLD") {
+      bank(e.doneAt);
+      o = { ...o, status: "ON_HOLD", openPause: { reason: m.reason ?? "", kind: "HOLD", pausedAt: e.doneAt } };
+    } else {
+      bank(e.doneAt);
+      o = { ...o, status: "COMPLETED", completedAt: e.doneAt, remarks: m.remarks ?? o.remarks ?? null, openPause: null };
+    }
+  }
+  return o;
+}
+
 export async function discardQueued(id: string): Promise<void> {
   await store("readwrite", (s) => s.delete(id));
   notify();
@@ -192,9 +266,20 @@ let syncing: Promise<void> | null = null;
 export function syncOutbox(userId: string): Promise<void> {
   syncing ??= (async () => {
     try {
+      // A job whose earlier move was refused: its later moves followed from
+      // that one ("paused" after a "started" that never happened), so they are
+      // not sent either.
+      const brokenJobs = new Set<string>();
       for (const entry of await listOutbox(userId)) {
+        if (entry.kind === "jobAction" && entry.status === "failed") brokenJobs.add(entry.workOrderId);
         if (entry.status === "failed") continue;
-        if ((await send(entry)) === "offline") break;
+        if (entry.kind === "jobAction" && brokenJobs.has(entry.workOrderId)) {
+          await fail(entry, "An earlier change to this job made on this phone couldn't be sent, so this one wasn't either.");
+          continue;
+        }
+        const outcome = await send(entry);
+        if (outcome === "offline") break;
+        if (outcome === "failed" && entry.kind === "jobAction") brokenJobs.add(entry.workOrderId);
       }
     } finally {
       syncing = null;
@@ -221,6 +306,15 @@ async function send(entry: OutboxEntry): Promise<Outcome> {
           await api.post(`/work-orders/${entry.workOrderId}/comments`, form);
         } else {
           await api.post(`/work-orders/${entry.workOrderId}/comments`, { body: entry.body, internal: entry.internal, doneAt: entry.doneAt });
+        }
+        break;
+      }
+      case "jobAction": {
+        const m = entry.move;
+        if (m.type === "timer") {
+          await api.post(`/work-orders/${entry.workOrderId}/timer`, { action: m.action, reason: m.reason, doneAt: entry.doneAt });
+        } else {
+          await api.patch(`/work-orders/${entry.workOrderId}`, { status: m.status, reason: m.reason, remarks: m.remarks, doneAt: entry.doneAt });
         }
         break;
       }
