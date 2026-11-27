@@ -487,15 +487,17 @@ export default function ChecklistFormPage() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-4 flex items-center gap-4 sticky top-0 z-10">
+      <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center gap-x-4 gap-y-2 sticky top-0 z-10">
         <Link
           href={`/accounts/${accountId}/checklists`}
           className="text-[var(--tu-text-brand)] text-sm font-semibold hover:underline shrink-0"
         >
           ← Checklists
         </Link>
-        <div className="flex-1 min-w-0">
-          <h2 className="text-sm font-bold text-[var(--tu-text-heading)] truncate">{checklist.name}</h2>
+        {/* On a phone the title takes its own line, so a long name and its place
+            are read in full instead of squeezed between the links. */}
+        <div className="flex-1 min-w-0 basis-full sm:basis-0 order-first sm:order-none">
+          <h2 className="text-sm font-bold text-[var(--tu-text-heading)] sm:truncate">{checklist.name}</h2>
           {assignment.asset && (
             <Link
               href={`/accounts/${accountId}/assets/${assignment.asset.id}`}
@@ -720,7 +722,7 @@ export default function ChecklistFormPage() {
       )}
 
       {/* Sections */}
-      <div className="flex-1 p-6 space-y-4 pb-40">
+      <div className="flex-1 p-3 sm:p-6 space-y-4 pb-48">
         {checklist.sections.map((sec) => {
           const locked = sectionSubmitted(sec);
           const editable = isEditing && !locked;
@@ -732,8 +734,10 @@ export default function ChecklistFormPage() {
           return (
             <div key={sec.id} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">
               {/* Section header */}
-              <div className="bg-[var(--tu-text-heading)] px-4 py-2.5 flex items-center justify-between">
-                <span className="text-sm font-bold text-white">{sec.title}</span>
+              {/* Theme tokens, not a fixed white on the heading colour: that colour
+                  turns near-white in dark mode and the title vanished into it. */}
+              <div className="bg-[var(--tu-bg-secondary-strong)] border-b border-[var(--tu-border)] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-bold text-[var(--tu-text-heading)]">{sec.title}</span>
                 {completedAt ? (
                   <span className="text-xs font-semibold text-[var(--tu-on-success)]">
                     {locked && "🔒 "}✓ {fmtDateTime(completedAt)}
@@ -747,7 +751,9 @@ export default function ChecklistFormPage() {
               </div>
 
               {/* Column headers */}
-              <div className="flex items-center border-b border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] px-4 py-2 text-xs font-bold text-[var(--tu-text-subtle)]">
+              {/* A table header from sm up; on a phone each answer carries its own
+                  label instead, since four columns do not fit beside a question. */}
+              <div className="hidden sm:flex items-center border-b border-[var(--tu-border)] bg-[var(--tu-bg-secondary)] px-4 py-2 text-xs font-bold text-[var(--tu-text-subtle)]">
                 <div className="flex-1 pr-4">Item</div>
                 {sec.answerOptions.map((opt) => (
                   <div key={opt} className="w-20 text-center">{opt}</div>
@@ -761,9 +767,9 @@ export default function ChecklistFormPage() {
                 return (
                   <div
                     key={item.id}
-                    className={`flex items-center px-4 py-3 border-b border-[var(--tu-border)] last:border-0 ${ii % 2 === 1 ? "bg-[var(--tu-bg-secondary)]/50" : ""}`}
+                    className={`flex flex-wrap sm:flex-nowrap items-center px-4 py-3 border-b border-[var(--tu-border)] last:border-0 ${ii % 2 === 1 ? "bg-[var(--tu-bg-secondary)]/50" : ""}`}
                   >
-                    <div className="flex-1 pr-4">
+                    <div className="basis-full sm:basis-auto sm:flex-1 sm:pr-4 mb-2 sm:mb-0">
                       <p className="text-sm text-[var(--tu-text-heading)]">{ii + 1}. {item.label}</p>
                       {!editable && state.answeredAt && (
                         <p className="text-xs text-[var(--tu-text-subtle)] mt-0.5">Answered {fmtTime(state.answeredAt)}</p>
@@ -794,29 +800,38 @@ export default function ChecklistFormPage() {
                       })()}
                     </div>
                     {sec.answerOptions.map((opt) => (
-                      <div key={opt} className="w-20 flex justify-center">
+                      <div key={opt} className="sm:w-20 flex sm:justify-center mr-2 sm:mr-0">
+                        {/* The whole option is the target — at least 44px tall on a
+                            phone, with its label beside the dot there. */}
                         <button
+                          type="button"
                           onClick={() => editable && setAnswer(item.id, opt)}
                           disabled={!editable}
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                          aria-pressed={state.answer === opt}
+                          aria-label={`${opt}: ${item.label}`}
+                          className={`flex items-center gap-2 min-h-[44px] sm:min-h-0 px-2 sm:px-0 rounded-lg ${editable ? "cursor-pointer" : "cursor-default"}`}
+                        >
+                          <span className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
                             state.answer === opt
                               ? "border-[var(--tu-text-brand)]"
                               : "border-[var(--tu-border-strong)]"
-                          } ${editable ? "cursor-pointer hover:border-[var(--tu-text-brand)]" : "cursor-default"}`}
-                        >
-                          {state.answer === opt && (
-                            <div className="w-2.5 h-2.5 rounded-full bg-[var(--tu-text-brand)]" />
-                          )}
+                          } ${editable ? "hover:border-[var(--tu-text-brand)]" : ""}`}>
+                            {state.answer === opt && (
+                              <span className="w-2.5 h-2.5 rounded-full bg-[var(--tu-text-brand)]" />
+                            )}
+                          </span>
+                          <span className="sm:hidden text-sm text-[var(--tu-text-body)]">{opt}</span>
                         </button>
                       </div>
                     ))}
-                    <div className="flex-1 pl-4">
+                    <div className="basis-full sm:basis-auto sm:flex-1 sm:pl-4 mt-1 sm:mt-0">
                       {editable ? (
                         <input
                           type="text"
                           value={state.remarks}
                           onChange={(e) => setRemarks(item.id, e.target.value)}
-                          placeholder="—"
+                          placeholder="Remarks"
+                          aria-label={`Remarks: ${item.label}`}
                           className="w-full text-sm border border-[var(--tu-border)] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]/30 bg-[var(--tu-bg-surface)]"
                         />
                       ) : (
@@ -833,7 +848,9 @@ export default function ChecklistFormPage() {
 
       {/* Footer — sticky submit bar */}
       {isEditing && (
-        <div className="fixed bottom-0 left-60 right-0 bg-[var(--tu-bg-surface)] border-t border-[var(--tu-border)] px-6 py-4 shadow-lg">
+        // Clears the desktop sidebar (256px, from lg) and nothing below it: a phone
+        // has no sidebar, and the old fixed 240px offset slid this over the form.
+        <div className="fixed bottom-0 left-0 lg:left-64 right-0 z-20 bg-[var(--tu-bg-surface)] border-t border-[var(--tu-border)] px-4 sm:px-6 py-3 sm:py-4 shadow-lg">
           <div className="max-w-4xl mx-auto space-y-3">
             {/* Progress */}
             <div className="flex items-center gap-3">

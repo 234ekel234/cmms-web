@@ -315,19 +315,21 @@ export default function EditChecklistPage() {
         {sections.map((sec, si) => (
           <div key={sec._key} className="bg-[var(--tu-bg-surface)] rounded-xl border border-[var(--tu-border)] shadow-sm overflow-hidden">
             {/* Section header */}
-            <div className="bg-[var(--tu-text-heading)] px-4 py-3 flex items-center gap-3">
-              <span className="text-white/50 text-xs font-bold w-5 shrink-0">{si + 1}</span>
+            {/* Theme tokens: the heading colour turns near-white in dark mode, and
+                white text on it disappeared. */}
+            <div className="bg-[var(--tu-bg-secondary-strong)] border-b border-[var(--tu-border)] px-4 py-3 flex items-center gap-3">
+              <span className="text-[var(--tu-text-subtle)] text-xs font-bold w-5 shrink-0">{si + 1}</span>
               <input
                 value={sec.title}
                 onChange={(e) => updateSection(sec._key, "title", e.target.value)}
                 disabled={!canEdit}
                 placeholder="Section title…"
-                className="flex-1 bg-transparent text-white placeholder-white/40 text-sm font-bold focus:outline-none border-b border-white/20 focus:border-white/60 pb-0.5 disabled:cursor-default"
+                className="flex-1 min-w-0 bg-transparent text-[var(--tu-text-heading)] placeholder-[var(--tu-text-disabled)] text-sm font-bold focus:outline-none border-b border-[var(--tu-border)] focus:border-[var(--tu-text-brand)] pb-0.5 disabled:cursor-default"
               />
               {canEdit && (
                 <button
                   onClick={() => removeSection(sec._key)}
-                  className="text-white/40 hover:text-[var(--tu-on-danger)] text-xs font-bold transition-colors cursor-pointer shrink-0"
+                  className="text-[var(--tu-text-subtle)] hover:text-[var(--tu-on-danger)] text-xs font-bold transition-colors cursor-pointer shrink-0"
                 >
                   Remove
                 </button>
@@ -401,7 +403,7 @@ export default function EditChecklistPage() {
 
       {/* Sticky footer */}
       {canEdit && (
-        <div className="fixed bottom-0 left-60 right-0 bg-[var(--tu-bg-surface)] border-t border-[var(--tu-border)] px-8 py-4 flex items-center gap-4">
+        <div className="fixed bottom-0 left-0 lg:left-64 right-0 z-20 bg-[var(--tu-bg-surface)] border-t border-[var(--tu-border)] px-4 sm:px-8 py-4 flex flex-wrap items-center gap-4">
           {error && <p className="text-sm text-[var(--tu-on-danger)] flex-1">{error}</p>}
           {saved && <p className="text-sm text-[var(--tu-on-success)] font-semibold flex-1">Saved successfully.</p>}
           {!error && !saved && <span className="flex-1" />}
