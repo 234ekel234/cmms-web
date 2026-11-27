@@ -89,6 +89,13 @@ main() {
   fi
   new="$(git rev-parse "$REMOTE/$BRANCH")"
 
+  # From GitHub (deploy/ci-deploy.sh): deploy only the commit CI tested. If main
+  # has moved on since, that newer commit's own run will deploy it.
+  if [[ -n "${EXPECT_SHA:-}" && "$new" != "$EXPECT_SHA" ]]; then
+    ok "main has moved past ${EXPECT_SHA:0:7}; the newer commit's own run deploys it"
+    return 0
+  fi
+
   # Up to date AND already running a release: nothing to do. With no release yet
   # (the first deploy) it carries on and builds what is checked out.
   if [[ "$old" == "$new" && -e "$RELEASES/current" ]]; then

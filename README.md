@@ -49,5 +49,6 @@ that must stay in step with the backend.
 
 Runs on the droplet at `https://hanni.servicemasterph.com` (`cmms.servicemasterph.com` redirects
 there permanently, for the printed stickers). Deploy with `npm run deploy` in `/var/www/hanni-web`
-(`deploy/deploy.sh`). It is not automatic on push. Deploy the backend first when a change needs both.
+(`deploy/deploy.sh`), or `hanni-deploy web` on the droplet. A push to `main` deploys by itself once CI
+passes (`.github/workflows/deploy.yml`). Deploy the backend first when a change needs both.
 `../backend/DEPLOY.md` §16 is the runbook.

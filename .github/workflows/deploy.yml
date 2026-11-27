@@ -1,0 +1,52 @@
+# Deploys to the droplet after CI passes on main — pushing is deploying.
+# Backend DEPLOY.md §18.
+#
+# A separate workflow on purpose, triggered by CI finishing (workflow_run):
+#   - CI cancels an older run when a newer push arrives; a deploy must never be
+#     cancelled that way, so it has its own concurrency group that queues.
+#   - It runs only for a successful CI run of a push to main.
+#
+# The droplet does the actual work (deploy/deploy.sh, with its backups before
+# migrations, health check and rollback). This only asks for it, through a key
+# that can run nothing but deploy/ci-deploy.sh, naming the commit CI tested.
+#
+# Secrets (repo → Settings → Secrets and variables → Actions):
+#   DEPLOY_HOST          the droplet's address
+#   DEPLOY_SSH_KEY       the private half of the deploy key (§18)
+#   DEPLOY_KNOWN_HOSTS   the droplet's host key line, so the connection is verified
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  # Actions → Deploy → Run workflow: deploys main as it stands (checking setup,
+  # or redeploying). Still only main, and still through ci-deploy.sh.
+  workflow_dispatch:
+
+# One deploy at a time across this repo, and never cancelled mid-way.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Deploy the web at the tested commit
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ServerAliveInterval=30 "root@$HOST" "web $SHA"
