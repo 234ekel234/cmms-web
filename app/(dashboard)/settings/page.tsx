@@ -11,6 +11,7 @@ import Switch from "@/components/Switch";
 import EmailRulesCard from "@/components/EmailRulesCard";
 import SignedInDevices from "@/components/SignedInDevices";
 import BrowserNotifications from "@/components/BrowserNotifications";
+import AboutApp from "@/components/AboutApp";
 
 type Role = "GENERAL_MANAGER" | "MANAGER" | "SUPERVISOR" | "TECHNICIAN" | "CLIENT";
 
@@ -298,6 +299,8 @@ export default function SettingsPage() {
       </div>
 
       {role === "GENERAL_MANAGER" && <EmailRulesCard />}
+
+      <div style={{ marginTop: 24 }}><AboutApp /></div>
     </div>
   );
 }
