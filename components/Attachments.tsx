@@ -13,6 +13,8 @@ import {
   type BaseAttachment, thumbUrl } from "@/lib/attachments";
 import { useConfirm } from "@/components/ConfirmDialog";
 import ArchivedList from "@/components/ArchivedList";
+import { startLoad } from "@/lib/startLoad";
+import { discardQueued, listOutbox, OUTBOX_EVENT, queueUpload, uploadsFor, type OutboxUpload } from "@/lib/offlineOutbox";
 
 /**
  * Photos and documents on a work order or an asset.
@@ -150,6 +152,27 @@ export default function Attachments({
   const [loadFailed, setLoadFailed] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Files added here without signal, waiting to send (lib/offlineOutbox.ts).
+  // When one goes, the list is read again so it appears among the rest.
+  const [waiting, setWaiting] = useState<OutboxUpload[]>([]);
+  const waitingCount = useRef(0);
+  const loadWaitingRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    const run = async (isCancelled?: () => boolean) => {
+      if (!user) return;
+      const rows = uploadsFor(await listOutbox(user.id), parent, parentId);
+      if (isCancelled?.()) return;
+      const sent = rows.length < waitingCount.current;
+      waitingCount.current = rows.length;
+      setWaiting(rows);
+      if (sent) loadWaitingRef.current();
+    };
+    const stop = startLoad(run);
+    const onChange = () => { void run(); };
+    window.addEventListener(OUTBOX_EVENT, onChange);
+    return () => { stop(); window.removeEventListener(OUTBOX_EVENT, onChange); };
+  }, [user, parent, parentId]);
+
   const load = useCallback(async () => {
     try {
       const res = await api.get(`/${parent}/${parentId}/attachments`);
@@ -162,6 +185,8 @@ export default function Attachments({
       setLoading(false);
     }
   }, [parent, parentId]);
+  // So a file sent from the offline queue shows up in the list (see `waiting` above).
+  useEffect(() => { loadWaitingRef.current = () => { void load(); }; }, [load]);
 
   // Fetched in a promise callback rather than by awaiting in the effect body,
   // so state is never set synchronously during the effect. The `cancelled`
@@ -209,6 +234,16 @@ export default function Attachments({
       onUploaded?.(res.data);
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number; data?: { error?: string } } })?.response;
+      // No signal: keep the file on this phone and send it later, dated when
+      // it was added.
+      if ((err as { isAxiosError?: boolean })?.isAxiosError && !status && user && await queueUpload({
+        userId: user.id, parent, parentId, file,
+        label: `File "${file.name}"`,
+        href: typeof window !== "undefined" ? window.location.pathname : "/today",
+      })) {
+        setError("");
+        return;
+      }
       setError(status?.data?.error ?? "Upload failed. Please try again.");
     } finally {
       setUploading(false);
@@ -276,6 +311,18 @@ export default function Attachments({
       </div>
 
       {error && <p className="tu-danger-text" style={{ fontSize: 12.5, marginBottom: 10 }}>{error}</p>}
+      {waiting.length > 0 && (
+        <ul role="status" style={{ listStyle: "none", margin: "0 0 10px", padding: "8px 12px", borderRadius: 8, background: "var(--tu-soft-warning)", color: "var(--tu-on-warning)", fontSize: 12.5 }}>
+          {waiting.map((w) => (
+            <li key={w.id} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", padding: "2px 0" }}>
+              <span style={{ flex: 1, minWidth: 180 }}>
+                {w.status === "failed" ? <>Couldn&apos;t send {w.file.name}: {w.error}</> : <>{w.file.name}: saved on this phone, waiting to send</>}
+              </span>
+              <button type="button" className="tu-btn-secondary tu-btn-sm" onClick={() => discardQueued(w.id)}>Discard</button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {loading ? (
         <div style={{ display: "flex", gap: 8 }}>

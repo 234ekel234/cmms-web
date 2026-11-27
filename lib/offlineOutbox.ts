@@ -1,36 +1,55 @@
 import api from "@/lib/api";
 import { OUTBOX_STORE, openDb } from "@/lib/offlineData";
+import { isPhotoFile, shrinkPhoto } from "@/lib/reportPhotos";
 
 /**
- * Changes made without signal, kept on this device until they can be sent
- * (offline release 2: PM rounds). The checklist form puts a round here when its
- * save gets no answer; `syncOutbox` sends it when the signal comes back — on
- * load, on the browser's "online", and whenever a request reaches the server.
+ * Changes made without signal, kept on this device until they can be sent.
  *
- * Each round goes with `doneAt`, the time it was saved on the phone, so the
- * server judges lateness by when the work was done (backend
- * helpers/offlineTime.js, which also bounds that time).
+ *   pmRound   a PM round, draft or submitted (release 2)
+ *   step      a job's step ticked or unticked (release 3)
+ *   comment   an update on a job, with or without photos (release 3)
+ *   upload    a photo or file added to a job (release 3)
+ *
+ * A form puts its change here when the save gets no answer; `syncOutbox` sends
+ * everything, oldest first, when the signal comes back — on load, on the
+ * browser's "online", and whenever a request reaches the server
+ * (lib/offline.ts). Each goes with `doneAt`, the time it was made on the phone,
+ * which the server bounds (backend helpers/offlineTime.js) and uses: a round's
+ * lateness, a comment's and a photo's place in the job's history.
  *
  * What can go wrong on the way, and what happens:
- *   - still no signal       stays waiting; tried again later
- *   - someone else started  their draft and these answers are merged (theirs
- *     the same round        kept, these added or winning where both answered)
- *   - already submitted     never overwritten: it is marked "couldn't send"
- *     by someone else       with the reason, for the person to open or discard
- *   - any other refusal     marked "couldn't send" with the server's reason
+ *   - still no signal         stays waiting; tried again later
+ *   - someone else started    their draft and these answers are merged
+ *     the same round          (`mergeAnswers`)
+ *   - anything refused        never forced: the entry is marked "couldn't send"
+ *     (round already filed,   with the server's reason, for the person to open
+ *     step deleted, job       or discard — a comment's words stay readable so
+ *     reassigned…)            they can be copied
  *
- * One entry per round per period: saving the same round again offline
- * replaces the waiting copy. Entries belong to the person who made them and
- * survive a lapsed session (so signing in again sends them); signing out on
- * purpose asks first (AuthContext).
+ * Entries belong to the person who made them and survive a lapsed session (so
+ * signing in again sends them); signing out on purpose asks first (AuthContext).
+ * Photos are shrunk before they are kept (as report photos are), so a day of
+ * pictures does not fill the phone.
  */
 
 export type OutboxItem = { itemId: string; answer: string; remarks: string | null };
+export type OutboxFile = { name: string; type: string; blob: Blob };
 
-export type OutboxRound = {
-  id: string; // `${userId}|pm|${assignmentId}|${periodStart}`
-  kind: "pmRound";
+type Base = {
+  id: string;
   userId: string;
+  /** What it is, for the offline bar: "Fire pump weekly", "Update on WO-1042". */
+  label: string;
+  /** Where to open it. */
+  href: string;
+  doneAt: string; // ISO, from this device
+  queuedAt: number;
+  status: "waiting" | "failed";
+  error?: string;
+};
+
+export type OutboxRound = Base & {
+  kind: "pmRound";
   accountId: string;
   assignmentId: string;
   checklistName: string;
@@ -38,17 +57,20 @@ export type OutboxRound = {
   logId: string | null; // the draft being continued, when there was one
   items: OutboxItem[];
   isDraft: boolean;
-  doneAt: string; // ISO, from this device
-  queuedAt: number;
-  status: "waiting" | "failed";
-  error?: string;
 };
+export type OutboxStep = Base & { kind: "step"; workOrderId: string; itemId: string; isDone: boolean };
+export type OutboxComment = Base & { kind: "comment"; workOrderId: string; body: string; internal: boolean; files: OutboxFile[] };
+/** `parent` is the attachment route's segment: "work-orders", "assets", "asset-locations"… */
+export type OutboxUpload = Base & { kind: "upload"; parent: string; parentId: string; file: OutboxFile };
+export type OutboxEntry = OutboxRound | OutboxStep | OutboxComment | OutboxUpload;
 
 export const OUTBOX_EVENT = "hanni:outbox";
 const notify = () => typeof window !== "undefined" && window.dispatchEvent(new Event(OUTBOX_EVENT));
 
 export const roundKey = (userId: string, assignmentId: string, periodStart: string) =>
   `${userId}|pm|${assignmentId}|${periodStart}`;
+const newId = (userId: string, kind: string) =>
+  `${userId}|${kind}|${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 
 async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T> | void): Promise<T | undefined> {
   const db = await openDb();
@@ -66,22 +88,87 @@ async function store<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => ID
   });
 }
 
-export async function listOutbox(userId: string): Promise<OutboxRound[]> {
-  const all = (await store<OutboxRound[]>("readonly", (s) => s.getAll())) ?? [];
-  return all.filter((e) => e.userId === userId).sort((a, b) => a.queuedAt - b.queuedAt);
-}
-
-export async function getQueuedRound(userId: string, assignmentId: string, periodStart: string): Promise<OutboxRound | null> {
-  return (await store<OutboxRound>("readonly", (s) => s.get(roundKey(userId, assignmentId, periodStart)))) ?? null;
-}
-
-/** False when this device cannot keep it (no IndexedDB): the caller must say the save failed. */
-export async function queueRound(entry: Omit<OutboxRound, "id" | "kind" | "queuedAt" | "status" | "error">): Promise<boolean> {
+async function put(entry: OutboxEntry): Promise<boolean> {
   if (!(await openDb())) return false;
-  const row: OutboxRound = { ...entry, id: roundKey(entry.userId, entry.assignmentId, entry.periodStart), kind: "pmRound", queuedAt: Date.now(), status: "waiting" };
-  await store("readwrite", (s) => s.put(row));
+  await store("readwrite", (s) => s.put(entry));
   notify();
   return true;
+}
+
+export async function listOutbox(userId: string): Promise<OutboxEntry[]> {
+  const all = (await store<OutboxEntry[]>("readonly", (s) => s.getAll())) ?? [];
+  return all
+    .filter((e) => e.userId === userId)
+    // Rows from before release 3 carry no kind/label; they were all rounds.
+    .map((e) => (e.kind ? e : ({ ...(e as OutboxRound), kind: "pmRound" } as OutboxRound)))
+    .sort((a, b) => a.queuedAt - b.queuedAt);
+}
+
+export const roundsOf = (rows: OutboxEntry[]) => rows.filter((r): r is OutboxRound => r.kind === "pmRound");
+export const forJob = (rows: OutboxEntry[], workOrderId: string) =>
+  rows.filter((r) => (r.kind === "step" || r.kind === "comment") ? r.workOrderId === workOrderId : r.kind === "upload" && r.parent === "work-orders" && r.parentId === workOrderId);
+export const uploadsFor = (rows: OutboxEntry[], parent: string, parentId: string) =>
+  rows.filter((r): r is OutboxUpload => r.kind === "upload" && r.parent === parent && r.parentId === parentId);
+
+/** What the offline bar and the badges call it. */
+export const entryLabel = (e: OutboxEntry) => e.label ?? (e.kind === "pmRound" ? e.checklistName : "A change");
+export const entryHref = (e: OutboxEntry) =>
+  e.href ?? (e.kind === "pmRound" ? `/accounts/${e.accountId}/checklists/${e.assignmentId}?period=${e.periodStart}` : "/today");
+
+// ── Putting changes in ──────────────────────────────────────────────────────
+// Each returns false when this device cannot keep it (no IndexedDB): the
+// caller must then say the save failed, as it did before there was an outbox.
+
+export async function queueRound(entry: Omit<OutboxRound, "id" | "kind" | "queuedAt" | "status" | "error" | "label" | "href">): Promise<boolean> {
+  return put({
+    ...entry,
+    id: roundKey(entry.userId, entry.assignmentId, entry.periodStart),
+    kind: "pmRound",
+    label: entry.checklistName,
+    href: `/accounts/${entry.accountId}/checklists/${entry.assignmentId}?period=${entry.periodStart}`,
+    queuedAt: Date.now(),
+    status: "waiting",
+  });
+}
+
+/** A step ticked or unticked. The latest wins: ticking twice offline sends one change. */
+export async function queueStep(e: { userId: string; workOrderId: string; itemId: string; isDone: boolean; label: string; href: string }): Promise<boolean> {
+  return put({
+    ...e,
+    id: `${e.userId}|step|${e.workOrderId}|${e.itemId}`,
+    kind: "step",
+    doneAt: new Date().toISOString(),
+    queuedAt: Date.now(),
+    status: "waiting",
+  });
+}
+
+async function keepFile(f: File): Promise<OutboxFile> {
+  const kept = isPhotoFile(f) ? await shrinkPhoto(f).catch(() => f) : f;
+  return { name: kept.name, type: kept.type || f.type, blob: kept };
+}
+
+export async function queueComment(e: { userId: string; workOrderId: string; body: string; internal: boolean; files: File[]; label: string; href: string }): Promise<boolean> {
+  const files = await Promise.all(e.files.map(keepFile));
+  return put({
+    userId: e.userId, workOrderId: e.workOrderId, body: e.body, internal: e.internal, files, label: e.label, href: e.href,
+    id: newId(e.userId, "comment"),
+    kind: "comment",
+    doneAt: new Date().toISOString(),
+    queuedAt: Date.now(),
+    status: "waiting",
+  });
+}
+
+export async function queueUpload(e: { userId: string; parent: string; parentId: string; file: File; label: string; href: string }): Promise<boolean> {
+  return put({
+    userId: e.userId, parentId: e.parentId, parent: e.parent, file: await keepFile(e.file), label: e.label, href: e.href,
+    id: newId(e.userId, "upload"),
+    kind: "upload",
+    doneAt: new Date().toISOString(),
+    queuedAt: Date.now(),
+    status: "waiting",
+  });
 }
 
 export async function discardQueued(id: string): Promise<void> {
@@ -94,7 +181,10 @@ export async function discardAllQueued(userId: string): Promise<void> {
   notify();
 }
 
+// ── Sending ─────────────────────────────────────────────────────────────────
+
 type ApiError = { response?: { status: number; data?: { error?: string; logId?: string } }; isAxiosError?: boolean };
+type Outcome = "sent" | "offline" | "failed";
 
 let syncing: Promise<void> | null = null;
 
@@ -104,8 +194,7 @@ export function syncOutbox(userId: string): Promise<void> {
     try {
       for (const entry of await listOutbox(userId)) {
         if (entry.status === "failed") continue;
-        const outcome = await sendRound(entry);
-        if (outcome === "offline") break;
+        if ((await send(entry)) === "offline") break;
       }
     } finally {
       syncing = null;
@@ -115,7 +204,48 @@ export function syncOutbox(userId: string): Promise<void> {
   return syncing;
 }
 
-async function sendRound(entry: OutboxRound): Promise<"sent" | "offline" | "failed"> {
+async function send(entry: OutboxEntry): Promise<Outcome> {
+  try {
+    switch (entry.kind) {
+      case "pmRound": return await sendRound(entry);
+      case "step":
+        await api.patch(`/work-orders/${entry.workOrderId}/checklist-items/${entry.itemId}`, { isDone: entry.isDone });
+        break;
+      case "comment": {
+        if (entry.files.length) {
+          const form = new FormData();
+          if (entry.body) form.append("body", entry.body);
+          if (entry.internal) form.append("internal", "true");
+          form.append("doneAt", entry.doneAt);
+          for (const f of entry.files) form.append("files", new File([f.blob], f.name, { type: f.type }));
+          await api.post(`/work-orders/${entry.workOrderId}/comments`, form);
+        } else {
+          await api.post(`/work-orders/${entry.workOrderId}/comments`, { body: entry.body, internal: entry.internal, doneAt: entry.doneAt });
+        }
+        break;
+      }
+      case "upload": {
+        const form = new FormData();
+        form.append("file", new File([entry.file.blob], entry.file.name, { type: entry.file.type }));
+        form.append("doneAt", entry.doneAt);
+        await api.post(`/${entry.parent}/${entry.parentId}/attachments`, form);
+        break;
+      }
+    }
+    await discardQueued(entry.id);
+    return "sent";
+  } catch (err) {
+    const e = err as ApiError;
+    if (!e.response) return "offline";
+    const reason = e.response.status === 404
+      ? (entry.kind === "step" ? "This step was removed while you were offline." : "This job is no longer yours or no longer exists.")
+      : e.response.data?.error ?? "The server refused this change.";
+    await fail(entry, reason);
+    return "failed";
+  }
+}
+
+async function sendRound(entry: OutboxRound): Promise<Outcome> {
   const base = `/account-pm-checklists/${entry.assignmentId}/logs`;
   const body = { items: entry.items, isDraft: entry.isDraft, doneAt: entry.doneAt };
   try {
@@ -136,7 +266,7 @@ async function sendRound(entry: OutboxRound): Promise<"sent" | "offline" | "fail
   }
 }
 
-async function mergeIntoDraft(entry: OutboxRound, logId: string): Promise<"sent" | "offline" | "failed"> {
+async function mergeIntoDraft(entry: OutboxRound, logId: string): Promise<Outcome> {
   try {
     const { data: logs } = await api.get<{ id: string; isDraft: boolean; items: OutboxItem[] }[]>(`/account-pm-checklists/${entry.assignmentId}/logs`);
     const current = logs.find((l) => l.id === logId);
@@ -170,7 +300,7 @@ export function mergeAnswers(theirs: OutboxItem[], mine: OutboxItem[]): OutboxIt
   ];
 }
 
-async function fail(entry: OutboxRound, error: string) {
+async function fail(entry: OutboxEntry, error: string) {
   await store("readwrite", (s) => s.put({ ...entry, status: "failed", error }));
   notify();
 }

@@ -16,7 +16,7 @@ import { findingDraft, isPmFinding, raiseWorkOrderHref } from "@/lib/linkedWorkO
 import { workOrderRef } from "@/lib/workOrders";
 import { workOrderStatusFor } from "@/lib/statuses";
 import WorkLocationSelect from "@/components/WorkLocationSelect";
-import { discardQueued, listOutbox, OUTBOX_EVENT, queueRound, type OutboxRound } from "@/lib/offlineOutbox";
+import { discardQueued, listOutbox, OUTBOX_EVENT, queueRound, roundsOf, type OutboxRound } from "@/lib/offlineOutbox";
 import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
 type PMItem = { id: string; label: string; order: number };
@@ -213,7 +213,7 @@ export default function ChecklistFormPage() {
   const queuedKeys = useRef<string[]>([]);
   const loadQueued = useCallback(async (isCancelled?: () => boolean) => {
     if (!user) return;
-    const rows = (await listOutbox(user.id)).filter((r) => r.assignmentId === assignmentId);
+    const rows = roundsOf(await listOutbox(user.id)).filter((r) => r.assignmentId === assignmentId);
     if (isCancelled?.()) return;
     const sent = queuedKeys.current.some((k) => !rows.some((r) => r.periodStart === k));
     queuedKeys.current = rows.map((r) => r.periodStart);

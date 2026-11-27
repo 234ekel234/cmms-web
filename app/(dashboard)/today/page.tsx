@@ -9,7 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { WORK_ORDER_PRIORITY, workOrderStatusMeta, type WorkOrderPriority } from "@/lib/statuses";
 import { workOrderRef } from "@/lib/workOrders";
 import { warmPages } from "@/lib/offline";
-import { listOutbox, OUTBOX_EVENT, type OutboxRound } from "@/lib/offlineOutbox";
+import { listOutbox, OUTBOX_EVENT, roundsOf, type OutboxRound } from "@/lib/offlineOutbox";
 
 /**
  * Today — a technician's day on one screen (GET /me/today, backend
@@ -212,7 +212,7 @@ export default function TodayPage() {
   const [onPhone, setOnPhone] = useState<Record<string, OutboxRound>>({});
   const loadOnPhone = useCallback(async (isCancelled?: () => boolean) => {
     if (!user) return;
-    const rows = await listOutbox(user.id);
+    const rows = roundsOf(await listOutbox(user.id));
     if (!isCancelled?.()) setOnPhone(Object.fromEntries(rows.map((r) => [`${r.assignmentId}|${r.periodStart}`, r])));
   }, [user]);
   useEffect(() => {

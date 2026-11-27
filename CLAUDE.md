@@ -150,10 +150,10 @@ well as priority, due date, category and estimate. It loads the site's live asse
 open and keeps the current asset offered even if it has since been archived; save errors are
 shown, not swallowed.
 
-## Offline (releases 1–2 of 4: reading, PM rounds)
+## Offline (releases 1–3 of 4: reading, PM rounds, job updates)
 
-Pages and their data open without signal. PM rounds can be filled in offline; other changes
-still need a connection.
+Pages and their data open without signal. PM rounds, a job's steps, updates (with photos) and
+file uploads can be done offline; status and the clock still need a connection.
 - **Pages:** `public/sw.js` keeps the app's code (`/_next/static`, cache-first) and every page
   opened (network-first, 6 s, then the saved copy, then `public/offline.html`). Pages are the same
   shell for everyone; nothing personal is stored there. It never touches the API (another origin)
@@ -178,8 +178,15 @@ still need a connection.
   shows the phone's answers over the server's and a waiting / couldn't-send banner; OfflineBar and
   Today show what is waiting. Not wiped by `clearSession` (a lapsed session must not lose work);
   `logout` asks first when anything is unsent.
-- Next: queued steps/comments/photos (3), status and clock with server-side checks on the reported
-  time (4).
+- **Job updates offline (release 3):** the outbox also holds `step` (latest tick per step wins),
+  `comment` (body, internal flag, photos as Blobs, shrunk by `shrinkPhoto`) and `upload` (any
+  attachment parent, via `components/Attachments.tsx`). Comments and uploads carry `doneAt`; the API
+  dates them by it (`createdAt`), so the thread reads in the order things happened. The job page
+  overlays waiting ticks on the steps, lists waiting updates above the thread with Discard, and
+  re-reads the job when one is sent. Anything refused (step deleted, job reassigned — 404) is marked
+  failed with the reason, never retried blindly. The queue pane's composer is not wired; technicians
+  post from the job page.
+- Next: status and the clock (4), with server-side checks on the reported time.
 
 ## Notifications on this device (web push)
 

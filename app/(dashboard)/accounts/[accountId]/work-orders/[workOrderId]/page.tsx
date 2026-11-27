@@ -18,6 +18,7 @@ import ProgressThread, { type ProgressAttachment } from "@/components/ProgressTh
 import { canManage as canAdministerAccount } from "@/lib/rbac";
 import { useConfirm } from "@/components/ConfirmDialog";
 import { startLoad } from "@/lib/startLoad";
+import { discardQueued, forJob, listOutbox, OUTBOX_EVENT, queueComment, queueStep, type OutboxComment, type OutboxEntry } from "@/lib/offlineOutbox";
 import WorkOrderLinks from "@/components/WorkOrderLinks";
 import AcceptAndAssign from "@/components/AcceptAndAssign";
 import WorkLocationSelect, { placeForAsset } from "@/components/WorkLocationSelect";
@@ -306,15 +307,44 @@ export default function WorkOrderDetailPage() {
       // search it client-side, for want of a single-order endpoint — every
       // work order on the site fetched to render one of them.
       const res = await api.get(`/work-orders/${workOrderId}`);
+      // Steps ticked on this phone and not sent yet read as ticked: they are
+      // newer than anything the server (or the saved copy) has.
+      const waitingSteps = user ? forJob(await listOutbox(user.id), workOrderId).filter((e) => e.kind === "step" && e.status === "waiting") : [];
+      if (waitingSteps.length && res.data?.checklistItems) {
+        const latest = new Map(waitingSteps.map((e) => [e.kind === "step" ? e.itemId : "", e.kind === "step" ? e.isDone : false]));
+        res.data.checklistItems = res.data.checklistItems.map((i: { id: string; isDone: boolean }) => latest.has(i.id) ? { ...i, isDone: latest.get(i.id) } : i);
+      }
       setOrder(res.data);
     } catch {
       setError(true);
     } finally {
       setLoading(false);
     }
-  }, [workOrderId]);
+  }, [workOrderId, user]);
 
   useEffect(() => startLoad(fetchOrder), [fetchOrder]);
+
+  // This job's changes saved on this phone and not sent yet
+  // (lib/offlineOutbox.ts). When one goes, the job is read again so the page
+  // shows what the server now has.
+  const [onPhone, setOnPhone] = useState<OutboxEntry[]>([]);
+  const onPhoneCount = useRef(0);
+  const loadOnPhone = useCallback(async (isCancelled?: () => boolean) => {
+    if (!user) return;
+    const rows = forJob(await listOutbox(user.id), workOrderId);
+    if (isCancelled?.()) return;
+    const sent = rows.length < onPhoneCount.current;
+    onPhoneCount.current = rows.length;
+    setOnPhone(rows);
+    if (sent) void fetchOrder();
+  }, [user, workOrderId, fetchOrder]);
+  useEffect(() => {
+    const stop = startLoad(loadOnPhone);
+    const onChange = () => { void loadOnPhone(); };
+    window.addEventListener(OUTBOX_EVENT, onChange);
+    return () => { stop(); window.removeEventListener(OUTBOX_EVENT, onChange); };
+  }, [loadOnPhone]);
+  const [stepNotice, setStepNotice] = useState("");
 
   async function openAssignPicker() {
     setShowAssignPicker(true);
@@ -638,7 +668,18 @@ export default function WorkOrderDetailPage() {
     } : prev);
     try {
       await api.patch(`/work-orders/${order.id}/checklist-items/${item.id}`, { isDone: next });
+      setStepNotice("");
     } catch (err: unknown) {
+      // No signal: keep the tick on this phone and send it later.
+      const offline = (err as { isAxiosError?: boolean; response?: unknown })?.isAxiosError && !(err as { response?: unknown }).response;
+      if (offline && user && await queueStep({
+        userId: user.id, workOrderId: order.id, itemId: item.id, isDone: next,
+        label: `Step on ${workOrderRef(order.number)}: ${item.description}`,
+        href: `/accounts/${accountId}/work-orders/${order.id}`,
+      })) {
+        setStepNotice("Saved on this phone. Steps are sent when you're back online.");
+        return;
+      }
       setOrder((prev) => prev ? {
         ...prev,
         checklistItems: prev.checklistItems.map((i) => i.id === item.id ? { ...i, isDone: item.isDone } : i),
@@ -732,6 +773,18 @@ export default function WorkOrderDetailPage() {
       if (progressFileRef.current) progressFileRef.current.value = "";
     } catch (err: unknown) {
       const r = (err as { response?: { data?: { error?: string } } })?.response;
+      // No signal: keep the update (and its photos) on this phone, sent later
+      // with the time it was written.
+      if ((err as { isAxiosError?: boolean })?.isAxiosError && !r && user && await queueComment({
+        userId: user.id, workOrderId: order.id, body: text, internal: internalNote && !isClient, files: staged,
+        label: `Update on ${workOrderRef(order.number)}`,
+        href: `/accounts/${accountId}/work-orders/${order.id}`,
+      })) {
+        setCommentText("");
+        setStaged([]);
+        if (progressFileRef.current) progressFileRef.current.value = "";
+        return;
+      }
       setProgressError(r?.data?.error ?? "Could not post that update.");
     } finally {
       setSubmittingComment(false);
@@ -1685,6 +1738,9 @@ export default function WorkOrderDetailPage() {
           {!!stepError && (
             <p className="text-xs text-[var(--tu-on-danger)] mt-2">{stepError}</p>
           )}
+          {!!stepNotice && onPhone.some((e) => e.kind === "step") && (
+            <p role="status" className="text-xs text-[var(--tu-on-warning)] mt-2">{stepNotice}</p>
+          )}
         </div>
       )}
 
@@ -1898,6 +1954,31 @@ export default function WorkOrderDetailPage() {
             </div>
           )}
         </div>
+      )}
+
+      {/* Updates written on this phone without signal, not sent yet. */}
+      {onPhone.some((e) => e.kind === "comment") && (
+        <section className="rounded-xl border border-[var(--tu-bd-warning)] bg-[var(--tu-soft-warning)] p-4 mt-6" aria-label="Updates waiting to send">
+          <h2 className="text-sm font-semibold text-[var(--tu-on-warning)] mb-2">Saved on this phone, waiting to send</h2>
+          <ul className="space-y-2">
+            {onPhone.filter((e): e is OutboxComment => e.kind === "comment").map((c) => (
+              <li key={c.id} className="text-sm text-[var(--tu-text-body)] bg-[var(--tu-bg-surface)] rounded-lg border border-[var(--tu-border)] px-3 py-2">
+                <div className="flex items-start gap-2 flex-wrap">
+                  <span className="flex-1 min-w-[200px] whitespace-pre-wrap">{c.body || <em>Photos only</em>}</span>
+                  <button type="button" className="text-xs text-[var(--tu-text-subtle)] hover:underline cursor-pointer" onClick={async () => {
+                    if (await confirm({ title: "Discard this update?", message: "It was never sent. The words and photos are deleted from this phone.", confirmLabel: "Discard" })) await discardQueued(c.id);
+                  }}>Discard</button>
+                </div>
+                <p className="text-xs text-[var(--tu-text-subtle)] mt-1">
+                  {new Date(c.doneAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" })}
+                  {c.files.length ? ` · ${c.files.length} photo${c.files.length === 1 ? "" : "s"}` : ""}
+                  {c.internal ? " · internal note" : ""}
+                </p>
+                {c.status === "failed" && <p className="text-xs text-[var(--tu-on-danger)] mt-1">Couldn&apos;t send: {c.error}</p>}
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Progress — the running record of what happened and when: notes,

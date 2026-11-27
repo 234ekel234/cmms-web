@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { OFFLINE_DATA_EVENT, ONLINE_DATA_EVENT } from "@/lib/offlineData";
-import { listOutbox, OUTBOX_EVENT, type OutboxRound } from "@/lib/offlineOutbox";
+import { entryHref, entryLabel, listOutbox, OUTBOX_EVENT, type OutboxEntry } from "@/lib/offlineOutbox";
 import { useAuth } from "@/context/AuthContext";
 import { startLoad } from "@/lib/startLoad";
 
@@ -20,7 +20,7 @@ export default function OfflineBar() {
   const { user } = useAuth();
   const [offline, setOffline] = useState(false);
   // Rounds saved on this phone and not sent yet (lib/offlineOutbox.ts).
-  const [outbox, setOutbox] = useState<OutboxRound[]>([]);
+  const [outbox, setOutbox] = useState<OutboxEntry[]>([]);
   const loadOutbox = useCallback(async (isCancelled?: () => boolean) => {
     if (!user) return;
     const rows = await listOutbox(user.id);
@@ -89,16 +89,16 @@ export default function OfflineBar() {
           <>
             <strong>You&apos;re offline.</strong>{" "}
             {when ? <>Showing what was saved on this device at {when}.</> : <>Pages you opened before still work.</>}{" "}
-            Checklist rounds save on this phone; other changes need a connection.{" "}
+            Checklist rounds, steps, updates and photos save on this phone; other changes need a connection.{" "}
           </>
         )}
         {waiting.length > 0 && (
-          <>{waiting.length} round{waiting.length === 1 ? "" : "s"} waiting to send{offline ? "" : ", sending now"}.{" "}</>
+          <>{waiting.length} change{waiting.length === 1 ? "" : "s"} saved on this phone, waiting to send{offline ? "" : " (sending now)"}.{" "}</>
         )}
         {failed.map((r) => (
           <span key={r.id} style={{ display: "block", marginTop: 4 }}>
-            <strong>Couldn&apos;t send {r.checklistName}.</strong>{" "}
-            <Link href={`/accounts/${r.accountId}/checklists/${r.assignmentId}?period=${r.periodStart}`} style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}>Open it</Link>
+            <strong>Couldn&apos;t send: {entryLabel(r)}.</strong> {r.error}{" "}
+            <Link href={entryHref(r)} style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}>Open it</Link>
           </span>
         ))}
       </span>
