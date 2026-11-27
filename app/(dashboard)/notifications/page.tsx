@@ -175,6 +175,7 @@ export default function NotificationsPage() {
               : n.action === "PUBLIC_REPORT" ? `/accounts/${n.accountId}/problem-reports`
               : WORK_ORDER_ACTIONS.has(n.action) && n.entityId ? `/accounts/${n.accountId}/work-orders/${n.entityId}`
               : n.action === "ASSET_BREAKDOWN" && n.entityId ? `/accounts/${n.accountId}/assets/${n.entityId}`
+              : n.action.startsWith("CHECKLIST_") || n.action === "PM_CHECKLIST_PENDING" ? `/accounts/${n.accountId}/checklists`
               : null;
             const isDeepLinkable = !!href;
 
