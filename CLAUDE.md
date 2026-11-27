@@ -26,7 +26,7 @@ backend is not beside the web folder, as in CI. Change a mirrored rule on both s
 Create `.env.local`:
 ```
 NEXT_PUBLIC_API_URL=http://localhost:3000/api   # dev
-# NEXT_PUBLIC_API_URL=https://cmms-api.servicemasterph.com/api  # production (set in Vercel)
+# NEXT_PUBLIC_API_URL=https://cmms-api.servicemasterph.com/api  # production (droplet: .env.production.local)
 ```
 
 ## Architecture

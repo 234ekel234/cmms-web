@@ -46,3 +46,6 @@ next-env.d.ts
 .agents/
 .typeui-design-system.json
 skills-lock.json
+
+# droplet: built releases (deploy/deploy.sh)
+/releases

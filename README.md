@@ -1,7 +1,7 @@
 # FMI HANNI — Web Client
 
 The primary client of FMI HANNI: a Next.js app for managers, supervisors, technicians and
-clients, live at **https://cmms.servicemasterph.com**. It talks to the Express API in
+clients, live at **https://hanni.servicemasterph.com**. It talks to the Express API in
 `../backend` and holds no data of its own.
 
 ## Stack
@@ -47,5 +47,7 @@ that must stay in step with the backend.
 
 ## Deployment
 
-Vercel deploys on push. Deploy the backend first when a change needs both.
-`../backend/DEPLOY.md` §13 covers the domain.
+Runs on the droplet at `https://hanni.servicemasterph.com` (`cmms.servicemasterph.com` redirects
+there permanently, for the printed stickers). Deploy with `npm run deploy` in `/var/www/hanni-web`
+(`deploy/deploy.sh`). It is not automatic on push. Deploy the backend first when a change needs both.
+`../backend/DEPLOY.md` §16 is the runbook.

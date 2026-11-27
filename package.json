@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "deploy": "bash deploy/deploy.sh"
   },
   "dependencies": {
     "axios": "^1.18.0",

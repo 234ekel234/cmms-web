@@ -1,5 +1,5 @@
 # Every push and pull request: typecheck, then a production build — the same
-# `next build` Vercel runs, so a commit that would fail to deploy fails here
+# `next build` the droplet's deploy runs, so a commit that would fail to deploy fails here
 # first, with the error in front of whoever pushed it.
 #
 # Lint is blocking: the react-hooks backlog that predated CI was cleared on
