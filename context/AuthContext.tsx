@@ -6,6 +6,7 @@ import { getUser, clearSession, loginUrl, type User } from "@/lib/auth";
 import api from "@/lib/api";
 import { dropPush, syncPush } from "@/lib/webPush";
 import { startOffline } from "@/lib/offline";
+import { discardAllQueued, listOutbox } from "@/lib/offlineOutbox";
 import { canAccessRoute, ROLE_HOME } from "@/lib/rbac";
 
 type AuthContextType = {
@@ -49,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // removes them if they were turned on by somebody else (lib/webPush.ts).
   useEffect(() => {
     if (user && !user.mustChangePassword) {
-      startOffline();
+      startOffline(user.id);
       void syncPush(user.id);
     }
   }, [user]);
@@ -59,6 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // keep somebody signed in on a shared computer, so the local session goes
   // regardless.
   async function logout() {
+    // Rounds saved on this phone and not sent yet would be lost with the
+    // session; say so first (lib/offlineOutbox.ts).
+    if (user) {
+      const pending = await listOutbox(user.id);
+      if (pending.length) {
+        const ok = window.confirm(
+          `${pending.length} checklist round${pending.length === 1 ? " is" : "s are"} saved on this phone and not sent yet. ` +
+          "Signing out deletes them. Sign out anyway?",
+        );
+        if (!ok) return;
+        await discardAllQueued(user.id);
+      }
+    }
     // While the token still works, so the server row goes too. Capped at a
     // couple of seconds: notifications must never hold up signing out.
     await dropPush();

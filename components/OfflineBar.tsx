@@ -1,7 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
 import { OFFLINE_DATA_EVENT, ONLINE_DATA_EVENT } from "@/lib/offlineData";
+import { listOutbox, OUTBOX_EVENT, type OutboxRound } from "@/lib/offlineOutbox";
+import { useAuth } from "@/context/AuthContext";
+import { startLoad } from "@/lib/startLoad";
 
 /**
  * "You're offline", under the top bar, whenever there is no signal or the page
@@ -13,7 +17,21 @@ import { OFFLINE_DATA_EVENT, ONLINE_DATA_EVENT } from "@/lib/offlineData";
  * Goes away by itself once a request reaches the server again.
  */
 export default function OfflineBar() {
+  const { user } = useAuth();
   const [offline, setOffline] = useState(false);
+  // Rounds saved on this phone and not sent yet (lib/offlineOutbox.ts).
+  const [outbox, setOutbox] = useState<OutboxRound[]>([]);
+  const loadOutbox = useCallback(async (isCancelled?: () => boolean) => {
+    if (!user) return;
+    const rows = await listOutbox(user.id);
+    if (!isCancelled?.()) setOutbox(rows);
+  }, [user]);
+  useEffect(() => {
+    const stop = startLoad(loadOutbox);
+    const onChange = () => { void loadOutbox(); };
+    window.addEventListener(OUTBOX_EVENT, onChange);
+    return () => { stop(); window.removeEventListener(OUTBOX_EVENT, onChange); };
+  }, [loadOutbox]);
   // The oldest saved copy shown since going offline: the page is only as fresh
   // as its stalest part.
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -41,7 +59,9 @@ export default function OfflineBar() {
     };
   }, []);
 
-  if (!offline) return null;
+  const waiting = outbox.filter((r) => r.status === "waiting");
+  const failed = outbox.filter((r) => r.status === "failed");
+  if (!offline && !outbox.length) return null;
 
   const when = savedAt
     ? new Date(savedAt).toLocaleString("en-GB", {
@@ -65,9 +85,22 @@ export default function OfflineBar() {
         <path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M2 8.82a15 15 0 0 1 4.17-2.65M10.66 5c4.01-.36 8.14.9 11.34 3.76M16.85 11.25a10 10 0 0 1 2.22 1.68M5 13a10 10 0 0 1 5.24-2.76M12 20h.01" />
       </svg>
       <span style={{ flex: "1 1 260px" }}>
-        <strong>You&apos;re offline.</strong>{" "}
-        {when ? <>Showing what was saved on this device at {when}.</> : <>Pages you opened before still work.</>}{" "}
-        Changes need a connection.
+        {offline && (
+          <>
+            <strong>You&apos;re offline.</strong>{" "}
+            {when ? <>Showing what was saved on this device at {when}.</> : <>Pages you opened before still work.</>}{" "}
+            Checklist rounds save on this phone; other changes need a connection.{" "}
+          </>
+        )}
+        {waiting.length > 0 && (
+          <>{waiting.length} round{waiting.length === 1 ? "" : "s"} waiting to send{offline ? "" : ", sending now"}.{" "}</>
+        )}
+        {failed.map((r) => (
+          <span key={r.id} style={{ display: "block", marginTop: 4 }}>
+            <strong>Couldn&apos;t send {r.checklistName}.</strong>{" "}
+            <Link href={`/accounts/${r.accountId}/checklists/${r.assignmentId}?period=${r.periodStart}`} style={{ color: "inherit", fontWeight: 600, textDecoration: "underline" }}>Open it</Link>
+          </span>
+        ))}
       </span>
     </div>
   );

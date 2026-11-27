@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import { WORK_ORDER_PRIORITY, workOrderStatusMeta, type WorkOrderPriority } from "@/lib/statuses";
 import { workOrderRef } from "@/lib/workOrders";
 import { warmPages } from "@/lib/offline";
+import { listOutbox, OUTBOX_EVENT, type OutboxRound } from "@/lib/offlineOutbox";
 
 /**
  * Today — a technician's day on one screen (GET /me/today, backend
@@ -122,7 +123,7 @@ function JobRow({ job, today }: { job: Job; today: string }) {
   );
 }
 
-function RoundRow({ round, daysBefore }: { round: Round; daysBefore: number }) {
+function RoundRow({ round, daysBefore, onPhone }: { round: Round; daysBefore: number; onPhone?: OutboxRound }) {
   const where = [round.siteName, round.assetName, round.locationPath].filter(Boolean).join(" · ");
   const due = dayLabel(round.dueBy, { weekday: "short", day: "numeric", month: "short" });
   const tone =
@@ -136,6 +137,11 @@ function RoundRow({ round, daysBefore }: { round: Round; daysBefore: number }) {
           <span style={{ fontWeight: 600, color: "var(--tu-text-heading)" }}>{round.name}</span>
           <span className={tone.cls} title={round.standing === "ending" ? `Within ${daysBefore} days` : undefined}>{tone.text}</span>
           {round.draftBy && <span style={{ fontSize: 12.5, color: "var(--tu-text-body)" }}>Started by {round.draftBy}</span>}
+          {onPhone && (
+            <span className={onPhone.status === "failed" ? "tu-badge tu-badge-danger" : "tu-badge tu-badge-warning"}>
+              {onPhone.status === "failed" ? "Couldn't send" : onPhone.isDraft ? "Saved on this phone" : "Done on this phone, not sent"}
+            </span>
+          )}
         </div>
         {where && <p style={{ margin: "6px 0 0", fontSize: 12.5, color: "var(--tu-text-subtle)" }}>{where}</p>}
       </Link>
@@ -200,6 +206,21 @@ export default function TodayPage() {
     }
   }, []);
   useEffect(() => startLoad(load), [load]);
+
+  // Rounds saved on this phone and not sent yet, so a round done offline does
+  // not still read as "to do" (lib/offlineOutbox.ts).
+  const [onPhone, setOnPhone] = useState<Record<string, OutboxRound>>({});
+  const loadOnPhone = useCallback(async (isCancelled?: () => boolean) => {
+    if (!user) return;
+    const rows = await listOutbox(user.id);
+    if (!isCancelled?.()) setOnPhone(Object.fromEntries(rows.map((r) => [`${r.assignmentId}|${r.periodStart}`, r])));
+  }, [user]);
+  useEffect(() => {
+    const stop = startLoad(loadOnPhone);
+    const onChange = () => { void loadOnPhone(); void load(); };
+    window.addEventListener(OUTBOX_EVENT, onChange);
+    return () => { stop(); window.removeEventListener(OUTBOX_EVENT, onChange); };
+  }, [loadOnPhone, load]);
 
   const firstName = user?.name?.split(" ")[0] ?? "";
   const todayShift = day?.shifts[0];
@@ -304,7 +325,7 @@ export default function TodayPage() {
               <EmptyState icon="workOrder" title="All rounds filed" hint="Every checklist on your sites is done for this period." compact />
             ) : (
               <div className="tu-card-pad">
-                <ul className="tu-today-list">{day.checklists.map((r) => <RoundRow key={r.assignmentId} round={r} daysBefore={day.daysBefore} />)}</ul>
+                <ul className="tu-today-list">{day.checklists.map((r) => <RoundRow key={r.assignmentId} round={r} daysBefore={day.daysBefore} onPhone={onPhone[`${r.assignmentId}|${r.periodStart}`]} />)}</ul>
               </div>
             )}
           </section>

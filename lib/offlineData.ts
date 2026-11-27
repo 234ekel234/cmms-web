@@ -18,7 +18,10 @@
  */
 
 const DB_NAME = "hanni-offline";
+const DB_VERSION = 2;
 const STORE = "responses";
+/** Changes made offline, waiting to be sent (lib/offlineOutbox.ts). Added in version 2. */
+export const OUTBOX_STORE = "outbox";
 const MAX_ENTRIES = 500;
 const MAX_AGE_DAYS = 14;
 const MAX_BYTES = 2_000_000; // one response; a bigger one is not worth the space
@@ -27,14 +30,15 @@ export type Saved<T = unknown> = { data: T; savedAt: number };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
-function openDb(): Promise<IDBDatabase | null> {
+export function openDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === "undefined") return Promise.resolve(null);
   dbPromise ??= new Promise((resolve) => {
     try {
-      const req = indexedDB.open(DB_NAME, 1);
+      const req = indexedDB.open(DB_NAME, DB_VERSION);
       req.onupgradeneeded = () => {
-        const store = req.result.createObjectStore(STORE);
-        store.createIndex("savedAt", "savedAt");
+        const db = req.result;
+        if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE).createIndex("savedAt", "savedAt");
+        if (!db.objectStoreNames.contains(OUTBOX_STORE)) db.createObjectStore(OUTBOX_STORE, { keyPath: "id" });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => resolve(null);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import api, { errorMessage } from "@/lib/api";
@@ -16,6 +16,7 @@ import { findingDraft, isPmFinding, raiseWorkOrderHref } from "@/lib/linkedWorkO
 import { workOrderRef } from "@/lib/workOrders";
 import { workOrderStatusFor } from "@/lib/statuses";
 import WorkLocationSelect from "@/components/WorkLocationSelect";
+import { discardQueued, listOutbox, OUTBOX_EVENT, queueRound, type OutboxRound } from "@/lib/offlineOutbox";
 import { locationPath, type AssetLocationRef } from "@/lib/assetLocations";
 
 type PMItem = { id: string; label: string; order: number };
@@ -205,16 +206,47 @@ export default function ChecklistFormPage() {
 
   useEffect(() => startLoad(fetchData), [fetchData]);
 
+  // Rounds of this checklist saved on this phone and not sent yet
+  // (lib/offlineOutbox.ts), by period. One that disappears has been sent, so
+  // the server's copy is read again.
+  const [queued, setQueued] = useState<Record<string, OutboxRound>>({});
+  const queuedKeys = useRef<string[]>([]);
+  const loadQueued = useCallback(async (isCancelled?: () => boolean) => {
+    if (!user) return;
+    const rows = (await listOutbox(user.id)).filter((r) => r.assignmentId === assignmentId);
+    if (isCancelled?.()) return;
+    const sent = queuedKeys.current.some((k) => !rows.some((r) => r.periodStart === k));
+    queuedKeys.current = rows.map((r) => r.periodStart);
+    setQueued(Object.fromEntries(rows.map((r) => [r.periodStart, r])));
+    if (sent) void fetchData();
+  }, [user, assignmentId, fetchData]);
+  useEffect(() => {
+    const stop = startLoad(loadQueued);
+    const onChange = () => { void loadQueued(); };
+    window.addEventListener(OUTBOX_EVENT, onChange);
+    return () => { stop(); window.removeEventListener(OUTBOX_EVENT, onChange); };
+  }, [loadQueued]);
+
   // Load the chosen period's answers into the form whenever the period, the
   // filed rounds or the checklist change. Done during render rather than in an
   // effect, so the form never paints one frame of the previous period.
-  const [shownFor, setShownFor] = useState<{ date: Date; logs: PMLog[]; assignment: Assignment } | null>(null);
-  if (assignment && (shownFor?.date !== selectedDate || shownFor.logs !== allLogs || shownFor.assignment !== assignment)) {
-    setShownFor({ date: selectedDate, logs: allLogs, assignment });
+  const [shownFor, setShownFor] = useState<{ date: Date; logs: PMLog[]; assignment: Assignment; queued: Record<string, OutboxRound> } | null>(null);
+  if (assignment && (shownFor?.date !== selectedDate || shownFor.logs !== allLogs || shownFor.assignment !== assignment || shownFor.queued !== queued)) {
+    setShownFor({ date: selectedDate, logs: allLogs, assignment, queued });
     const periodStart = getPeriodStart(selectedDate, pmSchedule(assignment.checklist, assignment));
     const log = allLogs.find((l) => new Date(l.scheduledDate).getTime() === periodStart.getTime()) ?? null;
+    const waiting = queued[periodStart.toISOString().slice(0, 10)];
     setPeriodLog(log);
-    if (log) {
+    if (waiting) {
+      // Answers saved on this phone are newer than anything the server has.
+      const states: Record<string, ItemState> = {};
+      for (const li of log?.items ?? []) {
+        states[li.itemId] = { answer: li.answer, remarks: li.remarks ?? "", answeredAt: li.answeredAt, answeredByName: li.answeredByName ?? null };
+      }
+      for (const qi of waiting.items) states[qi.itemId] = { answer: qi.answer, remarks: qi.remarks ?? "" };
+      setItemStates(states);
+      setIsEditing(waiting.isDraft || waiting.status === "failed");
+    } else if (log) {
       const states: Record<string, ItemState> = {};
       for (const li of log.items) {
         states[li.itemId] = { answer: li.answer, remarks: li.remarks ?? "", answeredAt: li.answeredAt, answeredByName: li.answeredByName ?? null };
@@ -376,8 +408,32 @@ export default function ChecklistFormPage() {
         setSaveMsg("Checklist submitted.");
       }
     } catch (err: unknown) {
-      const e = err as { response?: { data?: { error?: string } } };
-      setError(e?.response?.data?.error ?? "Failed to submit. Please try again.");
+      const e = err as { response?: { data?: { error?: string } }; isAxiosError?: boolean };
+      // No signal: keep the round on this phone and send it later, with the time
+      // it was done (lib/offlineOutbox.ts).
+      if (e?.isAxiosError && !e.response && user) {
+        const periodStart = getPeriodStart(selectedDate, pmSchedule(assignment.checklist, assignment)).toISOString().slice(0, 10);
+        const kept = await queueRound({
+          userId: user.id,
+          accountId,
+          assignmentId,
+          checklistName: assignment.checklist.name,
+          periodStart,
+          logId: periodLog?.id ?? queued[periodStart]?.logId ?? null,
+          items,
+          isDraft,
+          doneAt: new Date().toISOString(),
+        });
+        if (kept) {
+          setDirty(false);
+          if (!isDraft) setIsEditing(false);
+          setSaveMsg(isDraft
+            ? "Saved on this phone. It will be sent when you're back online."
+            : "Submitted on this phone. It will be sent when you're back online, with the time you finished it.");
+          return;
+        }
+      }
+      setError(e?.response?.data?.error ?? errorMessage(err, "Failed to submit. Please try again."));
     } finally {
       setSubmitting(false);
     }
@@ -498,6 +554,25 @@ export default function ChecklistFormPage() {
           </button>
         )}
       </div>
+
+      {(() => {
+        const waiting = queued[getPeriodStart(selectedDate, schedule).toISOString().slice(0, 10)];
+        if (!waiting) return null;
+        const at = new Date(waiting.doneAt).toLocaleString("en-GB", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+        return waiting.status === "failed" ? (
+          <div role="alert" className="border-b border-[var(--tu-border)] bg-[var(--tu-soft-danger)] text-[var(--tu-on-danger)] px-6 py-3 text-sm flex flex-wrap items-center gap-3">
+            <span className="flex-1 min-w-[220px]"><strong>Couldn&apos;t send the answers saved on this phone ({at}).</strong> {waiting.error}</span>
+            <button type="button" className="tu-btn-secondary tu-btn-sm" onClick={async () => {
+              if (await confirm({ title: "Discard the answers saved on this phone?", message: "They were never sent. What the server has for this round stays as it is.", confirmLabel: "Discard" })) await discardQueued(waiting.id);
+            }}>Discard them</button>
+          </div>
+        ) : (
+          <div role="status" className="border-b border-[var(--tu-border)] bg-[var(--tu-soft-warning)] text-[var(--tu-on-warning)] px-6 py-3 text-sm">
+            <strong>{waiting.isDraft ? "Saved on this phone" : "Submitted on this phone"} at {at}, not sent yet.</strong>{" "}
+            It goes automatically when there&apos;s signal{waiting.isDraft ? "" : ", and counts from the time you finished it"}.
+          </div>
+        );
+      })()}
 
       {locEdit !== null && (
         <div className="bg-[var(--tu-bg-surface)] border-b border-[var(--tu-border)] px-6 py-2 flex flex-wrap items-center gap-2 text-xs">

@@ -150,9 +150,10 @@ well as priority, due date, category and estimate. It loads the site's live asse
 open and keeps the current asset offered even if it has since been archived; save errors are
 shown, not swallowed.
 
-## Offline (release 1 of 4: reading)
+## Offline (releases 1–2 of 4: reading, PM rounds)
 
-Pages and their data open without signal; changes still need a connection.
+Pages and their data open without signal. PM rounds can be filled in offline; other changes
+still need a connection.
 - **Pages:** `public/sw.js` keeps the app's code (`/_next/static`, cache-first) and every page
   opened (network-first, 6 s, then the saved copy, then `public/offline.html`). Pages are the same
   shell for everyone; nothing personal is stored there. It never touches the API (another origin)
@@ -168,8 +169,17 @@ Pages and their data open without signal; changes still need a connection.
 - **Telling people:** `components/OfflineBar.tsx` under the top bar: offline, how old the oldest
   shown copy is, changes need a connection. `errorMessage` says "You're offline" for a write that
   got no answer.
-- Next: offline PM rounds (2), queued steps/comments/photos (3), status and clock with server-side
-  checks on the reported time (4).
+- **PM rounds offline (release 2):** a round save that gets no answer goes to the outbox
+  (`lib/offlineOutbox.ts`, IndexedDB store `outbox`, one entry per person × round × period, newest
+  replaces) with `doneAt` = the phone's time. `syncOutbox` sends it on load, on `online` and on any
+  request that reaches the server (`lib/offline.ts`, debounced). A 409 naming someone's **draft** is
+  merged (`mergeAnswers`: theirs kept, this phone's wins where both answered) and PUT; a round
+  **already submitted** is never overwritten — the entry is marked failed with the reason. The form
+  shows the phone's answers over the server's and a waiting / couldn't-send banner; OfflineBar and
+  Today show what is waiting. Not wiped by `clearSession` (a lapsed session must not lose work);
+  `logout` asks first when anything is unsent.
+- Next: queued steps/comments/photos (3), status and clock with server-side checks on the reported
+  time (4).
 
 ## Notifications on this device (web push)
 
