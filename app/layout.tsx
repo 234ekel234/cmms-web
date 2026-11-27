@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { THEME_INIT_SCRIPT } from "@/lib/theme";
@@ -27,12 +27,20 @@ export const metadata: Metadata = {
   // the canonical origin rather than localhost. NEXT_PUBLIC_SITE_URL lets a
   // preview deployment describe itself accurately instead of claiming to be
   // production.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://cmms.servicemasterph.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://hanni.servicemasterph.com"),
   title: {
     default: "FMI HANNI",
     template: "%s · FMI HANNI",
   },
   description: "FMI HANNI — Hub for Asset Needs, Notices & Inspections. Track assets, work orders, and PM checklists across all sites.",
+  applicationName: "FMI HANNI",
+  // Installed on an iPhone's Home Screen: open without Safari's bars, named HANNI.
+  appleWebApp: { capable: true, title: "HANNI", statusBarStyle: "default" },
+};
+
+// Colours the browser bar and the installed app's title bar.
+export const viewport: Viewport = {
+  themeColor: "#2C377D",
 };
 
 export default function RootLayout({

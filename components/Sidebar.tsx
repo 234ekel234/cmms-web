@@ -313,8 +313,14 @@ export default function Sidebar({
         aria-hidden={!drawerOpen}
       >
         <div className="tu-drawer-header">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 26, width: "auto", objectFit: "contain" }} />
+          <div className="tu-hanni-lockup">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 22, width: "auto", objectFit: "contain" }} />
+            <span className="tu-hanni-rule" aria-hidden="true" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/hanni-icon-reverse.svg" alt="" width={24} height={24} />
+            <span className="tu-hanni-name">HANNI</span>
+          </div>
           <button
             ref={closeRef}
             className="tu-drawer-close"
@@ -333,8 +339,14 @@ export default function Sidebar({
       {/* Desktop sidebar — hidden below lg */}
       <aside className="tu-sidebar" aria-label="Navigation">
         <div className="tu-logo-strip">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 30, width: "auto", objectFit: "contain" }} />
+          <div className="tu-hanni-lockup">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/fmi_logo_light.png" alt="FMI" style={{ height: 26, width: "auto", objectFit: "contain" }} />
+            <span className="tu-hanni-rule" aria-hidden="true" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/brand/hanni-icon-reverse.svg" alt="" width={26} height={26} />
+            <span className="tu-hanni-name">HANNI</span>
+          </div>
         </div>
         <div className="tu-inner">
           <NavContent user={user} />

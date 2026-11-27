@@ -61,6 +61,8 @@ export default function LoginPage() {
           {/* eslint-enable @next/next/no-img-element */}
         </div>
         <div className="text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/hanni-icon-reverse.svg" alt="" className="tu-login-hanni-icon" />
           <p className="tu-login-headline">FMI HANNI</p>
           <p className="tu-login-sub">Hub for Asset Needs, Notices & Inspections</p>
         </div>
@@ -87,6 +89,10 @@ export default function LoginPage() {
             {/* eslint-disable @next/next/no-img-element */}
             <img src="/fmi_logo_dark.png" alt="FMI" className="tu-mark-fmi h-10 w-auto object-contain" />
             <img src="/servicemaster_logo_hq.png" alt="ServiceMaster" className="tu-mark-sm h-7 w-auto object-contain" />
+            <div className="tu-hanni-lockup mt-2">
+              <img src="/brand/hanni-icon.svg" alt="" width={32} height={32} />
+              <span className="tu-hanni-name">FMI HANNI</span>
+            </div>
             {/* eslint-enable @next/next/no-img-element */}
           </div>
 
