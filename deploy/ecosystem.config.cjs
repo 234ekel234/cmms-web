@@ -10,6 +10,8 @@
 //
 // Listens on 127.0.0.1 only: Nginx is the public face (deploy/nginx-hanni.conf).
 // The API keeps port 3000.
+// A pm2 config is CommonJS by contract; pm2 cannot load it as a module.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require("path");
 
 const root = path.resolve(__dirname, "..");
