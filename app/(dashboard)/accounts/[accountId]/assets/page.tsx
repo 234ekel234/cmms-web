@@ -277,7 +277,7 @@ export default function AssetsPage() {
             </button>
             <button
               onClick={() => setShowForm(true)}
-              className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+              className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] transition-colors cursor-pointer"
             >
               + Add Asset
             </button>
@@ -304,7 +304,7 @@ export default function AssetsPage() {
             key={k}
             onClick={() => setSortKey(k)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-              sortKey === k ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+              sortKey === k ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >
             {k === "name" ? "Name" : "Condition"}
@@ -317,7 +317,7 @@ export default function AssetsPage() {
           onClick={() => setAttentionOnly((v) => !v)}
           aria-pressed={attentionOnly}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-            attentionOnly ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+            attentionOnly ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
           }`}
         >
           {NEEDS_ATTENTION_LABEL}
@@ -564,7 +564,7 @@ export default function AssetsPage() {
           {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => { setShowForm(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-            <button onClick={addAsset} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+            <button onClick={addAsset} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
               {saving ? "Saving…" : "Add Asset"}
             </button>
           </div>

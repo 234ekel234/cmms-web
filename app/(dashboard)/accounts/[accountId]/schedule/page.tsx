@@ -330,7 +330,7 @@ export default function SchedulePage() {
           {writable && !showShiftForm && (
             <button
               onClick={openShiftForm}
-              className="text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer"
+              className="text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer"
             >
               + Add Shift
             </button>
@@ -382,7 +382,7 @@ export default function SchedulePage() {
                 <button
                   onClick={createShiftTemplate}
                   disabled={savingShift}
-                  className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                 >
                   {savingShift ? "Saving…" : "Create"}
                 </button>
@@ -566,7 +566,7 @@ export default function SchedulePage() {
 
             <button
               onClick={() => setModalSlot(null)}
-              className="w-full bg-[var(--tu-text-brand)] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[var(--tu-text-brand-strong)] cursor-pointer"
+              className="w-full bg-[var(--tu-fill-brand)] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer"
             >
               Done
             </button>

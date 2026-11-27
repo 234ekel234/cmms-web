@@ -26,6 +26,12 @@
   --tu-text-subtle: #64748b;
   --tu-text-brand: #2166AC;
   --tu-text-brand-strong: #1a5490;
+  /* A filled control with white text on it (primary buttons, active pills, the
+     avatar). Not --tu-text-brand: that is a text colour, and in dark mode it is
+     lightened for reading on dark surfaces — white on it measured 2.5:1. These
+     stay dark enough for white in both themes (light 5.9:1, dark 5.3:1). */
+  --tu-fill-brand: #2166AC;
+  --tu-fill-brand-strong: #1a5490;
   --tu-text-disabled: #94a3b8;
   --tu-border: #e2e8f0;
   /* A stronger hairline for dividers that need to carry structural weight. */
@@ -157,6 +163,9 @@
   --tu-text-subtle: #94a3b8;
   --tu-text-brand: #6ba8e0;
   --tu-text-brand-strong: #a9ccec;
+  /* White on these: 5.3:1 and 4.8:1; against the dark surface ≥3:1. */
+  --tu-fill-brand: #2a6db3;
+  --tu-fill-brand-strong: #2f74bd;
   --tu-text-disabled: #64748b;
   --tu-border: #232e42;
   --tu-border-strong: #33405a;
@@ -937,7 +946,7 @@ code, kbd, pre, .tu-mono {
   font-size: 14.5px;
   font-weight: 600;
   color: #ffffff;
-  background: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
   border: 1px solid transparent;
   border-radius: var(--tu-radius-md);
   box-shadow: var(--tu-shadow-xs);
@@ -946,7 +955,7 @@ code, kbd, pre, .tu-mono {
   white-space: nowrap;
   letter-spacing: -0.005em;
 }
-.tu-btn-primary:hover { background: var(--tu-text-brand-strong); box-shadow: var(--tu-shadow-sm); }
+.tu-btn-primary:hover { background: var(--tu-fill-brand-strong); box-shadow: var(--tu-shadow-sm); }
 /* A 1px press keeps the button feeling physical without moving layout. */
 .tu-btn-primary:active { transform: translateY(1px); box-shadow: none; }
 .tu-btn-primary:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
@@ -1549,7 +1558,7 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 }
 .tu-segmented button + button { border-left: 1px solid var(--tu-border); }
 .tu-segmented button:hover { background: var(--tu-bg-secondary); color: var(--tu-text-heading); }
-.tu-segmented button.tu-active { background: var(--tu-text-brand); color: #ffffff; }
+.tu-segmented button.tu-active { background: var(--tu-fill-brand); color: #ffffff; }
 .tu-segmented button.tu-active:hover { background: var(--tu-text-brand-strong); }
 .tu-segmented button:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: -2px; }
 
@@ -1569,8 +1578,8 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 .tu-filter-pill:hover { border-color: var(--tu-border-strong); color: var(--tu-text-heading); }
 .tu-filter-pill:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
 .tu-filter-pill.tu-active {
-  background: var(--tu-text-brand);
-  border-color: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
+  border-color: var(--tu-fill-brand);
   color: #ffffff;
 }
 
@@ -1590,8 +1599,8 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
 .tu-view-pill:hover { border-color: var(--tu-text-brand); color: var(--tu-text-brand); }
 .tu-view-pill:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
 .tu-view-pill.tu-active {
-  background: var(--tu-text-brand);
-  border-color: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
+  border-color: var(--tu-fill-brand);
   color: #ffffff;
   font-weight: 600;
 }
@@ -1713,10 +1722,10 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
   border: none;
   cursor: pointer;
   transition: background 150ms, filter 150ms;
-  background: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
   color: #ffffff;
 }
-.tu-action-btn:hover { background: var(--tu-text-brand-strong); }
+.tu-action-btn:hover { background: var(--tu-fill-brand-strong); }
 .tu-action-btn:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
 .tu-action-reject {
   background: color-mix(in srgb, var(--tu-priority-critical) 14%, transparent);
@@ -1778,8 +1787,8 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
   transition: background 150ms, border-color 150ms;
 }
 .tu-pick-check.tu-checked {
-  background: var(--tu-text-brand);
-  border-color: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
+  border-color: var(--tu-fill-brand);
   color: #ffffff;
 }
 
@@ -1811,8 +1820,8 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
   color: transparent;
 }
 .tu-pipe-node.tu-done {
-  background: var(--tu-text-brand);
-  border-color: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
+  border-color: var(--tu-fill-brand);
   color: #ffffff;
 }
 .tu-pipe-node.tu-current {
@@ -2078,13 +2087,13 @@ a.tu-stat-card:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-
   font-size: 14px;
   font-weight: 600;
   color: #ffffff;
-  background: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
   border: none;
   border-radius: var(--tu-radius-md);
   cursor: pointer;
   transition: background 150ms, transform 100ms;
 }
-.tu-login-submit:hover:not(:disabled) { background: var(--tu-text-brand-strong); }
+.tu-login-submit:hover:not(:disabled) { background: var(--tu-fill-brand-strong); }
 .tu-login-submit:active:not(:disabled) { transform: translateY(1px); }
 .tu-login-submit:disabled { opacity: 0.5; cursor: not-allowed; }
 .tu-login-submit:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
@@ -2288,7 +2297,7 @@ button {
   height: 32px;
   flex-shrink: 0;
   border-radius: 9999px;
-  background: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
   color: #ffffff;
   font-size: 13px;
   font-weight: 650;
@@ -2924,7 +2933,7 @@ figure:hover .tu-attachment-remove,
   border-radius: 999px;
   font-size: 10.5px;
   font-weight: 650;
-  background: var(--tu-text-brand);
+  background: var(--tu-fill-brand);
   color: #ffffff;
 }
 .tu-cover-set {
@@ -3320,7 +3329,7 @@ figure:hover .tu-attachment-remove,
 .tu-sheet-action:disabled { opacity: 0.5; cursor: not-allowed; }
 .tu-sheet-action:not(:disabled):hover { filter: brightness(0.96); }
 .tu-sheet-action:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
-.tu-sheet-action-brand   { background: var(--tu-text-brand);   color: #fff; }
+.tu-sheet-action-brand   { background: var(--tu-fill-brand);   color: #fff; }
 .tu-sheet-action-success { background: var(--tu-soft-success); color: var(--tu-on-success); border-color: var(--tu-bd-success); }
 .tu-sheet-action-danger  { background: var(--tu-soft-danger);  color: var(--tu-on-danger);  border-color: var(--tu-bd-danger); }
 .tu-sheet-action-neutral { background: var(--tu-soft-neutral); color: var(--tu-on-neutral); border-color: var(--tu-bd-neutral); }
@@ -3835,7 +3844,7 @@ figure:hover .tu-attachment-remove,
 }
 .tu-pager-btn:hover:not(:disabled) { border-color: var(--tu-border-strong); }
 .tu-pager-btn:disabled { opacity: 0.45; cursor: default; }
-.tu-pager-btn[aria-current="page"] { background: var(--tu-text-brand); border-color: var(--tu-text-brand); color: #fff; font-weight: 600; }
+.tu-pager-btn[aria-current="page"] { background: var(--tu-fill-brand); border-color: var(--tu-fill-brand); color: #fff; font-weight: 600; }
 .tu-pager-gap { padding: 0 4px; }
 .tu-pager-size { display: inline-flex; align-items: center; gap: 8px; }
 .tu-pager-size .tu-select { padding: 4px 28px 4px 8px; font-size: 13px; min-width: 0; }

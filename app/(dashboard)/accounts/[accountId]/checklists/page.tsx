@@ -257,7 +257,7 @@ export default function ChecklistsPage() {
               type="button"
               onClick={() => setStatusFilter("ALL")}
               className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                statusFilter === "ALL" ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                statusFilter === "ALL" ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
               }`}
             >
               All ({assignments.length})

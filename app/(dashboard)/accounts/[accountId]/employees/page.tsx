@@ -184,7 +184,7 @@ export default function EmployeesPage() {
             </button>
             <button
               onClick={openAssignModal}
-              className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+              className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] transition-colors cursor-pointer"
             >
               + Assign
             </button>
@@ -215,7 +215,7 @@ export default function EmployeesPage() {
                 type="button"
                 onClick={() => setTypeFilter(s)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                  typeFilter === s ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                  typeFilter === s ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 {s === "ALL" ? "All" : s === "REGULAR" ? "Regular" : "Reliever"}
@@ -230,7 +230,7 @@ export default function EmployeesPage() {
                 type="button"
                 onClick={() => setAvailFilter(a)}
                 className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
-                  availFilter === a ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                  availFilter === a ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 {a === "ALL" ? "Anyone" : a === "AVAILABLE" ? "Free" : "On a job now"}
@@ -385,7 +385,7 @@ export default function EmployeesPage() {
             <button
               onClick={assignSelected}
               disabled={assigning}
-              className="w-full bg-[var(--tu-text-brand)] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+              className="w-full bg-[var(--tu-fill-brand)] text-white rounded-xl py-3 font-semibold text-sm hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {assigning ? "Assigning…" : selectedIds.length > 0 ? `Assign ${selectedIds.length} Employee${selectedIds.length > 1 ? "s" : ""}` : "Done"}
             </button>

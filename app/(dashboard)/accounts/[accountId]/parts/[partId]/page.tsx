@@ -289,7 +289,7 @@ export default function PartDetailPage() {
                 key={t}
                 onClick={() => openMovement(t)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer transition-colors ${
-                  moveType === t ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                  moveType === t ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 {t === "RECEIPT" ? "Receive Stock" : t === "ISSUE" ? "Issue Stock" : "Adjust Count"}
@@ -331,7 +331,7 @@ export default function PartDetailPage() {
             {moveError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{moveError}</p>}
             <div className="flex gap-3 justify-end mt-4">
               <button onClick={() => setMoveType(null)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-              <button onClick={submitMovement} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+              <button onClick={submitMovement} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
                 {saving ? "Saving…" : "Record"}
               </button>
             </div>
@@ -383,7 +383,7 @@ export default function PartDetailPage() {
           {editError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{editError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => setEditing(false)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-            <button onClick={saveDetails} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+            <button onClick={saveDetails} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
               {saving ? "Saving…" : "Save"}
             </button>
           </div>
@@ -426,7 +426,7 @@ export default function PartDetailPage() {
             )}
             <div className="flex gap-3 justify-end mt-4">
               <button onClick={() => setEditingAssets(false)} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-              <button onClick={saveAssets} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+              <button onClick={saveAssets} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
                 {saving ? "Saving…" : "Save"}
               </button>
             </div>

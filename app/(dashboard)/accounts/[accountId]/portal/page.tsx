@@ -395,7 +395,7 @@ function RequestCard({
                       type="button"
                       disabled={signingOff || !sendBackReason.trim()}
                       onClick={() => handleSignOff("ON_HOLD", sendBackReason.trim())}
-                      className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                      className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                     >
                       {signingOff ? "Sending\u2026" : "Send back"}
                     </button>
@@ -415,7 +415,7 @@ function RequestCard({
                     type="button"
                     disabled={signingOff}
                     onClick={() => handleSignOff("APPROVED")}
-                    className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                   >
                     {signingOff ? "Saving…" : "Approve"}
                   </button>
@@ -498,7 +498,7 @@ function RequestCard({
               type="button"
               onClick={handleComment}
               disabled={!canComment}
-              className="bg-[var(--tu-text-brand)] text-white rounded-lg px-3.5 py-2 text-[13px] font-bold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+              className="bg-[var(--tu-fill-brand)] text-white rounded-lg px-3.5 py-2 text-[13px] font-bold hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {submitting ? "…" : "Send"}
             </button>
@@ -649,7 +649,7 @@ export default function ClientPortalPage() {
         <h2 className="text-lg font-bold text-[var(--tu-text-heading)]">My Requests</h2>
         <button
           onClick={() => setShowForm((v) => !v)}
-          className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+          className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] transition-colors cursor-pointer"
         >
           + New Request
         </button>
@@ -788,7 +788,7 @@ export default function ClientPortalPage() {
             <button
               onClick={createRequest}
               disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {saving ? (formFiles.length > 0 ? "Uploading…" : "Submitting…") : "Submit Request"}
             </button>
@@ -811,7 +811,7 @@ export default function ClientPortalPage() {
             onClick={() => setFilter(f.key)}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
               filter === f.key
-                ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]"
+                ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]"
                 : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >

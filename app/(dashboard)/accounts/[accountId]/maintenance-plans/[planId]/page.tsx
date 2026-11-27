@@ -369,7 +369,7 @@ export default function MaintenancePlanDetailPage() {
             <button onClick={() => { setEditing(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">
               Cancel
             </button>
-            <button onClick={save} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+            <button onClick={save} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
               {saving ? "Saving…" : "Save changes"}
             </button>
           </div>

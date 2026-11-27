@@ -417,7 +417,7 @@ export default function EditChecklistPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="bg-[var(--tu-text-brand)] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-40 transition-colors cursor-pointer"
+            className="bg-[var(--tu-fill-brand)] text-white px-6 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-40 transition-colors cursor-pointer"
           >
             {saving ? "Saving…" : "Save"}
           </button>

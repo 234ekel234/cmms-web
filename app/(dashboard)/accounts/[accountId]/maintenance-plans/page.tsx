@@ -189,7 +189,7 @@ export default function MaintenancePlansPage() {
           )}
           <button
             onClick={() => setShowForm(true)}
-            className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+            className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] transition-colors cursor-pointer"
           >
             + New Plan
           </button>
@@ -413,7 +413,7 @@ export default function MaintenancePlansPage() {
             <button
               onClick={createPlan}
               disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
             >
               {saving ? "Saving…" : "Create Plan"}
             </button>

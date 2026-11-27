@@ -248,6 +248,14 @@ record just left. Declare the loader with `useCallback` *above* the effect; a pl
 State derived from props or other state is set during render with a "last seen" guard (the
 checklist fill-in page, the account layout's menu), not in an effect.
 
+## Filled brand controls
+
+White text on a brand-coloured fill (primary buttons, active pills and filters, the avatar, the
+pager's current page) uses **`--tu-fill-brand` / `--tu-fill-brand-strong`**, never
+`--tu-text-brand`. The latter is a *text* colour and is lightened in dark mode, where white on it
+measured 2.5:1; the fill tokens keep white at ≥4.8:1 in both themes. Dots, bars and other fills
+with no text on them may keep `--tu-text-brand`.
+
 ## Phone widths
 
 Every page was checked at 390px (27 Oct 2026). Rows of controls use `tu-page-actions` (wraps),

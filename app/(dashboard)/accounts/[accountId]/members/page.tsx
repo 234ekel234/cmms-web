@@ -174,7 +174,7 @@ export default function MembersPage() {
                         <button
                           onClick={() => assign(u.id)}
                           disabled={savingId === u.id}
-                          className="bg-[var(--tu-text-brand)] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[var(--tu-text-brand-strong)] cursor-pointer disabled:opacity-50"
+                          className="bg-[var(--tu-fill-brand)] text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer disabled:opacity-50"
                         >
                           {savingId === u.id ? "…" : "+ Add"}
                         </button>

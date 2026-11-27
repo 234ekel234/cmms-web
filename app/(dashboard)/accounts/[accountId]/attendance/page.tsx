@@ -260,7 +260,7 @@ export default function AttendancePage() {
             key={v}
             onClick={() => setView(v)}
             className={`px-6 py-2.5 text-sm font-semibold cursor-pointer transition-colors ${
-              view === v ? "bg-[var(--tu-text-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
+              view === v ? "bg-[var(--tu-fill-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
             }`}
           >
             {v === "daily" ? "Daily Log" : "Summary"}
@@ -284,7 +284,7 @@ export default function AttendancePage() {
                 key={t.id}
                 onClick={() => selectShift(i)}
                 className={`px-4 py-2 text-sm font-semibold cursor-pointer transition-colors ${
-                  i === selectedIndex ? "bg-[var(--tu-text-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
+                  i === selectedIndex ? "bg-[var(--tu-fill-brand)] text-white" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] hover:bg-[var(--tu-bg-secondary)]"
                 }`}
               >
                 {t.name}
@@ -372,7 +372,7 @@ export default function AttendancePage() {
                 key={c}
                 onClick={() => setCutoff(c)}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold border cursor-pointer transition-colors ${
-                  cutoff === c ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+                  cutoff === c ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
                 }`}
               >
                 {c === "first" ? "1–15" : `16–${lastDayOfMonth(summaryMonth)}`}

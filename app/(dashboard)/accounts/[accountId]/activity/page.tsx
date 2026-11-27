@@ -152,7 +152,7 @@ export default function ActivityPage() {
             key={f.key}
             onClick={() => setActiveFilter(f.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
-              activeFilter === f.key ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+              activeFilter === f.key ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >
             {f.label}

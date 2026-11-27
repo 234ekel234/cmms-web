@@ -95,7 +95,7 @@ export default function PartsPage() {
         </div>
         <button
           onClick={() => setShowForm(true)}
-          className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] transition-colors cursor-pointer"
+          className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] transition-colors cursor-pointer"
         >
           + Add Part
         </button>
@@ -173,7 +173,7 @@ export default function PartsPage() {
           {formError && <p className="text-[var(--tu-on-danger)] text-xs mt-3">{formError}</p>}
           <div className="flex gap-3 justify-end mt-4">
             <button onClick={() => { setShowForm(false); setFormError(""); }} className="px-4 py-2 text-sm text-[var(--tu-text-body)] border border-[var(--tu-border)] rounded-lg hover:bg-[var(--tu-bg-secondary)] cursor-pointer">Cancel</button>
-            <button onClick={addPart} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer">
+            <button onClick={addPart} disabled={saving} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer">
               {saving ? "Saving…" : "Add Part"}
             </button>
           </div>

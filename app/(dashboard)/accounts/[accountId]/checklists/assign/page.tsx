@@ -152,7 +152,7 @@ export default function AssignChecklistPage() {
                         onClick={() => setFreqFilter(f)}
                         className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors cursor-pointer ${
                           freqFilter === f
-                            ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]"
+                            ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]"
                             : cfg
                             ? `${cfg.cls} border-transparent`
                             : "bg-[var(--tu-bg-secondary-strong)] text-[var(--tu-text-subtle)] border-transparent"
@@ -323,7 +323,7 @@ export default function AssignChecklistPage() {
               <button
                 onClick={handleAssign}
                 disabled={!selectedChecklist || submitting}
-                className="flex-1 bg-[var(--tu-text-brand)] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex-1 bg-[var(--tu-fill-brand)] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 {submitting ? "Assigning…" : "Assign"}
               </button>

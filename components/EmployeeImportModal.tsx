@@ -216,7 +216,7 @@ export default function EmployeeImportModal({
 
         <div className="px-6 py-4 border-t border-[var(--tu-border)] flex justify-end gap-3 shrink-0">
           {result ? (
-            <button onClick={onClose} className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] cursor-pointer">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer">
               Done
             </button>
           ) : (
@@ -227,7 +227,7 @@ export default function EmployeeImportModal({
               <button
                 onClick={submit}
                 disabled={validRows.length === 0 || submitting}
-                className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
                 {submitting ? "Importing…" : `Import ${validRows.length || ""} Employee${validRows.length === 1 ? "" : "s"}`}
               </button>

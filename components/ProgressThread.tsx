@@ -225,7 +225,7 @@ export default function ProgressThread({
           <button
             onClick={onPost}
             disabled={!canPost}
-            className="px-4 py-2 text-sm text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+            className="px-4 py-2 text-sm text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
             style={{ whiteSpace: "nowrap" }}
           >
             {posting ? "Posting…" : internal ? "Post internal note" : "Post"}

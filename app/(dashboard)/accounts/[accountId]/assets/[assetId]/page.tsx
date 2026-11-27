@@ -483,7 +483,7 @@ export default function AssetDetailPage() {
             {!asset.archivedAt && (
               <Link
                 href={`/accounts/${accountId}/work-orders?assetId=${asset.id}`}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] transition-colors"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-fill-brand)] hover:bg-[var(--tu-fill-brand-strong)] transition-colors"
               >
                 + New Work Order
               </Link>
@@ -556,7 +556,7 @@ export default function AssetDetailPage() {
                     <button
                       onClick={saveHealthWithFindings}
                       disabled={saving || !findingsDraft.trim()}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-fill-brand)] hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                     >
                       {saving ? "Saving…" : `Save as ${ASSET_HEALTH[healthChoice].label}`}
                     </button>
@@ -612,7 +612,7 @@ export default function AssetDetailPage() {
               <button
                 onClick={() => updateAsset({ status: statusDraft })}
                 disabled={saving}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-text-brand)] hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-[var(--tu-fill-brand)] hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
                 {saving ? "Saving…" : "Save"}
               </button>
@@ -715,7 +715,7 @@ export default function AssetDetailPage() {
                 <button
                   onClick={saveDetails}
                   disabled={saving}
-                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? "Saving…" : "Save"}
                 </button>

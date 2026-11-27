@@ -380,7 +380,7 @@ export default function ReportsPage() {
           <button
             type="button"
             onClick={() => setShowPmExport(true)}
-            className="text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer"
+            className="text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg px-3 py-1.5 hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer"
           >
             PM analytics (Excel)
           </button>
@@ -404,7 +404,7 @@ export default function ReportsPage() {
             key={p}
             onClick={() => handlePeriodChange(p)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold border cursor-pointer transition-colors ${
-              period === p ? "bg-[var(--tu-text-brand)] text-white border-[var(--tu-text-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
+              period === p ? "bg-[var(--tu-fill-brand)] text-white border-[var(--tu-fill-brand)]" : "bg-[var(--tu-bg-surface)] text-[var(--tu-text-body)] border-[var(--tu-border)] hover:border-[var(--tu-border-strong)]"
             }`}
           >
             {PERIOD_LABELS[p]}
@@ -425,7 +425,7 @@ export default function ReportsPage() {
             <input type="date" value={customTo} onChange={(e) => { setCustomTo(e.target.value); setCustomError(""); }}
               className="border border-[var(--tu-border)] rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]" />
           </div>
-          <button onClick={applyCustom} className="bg-[var(--tu-text-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer hover:bg-[var(--tu-text-brand-strong)]">Apply</button>
+          <button onClick={applyCustom} className="bg-[var(--tu-fill-brand)] text-white px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer hover:bg-[var(--tu-fill-brand-strong)]">Apply</button>
           {customError && <p className="text-xs text-[var(--tu-on-danger)] w-full">{customError}</p>}
         </div>
       )}

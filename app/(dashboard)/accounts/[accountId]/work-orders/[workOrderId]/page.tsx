@@ -1115,7 +1115,7 @@ export default function WorkOrderDetailPage() {
               <button
                 onClick={saveEdit}
                 disabled={savingEdit}
-                className="px-3 py-1.5 text-xs text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                className="px-3 py-1.5 text-xs text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
               >
                 {savingEdit ? "Saving…" : "Save changes"}
               </button>
@@ -1324,7 +1324,7 @@ export default function WorkOrderDetailPage() {
                     <input type="number" min={0} max={59} value={estMins} onChange={(e) => setEstMins(e.target.value)} placeholder="0"
                       className="w-14 border border-[var(--tu-border)] rounded-lg px-2 py-1 text-sm text-right focus:outline-none focus:ring-2 focus:ring-[var(--tu-text-brand)]" />
                     <span className="text-xs text-[var(--tu-text-subtle)]">m</span>
-                    <button onClick={saveEstimate} className="ml-1 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg px-2.5 py-1 hover:bg-[var(--tu-text-brand-strong)] cursor-pointer">Save</button>
+                    <button onClick={saveEstimate} className="ml-1 text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg px-2.5 py-1 hover:bg-[var(--tu-fill-brand-strong)] cursor-pointer">Save</button>
                     <button onClick={() => setEditingEst(false)} className="text-xs text-[var(--tu-text-subtle)] px-1 cursor-pointer">Cancel</button>
                   </div>
                 ) : (
@@ -1405,7 +1405,7 @@ export default function WorkOrderDetailPage() {
                     onClick={() => (order.timerStartedAt ? setPausing(true) : setTimer("resume"))}
                     disabled={timerBusy}
                     className={`mt-3 w-full py-2 rounded-lg text-sm font-semibold cursor-pointer transition-colors disabled:opacity-50 ${
-                      order.timerStartedAt ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]" : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
+                      order.timerStartedAt ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]" : "bg-[var(--tu-fill-brand)] text-white hover:bg-[var(--tu-fill-brand-strong)]"
                     }`}
                   >
                     {timerBusy ? "…" : order.timerStartedAt ? "❚❚ Pause Timer" : "▶ Resume Timer"}
@@ -1613,7 +1613,7 @@ export default function WorkOrderDetailPage() {
                   <button
                     onClick={() => setAcceptAssign(true)}
                     disabled={updatingStatus}
-                    className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
+                    className="px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-colors disabled:opacity-50 bg-[var(--tu-fill-brand)] text-white hover:bg-[var(--tu-fill-brand-strong)]"
                   >
                     Accept &amp; assign
                   </button>
@@ -1635,7 +1635,7 @@ export default function WorkOrderDetailPage() {
                         ? "bg-[var(--tu-soft-success)] text-[var(--tu-on-success)] hover:bg-[var(--tu-soft-success)]"
                         : ns === "ON_HOLD"
                         ? "bg-[var(--tu-soft-neutral)] text-[var(--tu-on-neutral)] hover:bg-[var(--tu-bg-tertiary)]"
-                        : "bg-[var(--tu-text-brand)] text-white hover:bg-[var(--tu-text-brand-strong)]"
+                        : "bg-[var(--tu-fill-brand)] text-white hover:bg-[var(--tu-fill-brand-strong)]"
                     }`}
                   >
                     {ns === "PENDING" && order.status === "REQUESTED" ? "Accept" :
@@ -2008,7 +2008,7 @@ export default function WorkOrderDetailPage() {
                 <button
                   onClick={savePart}
                   disabled={savingPart}
-                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-text-brand)] rounded-lg hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-50 cursor-pointer"
+                  className="px-3 py-1.5 text-xs font-semibold text-white bg-[var(--tu-fill-brand)] rounded-lg hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-50 cursor-pointer"
                 >
                   {savingPart ? "Saving…" : editingPartId ? "Save changes" : "Add part"}
                 </button>

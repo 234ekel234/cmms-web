@@ -887,7 +887,7 @@ export default function ChecklistFormPage() {
               <button
                 onClick={handleSubmit}
                 disabled={submitting || completeCount === 0}
-                className="flex-1 bg-[var(--tu-text-brand)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-text-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                className="flex-1 bg-[var(--tu-fill-brand)] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--tu-fill-brand-strong)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
               >
                 {submitting ? "Saving…" : completeCount < total ? "Save Partial" : "Submit Checklist"}
               </button>
