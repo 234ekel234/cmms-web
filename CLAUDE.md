@@ -70,8 +70,12 @@ in it are load-bearing:
   technician narrowing, or it becomes unreachable — which once handed the checklist assign and
   fill-in forms to CLIENT while adding an unrelated role.
 
-`ROLE_HOME.TECHNICIAN` is `/work-orders`, not `/` — the dashboard is the account at a glance,
-which is exactly what a technician does not get.
+`ROLE_HOME.TECHNICIAN` is `/today`, not `/` — the dashboard is the account at a glance,
+which is exactly what a technician does not get. **Today** (`app/(dashboard)/today`, `GET /me/today`,
+backend `helpers/myDay.js`) is their day: open jobs in one urgency bucket each (in progress, on hold,
+overdue, due today, this week, later), the PM rounds still to do on their sites (the 08:00 reminder's
+`checklistStanding`), and their own shifts for 14 days (dated entries + weekday rules, rostered sites
+only). The page groups and formats; the API decides the buckets.
 
 ## PM checklists
 

@@ -6,6 +6,8 @@ const who = (path: string) => ALL_ROLES.filter((r) => canAccessRoute(r, path));
 describe("route access", () => {
   it("keeps a technician out of the overview pages", () => {
     expect(canAccessRoute("TECHNICIAN", "/")).toBe(false);
+    expect(canAccessRoute("TECHNICIAN", "/today")).toBe(true);
+    for (const r of ["GENERAL_MANAGER", "MANAGER", "SUPERVISOR", "CLIENT"] as Role[]) expect(canAccessRoute(r, "/today")).toBe(false);
     expect(canAccessRoute("TECHNICIAN", "/reports")).toBe(false);
     expect(canAccessRoute("TECHNICIAN", "/accounts/a/employees")).toBe(false);
     expect(canAccessRoute("TECHNICIAN", "/accounts/a/activity")).toBe(false);

@@ -3861,3 +3861,62 @@ figure:hover .tu-attachment-remove,
 .tu-mix-legend li { display: flex; align-items: center; gap: 8px; }
 .tu-mix-legend i { width: 10px; height: 10px; border-radius: 2px; flex: none; }
 .tu-mix-legend .tu-figure { margin-left: auto; }
+
+/* ── Today (technicians' home, app/(dashboard)/today) ─────────────────── */
+.tu-today-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.tu-today-summary > .tu-card { margin: 0; }
+.tu-today-kicker {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tu-text-subtle);
+  margin: 0 0 6px;
+}
+.tu-today-big { font-size: 18px; font-weight: 650; color: var(--tu-text-heading); margin: 0; }
+.tu-today-site { font-weight: 500; color: var(--tu-text-body); }
+.tu-today-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.tu-today-count {
+  font-size: 26px;
+  font-weight: 650;
+  line-height: 1.1;
+  color: var(--tu-text-heading);
+  margin: 0 0 4px;
+  font-variant-numeric: tabular-nums;
+}
+.tu-today-group { font-size: 14px; font-weight: 650; color: var(--tu-text-heading); margin: 0 0 8px; }
+.tu-today-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.tu-today-row {
+  display: block;
+  padding: 12px 14px;
+  border: 1px solid var(--tu-border);
+  border-radius: 10px;
+  background: var(--tu-bg-surface);
+  text-decoration: none;
+  color: inherit;
+  min-height: 44px;
+  transition: border-color 150ms, background 150ms;
+}
+.tu-today-row:hover { border-color: var(--tu-border-strong); background: var(--tu-bg-secondary); }
+.tu-today-row:focus-visible { outline: 2px solid var(--tu-focus-ring); outline-offset: 2px; }
+.tu-today-shifts { list-style: none; margin: 0; padding: 0; }
+.tu-today-shifts li {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tu-border);
+  font-size: 14px;
+}
+.tu-today-shifts li:last-child { border-bottom: 0; }
+.tu-today-shifts li[aria-current="date"] { font-weight: 600; }
+.tu-today-shift-day { color: var(--tu-text-body); }
+@media (max-width: 480px) {
+  .tu-today-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+  .tu-today-shifts li { grid-template-columns: 92px 1fr; }
+}

@@ -38,8 +38,9 @@ export const ROLE_HOME: Record<Role, string> = {
   MANAGER: "/",
   SUPERVISOR: "/",
   // Not "/" — the dashboard is the account at a glance, which is exactly what a
-  // technician does not get. Their queue is the whole product for them.
-  TECHNICIAN: "/work-orders",
+  // technician does not get. Today is their day instead: their jobs by urgency,
+  // the rounds due on their sites and their shifts (app/(dashboard)/today).
+  TECHNICIAN: "/today",
   CLIENT: "/accounts",
 };
 
@@ -111,6 +112,8 @@ function rolesForPath(path: string): Role[] {
 
   // Global top-level pages.
   if (path === "/") return STAFF;
+  // Built on the employee link (GET /me/today answers technicians only).
+  if (path.startsWith("/today")) return ["TECHNICIAN"];
   if (path.startsWith("/users")) return MANAGERS;
   if (path.startsWith("/work-orders")) return FIELD_STAFF;
   if (path.startsWith("/assets")) return FIELD_STAFF;
