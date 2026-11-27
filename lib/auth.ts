@@ -1,3 +1,4 @@
+import { clearOfflineData } from "@/lib/offlineData";
 export type User = {
   id: string;
   name: string;
@@ -31,6 +32,9 @@ export function saveSession(token: string, user: User) {
 export function clearSession() {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  // The offline copies are this person's jobs and sites; the next person to
+  // sign in on this device must not read them (lib/offlineData.ts).
+  void clearOfflineData();
 }
 
 /**

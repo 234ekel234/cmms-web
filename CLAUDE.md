@@ -150,6 +150,27 @@ well as priority, due date, category and estimate. It loads the site's live asse
 open and keeps the current asset offered even if it has since been archived; save errors are
 shown, not swallowed.
 
+## Offline (release 1 of 4: reading)
+
+Pages and their data open without signal; changes still need a connection.
+- **Pages:** `public/sw.js` keeps the app's code (`/_next/static`, cache-first) and every page
+  opened (network-first, 6 s, then the saved copy, then `public/offline.html`). Pages are the same
+  shell for everyone; nothing personal is stored there. It never touches the API (another origin)
+  or Next's RSC requests (offline they fail and Next falls back to a full load, served from the
+  saved page). Bump `VERSION` when its rules change. Registered for every signed-in session
+  (`lib/offline.ts`, production only).
+- **Data:** `lib/api.ts` saves every successful JSON GET to IndexedDB (`lib/offlineData.ts`, per
+  user, 14 days, 500 entries) and answers a GET that got **no response** from that copy, with an
+  `x-hanni-saved-at` header. GETs time out at 15 s so one bar of signal falls back rather than hangs.
+  `clearSession` wipes it: a shared phone must not show the last person's jobs.
+- **Warming:** Today (when it came from the server) fetches each listed job's and round's reads and
+  asks the worker to save their pages (`warmPages`), at most every 30 min, 25 of each.
+- **Telling people:** `components/OfflineBar.tsx` under the top bar: offline, how old the oldest
+  shown copy is, changes need a connection. `errorMessage` says "You're offline" for a write that
+  got no answer.
+- Next: offline PM rounds (2), queued steps/comments/photos (3), status and clock with server-side
+  checks on the reported time (4).
+
 ## Notifications on this device (web push)
 
 `lib/webPush.ts` + `public/sw.js`, the switch in `components/BrowserNotifications.tsx` (Settings).

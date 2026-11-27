@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import EmptyState from "@/components/EmptyState";
 import { WORK_ORDER_PRIORITY, workOrderStatusMeta, type WorkOrderPriority } from "@/lib/statuses";
 import { workOrderRef } from "@/lib/workOrders";
+import { warmPages } from "@/lib/offline";
 
 /**
  * Today — a technician's day on one screen (GET /me/today, backend
@@ -144,6 +145,45 @@ function RoundRow({ round, daysBefore }: { round: Round; daysBefore: number }) {
 
 const shiftText = (s: Shift) => `${s.name} ${s.startTime}–${s.endTime}`;
 
+const WARM_KEY = "hanni.offline.warmedAt";
+const WARM_EVERY_MS = 30 * 60_000;
+const WARM_MAX = 25;
+
+/**
+ * Saves what a technician will want without signal: each job and round on this
+ * page — its data (through the API client, which keeps a copy of every read)
+ * and its page (through the service worker). At most every half hour, in the
+ * background, and only when this page came from the server rather than from
+ * the copy on the device.
+ */
+async function warmForOffline(day: MyDay) {
+  try {
+    const last = Number(localStorage.getItem(WARM_KEY) ?? 0);
+    if (Date.now() - last < WARM_EVERY_MS) return;
+    localStorage.setItem(WARM_KEY, String(Date.now()));
+  } catch { /* storage blocked: warm anyway */ }
+
+  const jobs = day.jobs.slice(0, WARM_MAX);
+  const rounds = day.checklists.slice(0, WARM_MAX);
+  const reads = [
+    "/work-orders",
+    "/accounts",
+    ...jobs.flatMap((j) => [`/work-orders/${j.id}`, `/work-orders/${j.id}/history`, `/work-orders/${j.id}/attachments`]),
+    ...[...new Set(rounds.map((r) => r.accountId))].map((a) => `/accounts/${a}/pm-checklists`),
+    ...rounds.map((r) => `/account-pm-checklists/${r.assignmentId}/logs`),
+  ];
+  // A few at a time: this runs while someone is using the page.
+  for (let i = 0; i < reads.length; i += 4) {
+    await Promise.all(reads.slice(i, i + 4).map((u) => api.get(u).catch(() => null)));
+  }
+  await warmPages([
+    "/today",
+    "/work-orders",
+    ...jobs.map((j) => `/accounts/${j.accountId}/work-orders/${j.id}`),
+    ...rounds.map((r) => `/accounts/${r.accountId}/checklists/${r.assignmentId}?period=${r.periodStart}`),
+  ]);
+}
+
 export default function TodayPage() {
   const { user } = useAuth();
   const [day, setDay] = useState<MyDay | null>(null);
@@ -153,6 +193,8 @@ export default function TodayPage() {
     try {
       const res = await api.get<MyDay>("/me/today");
       if (!isCancelled?.()) { setDay(res.data); setError(""); }
+      // Fresh from the server: save the rest of the day for offline use.
+      if (!res.headers?.["x-hanni-saved-at"]) void warmForOffline(res.data);
     } catch (err) {
       if (!isCancelled?.()) setError(errorMessage(err, "Could not load your day."));
     }

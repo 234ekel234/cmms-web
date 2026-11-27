@@ -4,6 +4,7 @@ import { useState } from "react";
 import Sidebar from "@/components/Sidebar";
 import Topbar from "@/components/Topbar";
 import EmailConfirmBanner from "@/components/EmailConfirmBanner";
+import OfflineBar from "@/components/OfflineBar";
 import CommandPalette from "@/components/CommandPalette";
 import { ConfirmProvider } from "@/components/ConfirmDialog";
 
@@ -22,6 +23,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <Sidebar drawerOpen={drawerOpen} onCloseDrawer={() => setDrawerOpen(false)} />
         <div className="tu-shell-main">
           <Topbar onOpenNav={() => setDrawerOpen(true)} />
+          <OfflineBar />
           <EmailConfirmBanner />
           <main className="tu-shell-content">{children}</main>
         </div>

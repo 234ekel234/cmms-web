@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2C377D">
+<title>Offline · FMI HANNI</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f5f6fa; --card: #ffffff; --text: #1b1f33; --sub: #4a4f66; --brand: #2C377D; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1420; --card: #171d2b; --text: #e8eef7; --sub: #a9b4c7; --brand: #8fa2ff; } }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text);
+         font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; padding: 16px; box-sizing: border-box; }
+  main { max-width: 420px; width: 100%; background: var(--card); border-radius: 16px; padding: 28px 24px; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+  img { width: 48px; height: 48px; display: block; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p { margin: 0 0 12px; line-height: 1.5; color: var(--sub); font-size: 15px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+  a, button { min-height: 44px; padding: 0 18px; border-radius: 10px; font: inherit; font-weight: 600; font-size: 15px;
+              display: inline-flex; align-items: center; justify-content: center; cursor: pointer; text-decoration: none; }
+  button { background: var(--brand); color: #fff; border: 0; }
+  @media (prefers-color-scheme: dark) { button { color: #0f1420; } }
+  a { color: var(--brand); border: 1px solid currentColor; }
+</style>
+</head>
+<body>
+<main>
+  <img src="/brand/hanni-icon.svg" alt="">
+  <h1>You're offline</h1>
+  <p>This page hasn't been opened on this device yet, so there's no saved copy of it.</p>
+  <p>Pages you've opened before, such as Today and your jobs, still work without signal.</p>
+  <div class="row">
+    <button type="button" onclick="location.reload()">Try again</button>
+    <a href="/today">Go to Today</a>
+  </div>
+</main>
+</body>
+</html>

@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { getUser, clearSession, loginUrl, type User } from "@/lib/auth";
 import api from "@/lib/api";
 import { dropPush, syncPush } from "@/lib/webPush";
+import { startOffline } from "@/lib/offline";
 import { canAccessRoute, ROLE_HOME } from "@/lib/rbac";
 
 type AuthContextType = {
@@ -47,7 +48,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Keeps this browser's notifications attached to the current sign-in, or
   // removes them if they were turned on by somebody else (lib/webPush.ts).
   useEffect(() => {
-    if (user && !user.mustChangePassword) void syncPush(user.id);
+    if (user && !user.mustChangePassword) {
+      startOffline();
+      void syncPush(user.id);
+    }
   }, [user]);
 
   // Ends the session on the server first, so the token stops working rather
